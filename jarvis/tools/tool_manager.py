@@ -138,9 +138,18 @@ class ToolManager:
             for pattern in all_patterns:
                 if re.search(pattern, query, re.IGNORECASE):
                     logger.info(f"Detected web search intent in query: {query}")
+                    
+                    # Detect the best search type for this query
+                    web_search_tool = self.tools["web_search"]
+                    search_type = web_search_tool.detect_search_type(query)
+                    
                     tool_calls.append({
                         "tool": "web_search",
-                        "params": {"query": query.strip()},
+                        "params": {
+                            "query": query.strip(),
+                            "search_type": search_type,
+                            "multi_search": True
+                        },
                         "confidence": 0.8  # Confidence score
                     })
                     break
@@ -276,9 +285,21 @@ class ToolManager:
                     logger.warning("No search query provided")
                     return "Error: No search query provided."
                 
+                # Check if we should do a multi-search
+                multi_search = params.get("multi_search", False)
+                search_type = params.get("search_type", "text")
+                
+                web_tool = self.tools["web_search"]
                 logger.info(f"Executing web search with query: {query}")
-                results = tool.search(query)
-                result = tool.summarize_results(results)
+                
+                if multi_search:
+                    # Perform multiple search types based on query
+                    results = web_tool.multi_search(query)
+                else:
+                    # Perform a single search type
+                    results = web_tool.search(query, search_type)
+                    
+                result = web_tool.summarize_results(results)
                 
             elif tool_name == "calculator":
                 if "expression" in params:

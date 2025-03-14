@@ -26,15 +26,22 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 if not OPENAI_API_KEY:
     print("Warning: OPENAI_API_KEY not found in environment variables or .env file")
 
+# Available local models
+LOCAL_MODELS = {
+    "llama3": "llama3:8b-instruct-q4_0",     # Good all-rounder
+    "mistral": "mistral:7b-instruct-v0.2-q4_0",  # Great reasoning
+    "phi3": "phi3:mini"     # Efficient smaller model
+}
+
 # Model settings
-LOCAL_MODEL_NAME = "llama3.2:latest"  # Using the more capable Llama 3.2 model
+LOCAL_MODEL_NAME = LOCAL_MODELS["phi3"\]  # Default model
 LOCAL_MODEL_BASE_URL = "http://localhost:11434/api"  # Ollama API endpoint
 
 OPENAI_MODEL = "gpt-4o-mini"  # Default OpenAI model to use for complex reasoning
 
 # Intelligence threshold - above this complexity we switch to OpenAI
 # Scale of 1-10, where 10 is the most complex
-COMPLEXITY_THRESHOLD = 6
+COMPLEXITY_THRESHOLD = 7
 
 # Memory settings
 MEMORY_ENABLED = True
