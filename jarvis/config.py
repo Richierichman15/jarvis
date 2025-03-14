@@ -50,6 +50,7 @@ CONVERSATION_BUFFER_SIZE = 10  # Number of recent messages to keep for context
 # Tools configuration
 AVAILABLE_TOOLS = [
     "web_search",
+    "web_researcher",  # New advanced web research tool
     "calculator",
     "file_operations",
     "system_info",

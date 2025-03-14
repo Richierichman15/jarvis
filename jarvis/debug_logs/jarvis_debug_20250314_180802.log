@@ -1,0 +1,29 @@
+2025-03-14 18:08:02,421 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_180802.log
+2025-03-14 18:08:02,421 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-14 18:08:02,421 - jarvis.tools.tool_manager - INFO - Available tools: web_search, calculator, file_operations, system_info, code_editor
+2025-03-14 18:08:33,689 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: what is bitcoin price?
+2025-03-14 18:08:33,690 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-14 18:08:33,690 - jarvis.tools.tool_manager - INFO - Executing web search with query: what is bitcoin price?
+2025-03-14 18:08:33,691 - jarvis.tools.web_search - INFO - Performing text search for: what is bitcoin price?
+2025-03-14 18:08:34,646 - primp - INFO - response: https://lite.duckduckgo.com/lite/ 200
+2025-03-14 18:08:34,657 - jarvis.tools.web_search - INFO - Found 5 results for text search
+2025-03-14 18:08:34,659 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-14 18:08:34,659 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 18:08:34,698 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 18:09:04,762 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 18:09:04,768 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 18:09:05,278 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 18:09:44,765 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 18:11:30,533 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: why is bitcoin freefalling? this year it hit its peak at $100k now it is at $80k. will it bounce back
+2025-03-14 18:11:30,533 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-14 18:11:30,533 - jarvis.tools.tool_manager - INFO - Executing web search with query: why is bitcoin freefalling? this year it hit its peak at $100k now it is at $80k. will it bounce back
+2025-03-14 18:11:30,534 - jarvis.tools.web_search - INFO - Performing text search for: why is bitcoin freefalling? this year it hit its peak at $100k now it is at $80k. will it bounce back
+2025-03-14 18:11:31,500 - primp - INFO - response: https://lite.duckduckgo.com/lite/ 200
+2025-03-14 18:11:31,513 - jarvis.tools.web_search - INFO - Found 5 results for text search
+2025-03-14 18:11:31,514 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-14 18:11:31,514 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 18:11:31,539 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 18:12:01,578 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 18:12:01,585 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 18:12:01,652 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 18:12:32,005 - jarvis.models.model_manager - INFO - Generated response using local model

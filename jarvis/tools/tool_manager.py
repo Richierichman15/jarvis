@@ -12,6 +12,7 @@ from .file_operations import FileOperations
 from .system_info import SystemInfo
 from .debug import DebugTool
 from .code_editor import CodeEditorTool
+from .web_researcher import web_researcher
 from ..config import AVAILABLE_TOOLS
 
 # Set up logging
@@ -30,6 +31,11 @@ class ToolManager:
         if "web_search" in AVAILABLE_TOOLS:
             self.tools["web_search"] = WebSearch()
             logger.info("Web search tool initialized")
+            
+        # Initialize web researcher tool if enabled
+        if "web_researcher" in AVAILABLE_TOOLS:
+            self.tools["web_researcher"] = web_researcher
+            logger.info("Web researcher tool initialized")
             
         # Initialize calculator tool if enabled
         if "calculator" in AVAILABLE_TOOLS:

@@ -300,5 +300,45 @@ def code(
     return 0
 
 
+@app.command()
+def research(
+    query: str = typer.Argument(..., help="The research query or topic to investigate"),
+    research_type: str = typer.Option("general", help="Type of research: general, crypto, news, products, jobs"),
+    name: str = typer.Option("Boss", help="How Jarvis should address you"),
+    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+):
+    """Use Jarvis to research a topic on the web with advanced capabilities."""
+    display_startup_message()
+    
+    # Initialize Jarvis (only uses user_name parameter)
+    jarvis = Jarvis(user_name=name)
+    
+    # Show thinking message
+    console.print("[system]Researching... Please wait.[/system]", style=system_style)
+    
+    # Use the web researcher tool directly
+    web_researcher_tool = jarvis.tool_manager.tools.get("web_researcher")
+    if not web_researcher_tool:
+        console.print("[system]Web researcher tool is not available.[/system]", style=system_style)
+        return
+    
+    try:
+        # Get research results
+        results = web_researcher_tool.research(query, research_type)
+        
+        # Format the results
+        formatted_results = web_researcher_tool.format_research_results(results, research_type)
+        
+        # Display results
+        console.print("\n[bold]Research Results:[/bold]\n")
+        console.print(Markdown(formatted_results))
+        
+        # Show footer
+        console.print(f"\n[system]Research completed at {time.strftime('%H:%M:%S')}[/system]", style=system_style)
+    
+    except Exception as e:
+        console.print(f"[bold red]Error during research: {str(e)}[/bold red]")
+
+
 if __name__ == "__main__":
     app() 
