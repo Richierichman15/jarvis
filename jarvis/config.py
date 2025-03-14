@@ -14,6 +14,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MEMORY_DIR = PROJECT_ROOT / "jarvis" / "memory"
 os.makedirs(MEMORY_DIR, exist_ok=True)  # Ensure memory directory exists
 
+# Debug logs directory
+DEBUG_LOGS_DIR = PROJECT_ROOT / "jarvis" / "debug_logs"
+os.makedirs(DEBUG_LOGS_DIR, exist_ok=True)  # Ensure debug logs directory exists
+
 # OpenAI API configuration
 # First check for API key in environment, then use default if not available
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -42,4 +46,12 @@ AVAILABLE_TOOLS = [
     "calculator",
     "file_operations",
     "system_info",
+]
+
+# Tool settings
+FILE_MAX_SIZE = 1024 * 1024  # Maximum file size for file operations (1MB)
+SAFE_DIRECTORIES = [
+    os.path.expanduser("~/Documents"),
+    os.path.expanduser("~/Downloads"),
+    os.getcwd()
 ] 
