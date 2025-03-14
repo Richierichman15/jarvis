@@ -34,7 +34,7 @@ LOCAL_MODELS = {
 }
 
 # Model settings
-LOCAL_MODEL_NAME = LOCAL_MODELS["phi3"\]  # Default model
+LOCAL_MODEL_NAME = LOCAL_MODELS["phi3"]  # Default model
 LOCAL_MODEL_BASE_URL = "http://localhost:11434/api"  # Ollama API endpoint
 
 OPENAI_MODEL = "gpt-4o-mini"  # Default OpenAI model to use for complex reasoning
@@ -53,6 +53,7 @@ AVAILABLE_TOOLS = [
     "calculator",
     "file_operations",
     "system_info",
+    "code_editor",
 ]
 
 # Tool settings

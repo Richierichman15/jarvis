@@ -11,6 +11,7 @@ from .calculator import Calculator
 from .file_operations import FileOperations
 from .system_info import SystemInfo
 from .debug import DebugTool
+from .code_editor import CodeEditorTool
 from ..config import AVAILABLE_TOOLS
 
 # Set up logging
@@ -45,6 +46,11 @@ class ToolManager:
             self.tools["system_info"] = SystemInfo()
             logger.info("System info tool initialized")
             
+        # Initialize code editor tool if enabled
+        if "code_editor" in AVAILABLE_TOOLS:
+            self.tools["code_editor"] = CodeEditorTool()
+            logger.info("Code editor tool initialized")
+            
         # Always initialize debug tool (but not exposed to user)
         self.debug_tool = DebugTool()
         logger.info("Debug tool initialized")
@@ -70,6 +76,7 @@ class ToolManager:
             "calculator": "Perform mathematical calculations and unit conversions",
             "file_operations": "Read, write, and list files and directories",
             "system_info": "Get information about system resources like CPU and memory",
+            "code_editor": "Edit, highlight, and execute code in various programming languages"
         }
         
         return {name: descriptions.get(name, "No description available") 
@@ -129,6 +136,15 @@ class ToolManager:
             r"(cpu|processor|memory|ram|disk|storage|system)\s+(usage|utilization|info|information|status)",
             r"(how much|what is|show|display|tell me about)\s+(cpu|memory|ram|disk|storage)\s+(usage|utilization)",
             r"(system|computer|machine|device)\s+(status|health|performance|specs|specifications)",
+        ]
+        
+        # Code editor patterns
+        code_patterns = [
+            r"(edit|create|modify|update)\s+(the\s+)?(code|file|program|script)\s+([^\s]+)",
+            r"(run|execute|test)\s+(the\s+)?(code|program|script|function)\s+([^\s]+)?",
+            r"(highlight|format|indent|beautify|pretty print|analyze)\s+(the\s+)?(code|program|script)",
+            r"(diff|compare|find differences)\s+(?:between\s+)?([^\s]+)\s+(?:and\s+)?([^\s]+)",
+            r"(undo|revert|rollback)\s+(the\s+)?(changes|edits|modifications)",
         ]
         
         # Check if the query matches any web search patterns
@@ -255,6 +271,61 @@ class ToolManager:
                         "confidence": 0.8
                     })
                     break
+                    
+        # Check if the query matches any code editor patterns
+        if "code_editor" in self.tools and not tool_calls:
+            for pattern in code_patterns:
+                match = re.search(pattern, query, re.IGNORECASE)
+                if match:
+                    action = match.group(1).lower()
+                    
+                    if action in ["edit", "create", "modify", "update"]:
+                        # Extract the file path
+                        target = match.group(4) if len(match.groups()) >= 4 else ""
+                        logger.info(f"Detected code edit intent in query: {query}")
+                        tool_calls.append({
+                            "tool": "code_editor",
+                            "params": {"operation": "edit", "file_path": target},
+                            "confidence": 0.9
+                        })
+                        break
+                    elif action in ["run", "execute", "test"]:
+                        # Extract the file path or directly execute code
+                        target = match.group(4) if len(match.groups()) >= 4 else ""
+                        logger.info(f"Detected code execution intent in query: {query}")
+                        tool_calls.append({
+                            "tool": "code_editor",
+                            "params": {"operation": "execute", "file_path": target},
+                            "confidence": 0.9
+                        })
+                        break
+                    elif action in ["highlight", "format", "indent", "beautify", "pretty print", "analyze"]:
+                        logger.info(f"Detected code highlight intent in query: {query}")
+                        tool_calls.append({
+                            "tool": "code_editor",
+                            "params": {"operation": "highlight"},
+                            "confidence": 0.8
+                        })
+                        break
+                    elif action in ["diff", "compare", "find differences"]:
+                        # Extract the two files to compare
+                        file1 = match.group(2) if len(match.groups()) >= 2 else ""
+                        file2 = match.group(3) if len(match.groups()) >= 3 else ""
+                        logger.info(f"Detected diff intent in query: {query}")
+                        tool_calls.append({
+                            "tool": "code_editor",
+                            "params": {"operation": "diff", "file1": file1, "file2": file2},
+                            "confidence": 0.9
+                        })
+                        break
+                    elif action in ["undo", "revert", "rollback"]:
+                        logger.info(f"Detected undo intent in query: {query}")
+                        tool_calls.append({
+                            "tool": "code_editor",
+                            "params": {"operation": "undo"},
+                            "confidence": 0.9
+                        })
+                        break
         
         logger.info(f"Detected {len(tool_calls)} tool calls")
         return tool_calls
@@ -374,8 +445,117 @@ class ToolManager:
                     sys_result = tool.get_all_info()
                     
                 result = tool.summarize_results(sys_result, info_type)
+                
+            elif tool_name == "code_editor":
+                operation = params.get("operation")
+                
+                if operation == "edit":
+                    file_path = params.get("file_path")
+                    content = params.get("content")
                     
-            # Add handling for other tools as they are implemented
+                    if not file_path:
+                        logger.warning("No file path provided for code edit operation")
+                        return "Error: No file path provided for code edit operation."
+                    
+                    if content:
+                        # Write the file with new content
+                        logger.info(f"Editing code in file: {file_path}")
+                        op_result = tool.write_file(file_path, content)
+                    else:
+                        # Just read the file for editing
+                        logger.info(f"Opening file for editing: {file_path}")
+                        op_result = tool.read_file(file_path)
+                        
+                    result = tool.summarize_results(op_result)
+                
+                elif operation == "execute":
+                    code = params.get("code")
+                    language = params.get("language", "python")
+                    file_path = params.get("file_path")
+                    
+                    if file_path and not code:
+                        # Read code from file
+                        file_result = tool.read_file(file_path)
+                        if file_result["success"]:
+                            code = file_result["content"]
+                            # Try to detect language from file extension
+                            if "." in file_path:
+                                ext = file_path.split(".")[-1].lower()
+                                if ext in ["py", "pyw"]:
+                                    language = "python"
+                                elif ext in ["js"]:
+                                    language = "javascript"
+                                elif ext in ["sh", "bash"]:
+                                    language = "bash"
+                                # Add more languages as needed
+                    
+                    if not code:
+                        logger.warning("No code provided for execution")
+                        return "Error: No code provided for execution."
+                        
+                    logger.info(f"Executing {language} code")
+                    op_result = tool.execute_code(code, language)
+                    result = tool.summarize_results(op_result)
+                
+                elif operation == "highlight":
+                    code = params.get("code")
+                    language = params.get("language")
+                    file_path = params.get("file_path")
+                    
+                    if file_path and not code:
+                        # Read code from file
+                        file_result = tool.read_file(file_path)
+                        if file_result["success"]:
+                            # Already highlighted in read_file
+                            return tool.summarize_results(file_result)
+                    
+                    if not code:
+                        logger.warning("No code provided for highlighting")
+                        return "Error: No code provided for highlighting."
+                        
+                    logger.info("Highlighting code")
+                    highlighted = tool._highlight_code(code, file_path)
+                    result = tool.summarize_results({
+                        "success": True,
+                        "content": code,
+                        "highlighted": highlighted,
+                        "file_path": file_path
+                    })
+                
+                elif operation == "diff":
+                    file1 = params.get("file1")
+                    file2 = params.get("file2")
+                    content1 = params.get("content1")
+                    content2 = params.get("content2")
+                    
+                    if file1 and not content1:
+                        # Read content from file1
+                        file_result = tool.read_file(file1)
+                        if file_result["success"]:
+                            content1 = file_result["content"]
+                    
+                    if file2 and not content2:
+                        # Read content from file2
+                        file_result = tool.read_file(file2)
+                        if file_result["success"]:
+                            content2 = file_result["content"]
+                    
+                    if not content1 or not content2:
+                        logger.warning("Missing content for diff operation")
+                        return "Error: Missing content for diff operation."
+                        
+                    logger.info(f"Comparing files: {file1} and {file2}")
+                    diff_result = tool.diff(content1, content2)
+                    result = f"Diff between {file1 or 'first content'} and {file2 or 'second content'}:\n\n```diff\n{diff_result}\n```"
+                
+                elif operation == "undo":
+                    logger.info("Undoing last change")
+                    op_result = tool.undo()
+                    result = tool.summarize_results(op_result)
+                
+                else:
+                    logger.warning(f"Invalid code editor operation: {operation}")
+                    return f"Error: Invalid code editor operation {operation}."
             
             # Log the tool call
             if hasattr(self, 'debug_tool'):

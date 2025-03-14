@@ -1,0 +1,7 @@
+2025-03-14 14:41:32,269 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_144132.log
+2025-03-14 14:41:32,269 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-14 14:41:32,269 - jarvis.tools.tool_manager - INFO - Available tools: web_search, calculator, file_operations, system_info, code_editor
+2025-03-14 14:41:32,461 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-03-14 14:41:32,461 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-03-14 14:41:32,471 - werkzeug - INFO -  * Restarting with stat
