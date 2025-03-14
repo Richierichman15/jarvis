@@ -593,20 +593,61 @@ def dashboard():
         from jarvis.tools.system_monitor import system_monitor
         try:
             system_status = system_monitor.get_system_status()
-            # Add dummy data if needed for initialization
+            
+            # Ensure CPU data is properly structured
+            if not system_status.get("cpu", {}).get("success", False):
+                system_status["cpu"] = {
+                    "success": True,
+                    "cpu_percent": 0,
+                    "cpu_count": 1,
+                    "per_cpu_percent": [0],
+                    "top_processes": []
+                }
+            
+            # Ensure memory data is properly structured
+            if not system_status.get("memory", {}).get("success", False):
+                system_status["memory"] = {
+                    "success": True,
+                    "percent": 0,
+                    "total_gb": 0,
+                    "available_gb": 0,
+                    "used_gb": 0
+                }
+            
+            # Ensure disk data is properly structured
+            if not system_status.get("disk", {}).get("success", False) or not system_status.get("disk", {}).get("disks"):
+                system_status["disk"] = {
+                    "success": True,
+                    "disks": [{"mountpoint": "/", "percent": 0, "total_gb": 0, "used_gb": 0, "free_gb": 0}],
+                    "io_stats": {}
+                }
+                
+            # Ensure temperature data is properly structured
+            if not system_status.get("temperature", {}).get("success", False) or not system_status.get("temperature", {}).get("temperatures"):
+                system_status["temperature"] = {
+                    "success": True,
+                    "temperatures": {"system": [{"label": "System", "current": 0}]}
+                }
+                
+            # Add history for charts
             if "history" not in system_status:
                 system_status["history"] = {
-                    "cpu": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
-                    "memory": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
-                    "disk": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
-                    "temperature": [{"timestamp": datetime.now().isoformat(), "value": 0}]
+                    "cpu": [{"timestamp": datetime.now().isoformat(), "percent": system_status["cpu"].get("cpu_percent", 0)}],
+                    "memory": [{"timestamp": datetime.now().isoformat(), "percent": system_status["memory"].get("percent", 0)}],
+                    "disk": [{"timestamp": datetime.now().isoformat(), "percent": system_status["disk"]["disks"][0].get("percent", 0)}],
+                    "temperature": [{"timestamp": datetime.now().isoformat(), "value": system_status["temperature"]["temperatures"]["system"][0].get("current", 0)}]
                 }
+                
             return jsonify(system_status)
         except Exception as e:
             logger.error(f"Error getting system status: {str(e)}")
             # Return basic data structure with error info
             return jsonify({
                 "error": str(e),
+                "cpu": {"success": True, "cpu_percent": 0},
+                "memory": {"success": True, "percent": 0},
+                "disk": {"success": True, "disks": [{"percent": 0}]},
+                "temperature": {"success": True, "temperatures": {"system": [{"current": 0}]}},
                 "history": {
                     "cpu": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
                     "memory": [{"timestamp": datetime.now().isoformat(), "percent": 0}],

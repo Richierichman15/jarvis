@@ -92,12 +92,18 @@ class SystemMonitor:
                 "top_processes": top_processes
             }
             
-            # Add frequency if available
+            # Add frequency if available - with safeguards for None values
             if cpu_freq:
-                result["cpu_freq_current"] = cpu_freq.current
-                if hasattr(cpu_freq, "min"):
+                # Some macOS systems may return None for cpu_freq.current
+                if hasattr(cpu_freq, "current") and cpu_freq.current is not None:
+                    result["cpu_freq_current"] = cpu_freq.current
+                
+                # Handle cpu_freq.min which might be None on some systems
+                if hasattr(cpu_freq, "min") and cpu_freq.min is not None:
                     result["cpu_freq_min"] = cpu_freq.min
-                if hasattr(cpu_freq, "max"):
+                
+                # Handle cpu_freq.max which might be None on some systems
+                if hasattr(cpu_freq, "max") and cpu_freq.max is not None:
                     result["cpu_freq_max"] = cpu_freq.max
             
             # Add to history
@@ -236,11 +242,16 @@ class SystemMonitor:
                     for chip, values in sys_temps.items():
                         temps[chip] = []
                         for entry in values:
+                            # Safely handle None values
+                            current_temp = entry.current if hasattr(entry, "current") else None
+                            high_temp = entry.high if hasattr(entry, "high") and entry.high is not None else None
+                            critical_temp = entry.critical if hasattr(entry, "critical") and entry.critical is not None else None
+                            
                             temps[chip].append({
-                                "label": entry.label,
-                                "current": entry.current,
-                                "high": entry.high if hasattr(entry, "high") else None,
-                                "critical": entry.critical if hasattr(entry, "critical") else None
+                                "label": entry.label or "Unknown",
+                                "current": current_temp,
+                                "high": high_temp,
+                                "critical": critical_temp
                             })
             
             # On macOS, try using system_profiler
@@ -249,30 +260,42 @@ class SystemMonitor:
                     output = subprocess.check_output(["system_profiler", "SPHardwareDataType"]).decode('utf-8')
                     for line in output.split('\n'):
                         if 'Temperature' in line:
-                            value = line.split(':')[1].strip()
-                            temps['system'] = [{'label': 'System', 'current': float(value.replace('°C', '').strip())}]
+                            try:
+                                value = line.split(':')[1].strip()
+                                temps['system'] = [{'label': 'System', 'current': float(value.replace('°C', '').strip())}]
+                            except (ValueError, IndexError):
+                                # Fallback if temperature parsing fails
+                                temps['system'] = [{'label': 'System', 'current': 0, 'note': 'Could not parse temperature value'}]
                 except (subprocess.SubprocessError, ValueError):
-                    pass
+                    # Fallback for macOS when system_profiler fails
+                    temps['system'] = [{'label': 'System', 'current': 0, 'note': 'Temperature data unavailable'}]
+            
+            # If no temperatures found at all, provide a fallback
+            if not temps:
+                temps['system'] = [{'label': 'System', 'current': 0, 'note': 'Temperature data unavailable on this system'}]
             
             # Add to history if available
-            if temps:
-                # Just use the first temperature we find for history
-                for chip in temps:
-                    for sensor in temps[chip]:
-                        if 'current' in sensor and sensor['current'] is not None:
-                            self._add_to_history("temperature", {
-                                "timestamp": datetime.now().isoformat(),
-                                "value": sensor['current']
-                            })
-                            break
-                    else:
-                        continue
-                    break
+            for chip in temps:
+                for sensor in temps[chip]:
+                    if 'current' in sensor and sensor['current'] is not None:
+                        self._add_to_history("temperature", {
+                            "timestamp": datetime.now().isoformat(),
+                            "value": sensor['current']
+                        })
+                        break
+                else:
+                    continue
+                break
             
             return {"success": True, "temperatures": temps}
         except Exception as e:
             logger.error(f"Error getting temperature info: {str(e)}")
-            return {"success": False, "error": str(e)}
+            # Return a fallback dummy value
+            return {
+                "success": False, 
+                "error": str(e),
+                "temperatures": {'system': [{'label': 'System', 'current': 0, 'note': 'Error retrieving temperature'}]}
+            }
     
     def get_battery_info(self) -> Dict[str, Any]:
         """Get battery information if available.
