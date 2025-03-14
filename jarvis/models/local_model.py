@@ -5,6 +5,8 @@ import json
 import requests
 import logging
 import time
+import os
+import subprocess
 from typing import Dict, List, Any, Optional
 
 from ..config import LOCAL_MODEL_NAME, LOCAL_MODEL_BASE_URL
@@ -27,6 +29,91 @@ class OllamaModel:
         self.model_name = model_name
         self.base_url = base_url
         self.generate_endpoint = f"{base_url}/generate"
+        self.current_retry_count = 0
+        self.max_retries = 3
+        self.max_timeout = 60  # Increased from 30 seconds
+        self.backoff_factor = 1.5  # For exponential backoff
+        
+    def _is_ollama_running(self) -> bool:
+        """Check if Ollama service is running.
+        
+        Returns:
+            True if Ollama is running, False otherwise
+        """
+        try:
+            # First check if we can reach the API
+            response = requests.get(f"{self.base_url}/version", timeout=5)
+            if response.status_code == 200:
+                return True
+                
+            # If API check fails, try a more system-level check
+            if os.name == 'posix':  # Linux/Mac
+                # Check for running process
+                result = subprocess.run(
+                    ["pgrep", "-f", "ollama"],
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                return result.returncode == 0
+            else:  # Windows
+                result = subprocess.run(
+                    ["tasklist", "/FI", "IMAGENAME eq ollama.exe"],
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                return "ollama.exe" in result.stdout
+        except Exception as e:
+            logger.warning(f"Error checking if Ollama is running: {str(e)}")
+            return False
+    
+    def _calculate_timeout(self) -> int:
+        """Calculate timeout with exponential backoff.
+        
+        Returns:
+            Timeout in seconds
+        """
+        if self.current_retry_count == 0:
+            return 30  # Start with default 30s timeout
+        
+        # Apply exponential backoff
+        timeout = min(30 * (self.backoff_factor ** self.current_retry_count), self.max_timeout)
+        return int(timeout)
+    
+    def _restart_ollama_if_needed(self) -> bool:
+        """Try to restart Ollama if it's not running.
+        
+        Returns:
+            True if restart was successful or not needed, False otherwise
+        """
+        if self._is_ollama_running():
+            return True
+            
+        logger.warning("Ollama appears to be not running. Attempting to start...")
+        try:
+            if os.name == 'posix':  # Linux/Mac
+                # Start Ollama in the background
+                subprocess.Popen(
+                    ["ollama", "serve"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+            else:  # Windows
+                subprocess.Popen(
+                    ["ollama", "serve"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            
+            # Give it a moment to start
+            time.sleep(5)
+            return self._is_ollama_running()
+        except Exception as e:
+            logger.error(f"Failed to start Ollama: {str(e)}")
+            return False
         
     def generate(self, 
                 prompt: str, 
@@ -55,24 +142,70 @@ class OllamaModel:
         if system_prompt:
             payload["system"] = system_prompt
         
-        try:
-            logger.info(f"Sending request to Ollama API: {self.generate_endpoint}")
-            response = requests.post(self.generate_endpoint, json=payload, timeout=30)
-            if response.status_code == 200:
-                # Attempt to parse the JSON response
-                try:
-                    data = response.json()
-                    return data.get("response", "")
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON response: {e}")
-                    # If JSON parsing fails, return the raw text
-                    return "Error: Failed to parse response from local model."
-            else:
-                logger.error(f"Ollama API error: {response.status_code} - {response.text}")
-                return f"Error: Failed to get response from local model. Status code: {response.status_code}"
-        except Exception as e:
-            logger.error(f"Exception when calling Ollama API: {str(e)}")
-            return f"Error: Failed to communicate with local model: {str(e)}"
+        # Reset retry counter if this is a new request
+        self.current_retry_count = 0
+        
+        while self.current_retry_count <= self.max_retries:
+            # Check if Ollama is running and try to restart it if needed
+            if not self._restart_ollama_if_needed():
+                return "Error: Ollama service is not running and could not be started. Please start Ollama manually."
+            
+            try:
+                timeout = self._calculate_timeout()
+                logger.info(f"Sending request to Ollama API: {self.generate_endpoint} (attempt {self.current_retry_count+1}/{self.max_retries+1}, timeout: {timeout}s)")
+                
+                response = requests.post(self.generate_endpoint, json=payload, timeout=timeout)
+                
+                if response.status_code == 200:
+                    # Attempt to parse the JSON response
+                    try:
+                        data = response.json()
+                        return data.get("response", "")
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON response: {e}")
+                        # If JSON parsing fails, return the raw text
+                        return "Error: Failed to parse response from local model."
+                else:
+                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+                    
+                    # Check if model doesn't exist and suggest pulling
+                    if response.status_code == 404:
+                        return f"Error: Model '{self.model_name}' not found. Try running 'ollama pull {self.model_name}' to download it."
+                    
+                    # Increment retry counter and try again
+                    self.current_retry_count += 1
+                    if self.current_retry_count <= self.max_retries:
+                        logger.info(f"Retrying in {self.current_retry_count * 2} seconds...")
+                        time.sleep(self.current_retry_count * 2)
+                    else:
+                        return f"Error: Failed to get response from local model after {self.max_retries+1} attempts. Status code: {response.status_code}"
+            except requests.exceptions.Timeout:
+                logger.error(f"Timeout when calling Ollama API (timeout was {timeout}s)")
+                self.current_retry_count += 1
+                if self.current_retry_count <= self.max_retries:
+                    logger.info(f"Retrying with longer timeout...")
+                else:
+                    return "Error: Ollama is taking too long to respond. The model might be too large for your system or Ollama may be having issues."
+            except requests.exceptions.ConnectionError:
+                logger.error(f"Connection error when calling Ollama API")
+                self.current_retry_count += 1
+                if self.current_retry_count <= self.max_retries:
+                    logger.info(f"Retrying after connection error...")
+                    # Give more time for connection issues
+                    time.sleep(self.current_retry_count * 3)
+                else:
+                    return "Error: Could not connect to Ollama. Make sure the Ollama service is running."
+            except Exception as e:
+                logger.error(f"Exception when calling Ollama API: {str(e)}")
+                self.current_retry_count += 1
+                if self.current_retry_count <= self.max_retries:
+                    logger.info(f"Retrying after error...")
+                    time.sleep(self.current_retry_count * 2)
+                else:
+                    return f"Error: Failed to communicate with local model: {str(e)}"
+        
+        # If we've exhausted retries
+        return "Error: Failed to get a response from the local model after multiple attempts."
     
     def is_available(self) -> bool:
         """Check if the model is available and responding.
@@ -81,6 +214,11 @@ class OllamaModel:
             True if model is available, False otherwise
         """
         logger.info(f"Checking availability of local model: {self.model_name}")
+        
+        # First, check if Ollama service is running
+        if not self._restart_ollama_if_needed():
+            logger.error("Ollama service is not running and could not be started")
+            return False
         
         # Give Ollama a few seconds to initialize if just started
         max_retries = 3
@@ -103,6 +241,11 @@ class OllamaModel:
                 
                 if is_available:
                     return True
+                    
+                # If model not found, let the user know
+                if response.status_code == 404:
+                    logger.error(f"Model '{self.model_name}' not found in Ollama")
+                    return False
                     
                 # If not available, wait before retrying
                 if attempt < max_retries - 1:

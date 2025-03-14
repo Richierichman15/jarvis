@@ -41,7 +41,7 @@ class ModelManager:
             self.openai_model = None
             
     
-    def assess_complexity(self, prompt: str) -> int:
+    def _determine_complexity(self, prompt: str) -> int:
         """
         Assess the complexity of a prompt to determine which model to use.
         This is a simple heuristic-based approach that could be improved.
@@ -90,46 +90,33 @@ class ModelManager:
                     prompt: str, 
                     system_prompt: Optional[str] = None, 
                     force_model: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Get a response from the appropriate model based on complexity.
+        """Generate a response using the appropriate model.
         
         Args:
-            prompt: The user's input prompt
+            prompt: The user's query
             system_prompt: Optional system instructions
-            force_model: Optional model to force use ('local' or 'openai')
+            force_model: Force the use of a specific model ('local' or 'openai')
             
         Returns:
             Dictionary with response and metadata
         """
-        complexity = self.assess_complexity(prompt)
-        logger.info(f"Prompt complexity: {complexity}")
+        # Determine the complexity of the prompt (1-10)
+        complexity = self._determine_complexity(prompt)
         
-        # Determine which model to use
-        use_openai = False
-        
+        # Decide which model to use based on complexity
         if force_model == "local":
             use_openai = False
-            logger.info("Forcing use of local model")
         elif force_model == "openai":
             use_openai = True
-            logger.info("Forcing use of OpenAI model")
         else:
-            # Prefer local model first, only use OpenAI as fallback
-            if not self.local_available and self.openai_available:
-                use_openai = True
-                logger.info("Local model not available, using OpenAI")
-            elif not self.local_available and not self.openai_available:
-                logger.error("No AI models are available")
-                return {
-                    "response": "Error: No AI models are currently available. Please check your configuration.",
-                    "model_used": "none",
-                    "complexity": complexity,
-                    "success": False
-                }
-            else:
-                # Local model is available
-                use_openai = False
-                logger.info("Using local model")
+            use_openai = complexity >= COMPLEXITY_THRESHOLD
+            
+        logger.info(f"Prompt complexity: {complexity}")
+        
+        if use_openai:
+            logger.info("Using OpenAI model")
+        else:
+            logger.info("Using local model")
         
         # Generate response using the selected model
         if use_openai and self.openai_available:
@@ -163,16 +150,56 @@ class ModelManager:
                     prompt=prompt,
                     system_prompt=system_prompt
                 )
-                model_used = "local"
-                logger.info("Generated response using local model")
+                
+                # Check if the response is an error message from the local model
+                if response.startswith("Error:") and self.openai_available:
+                    logger.warning("Local model returned an error, trying to fall back to OpenAI")
+                    
+                    try:
+                        fallback_response = self.openai_model.generate(
+                            prompt=prompt,
+                            system_prompt=system_prompt
+                        )
+                        model_used = "openai (fallback)"
+                        logger.info("Fallback to OpenAI model successful")
+                        response = fallback_response
+                    except Exception as e:
+                        logger.error(f"OpenAI fallback also failed: {str(e)}")
+                        # Keep the original error from the local model
+                        model_used = "none"
+                        # Add additional info about OpenAI fallback failure
+                        response += f"\n\nOpenAI fallback also failed: {str(e)}"
+                else:
+                    model_used = "local"
+                    logger.info("Generated response using local model")
             except Exception as e:
                 logger.error(f"Local model failed: {str(e)}")
-                return {
-                    "response": f"Error: Failed to get a response from local model: {str(e)}",
-                    "model_used": "none",
-                    "complexity": complexity,
-                    "success": False
-                }
+                
+                # Try to fall back to OpenAI if available
+                if self.openai_available:
+                    try:
+                        logger.info("Attempting to fall back to OpenAI model")
+                        response = self.openai_model.generate(
+                            prompt=prompt,
+                            system_prompt=system_prompt
+                        )
+                        model_used = "openai (fallback)"
+                        logger.info("Fallback to OpenAI model successful")
+                    except Exception as fallback_error:
+                        logger.error(f"OpenAI fallback also failed: {str(fallback_error)}")
+                        return {
+                            "response": f"Error: Local model failed: {str(e)}\nOpenAI fallback also failed: {str(fallback_error)}",
+                            "model_used": "none",
+                            "complexity": complexity,
+                            "success": False
+                        }
+                else:
+                    return {
+                        "response": f"Error: Failed to get a response from local model: {str(e)}",
+                        "model_used": "none",
+                        "complexity": complexity,
+                        "success": False
+                    }
             
         return {
             "response": response,

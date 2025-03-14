@@ -1,0 +1,3 @@
+2025-03-14 14:50:46,135 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_145046.log
+2025-03-14 14:50:46,136 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-14 14:50:46,136 - jarvis.tools.tool_manager - INFO - Available tools: web_search, calculator, file_operations, system_info, code_editor

@@ -9,6 +9,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from pathlib import Path
+from datetime import datetime
 
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import pygments
@@ -61,31 +62,40 @@ def chat():
     if not message:
         return jsonify({"error": "No message provided"}), 400
     
-    # Process the message
-    jarvis = get_jarvis(user_name)
-    response = jarvis.process_query(message)
-    
-    # Extract code blocks if any
-    code_blocks = re.findall(r"```(?:(\w+))?\n(.*?)\n```", response, re.DOTALL)
-    highlighted_blocks = []
-    
-    for lang, code in code_blocks:
-        try:
-            if lang:
-                lexer = lexers.get_lexer_by_name(lang)
-            else:
-                lexer = lexers.guess_lexer(code)
-        except ClassNotFound:
-            lexer = lexers.get_lexer_by_name("text")
-            
-        formatter = formatters.HtmlFormatter(style="monokai")
-        highlighted = pygments.highlight(code, lexer, formatter)
-        highlighted_blocks.append({"code": code, "highlighted": highlighted, "language": lang or "text"})
-    
-    return jsonify({
-        "response": response,
-        "code_blocks": highlighted_blocks
-    })
+    try:
+        # Process the message
+        jarvis = get_jarvis(user_name)
+        response = jarvis.process_query(message)
+        
+        # Extract code blocks if any
+        code_blocks = re.findall(r"```(?:(\w+))?\n(.*?)\n```", response, re.DOTALL)
+        highlighted_blocks = []
+        
+        for lang, code in code_blocks:
+            try:
+                if lang:
+                    lexer = lexers.get_lexer_by_name(lang)
+                else:
+                    lexer = lexers.guess_lexer(code)
+            except ClassNotFound:
+                lexer = lexers.get_lexer_by_name("text")
+                
+            formatter = formatters.HtmlFormatter(style="monokai")
+            highlighted = pygments.highlight(code, lexer, formatter)
+            highlighted_blocks.append({"code": code, "highlighted": highlighted, "language": lang or "text"})
+        
+        return jsonify({
+            "success": True,
+            "response": response,
+            "code_blocks": highlighted_blocks
+        })
+    except Exception as e:
+        logger.error(f"Error processing chat message: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error processing your request: {str(e)}",
+            "response": "I'm sorry, but I encountered an error while processing your request. Please try again."
+        }), 500
 
 
 @app.route("/api/code/edit", methods=["POST"])
@@ -573,4 +583,37 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Run the web server
-    run_web_server(host=args.host, port=args.port, user_name=args.name) 
+    run_web_server(host=args.host, port=args.port, user_name=args.name)
+
+
+@app.route('/dashboard')
+def dashboard():
+    if request.content_type == 'application/json':
+        # API request for data
+        from jarvis.tools.system_monitor import system_monitor
+        try:
+            system_status = system_monitor.get_system_status()
+            # Add dummy data if needed for initialization
+            if "history" not in system_status:
+                system_status["history"] = {
+                    "cpu": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
+                    "memory": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
+                    "disk": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
+                    "temperature": [{"timestamp": datetime.now().isoformat(), "value": 0}]
+                }
+            return jsonify(system_status)
+        except Exception as e:
+            logger.error(f"Error getting system status: {str(e)}")
+            # Return basic data structure with error info
+            return jsonify({
+                "error": str(e),
+                "history": {
+                    "cpu": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
+                    "memory": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
+                    "disk": [{"timestamp": datetime.now().isoformat(), "percent": 0}],
+                    "temperature": [{"timestamp": datetime.now().isoformat(), "value": 0}]
+                }
+            })
+    else:
+        # HTML request for dashboard page
+        return render_template('dashboard.html') 

@@ -1,0 +1,15 @@
+2025-03-14 14:53:59,518 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_145359.log
+2025-03-14 14:53:59,518 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-14 14:53:59,518 - jarvis.tools.tool_manager - INFO - Available tools: web_search, calculator, file_operations, system_info, code_editor
+2025-03-14 14:54:20,945 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 14:54:20,946 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-14 14:54:20,946 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 14:54:20,946 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate
+2025-03-14 14:54:50,960 - jarvis.models.local_model - ERROR - Exception when calling Ollama API: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=30)
+2025-03-14 14:54:50,961 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 15:00:01,956 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 15:00:01,960 - jarvis.models.model_manager - INFO - Prompt complexity: 5
+2025-03-14 15:00:01,960 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 15:00:01,961 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate
+2025-03-14 15:00:31,985 - jarvis.models.local_model - ERROR - Exception when calling Ollama API: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=30)
+2025-03-14 15:00:31,989 - jarvis.models.model_manager - INFO - Generated response using local model

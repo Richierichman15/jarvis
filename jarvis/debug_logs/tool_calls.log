@@ -1,0 +1,30 @@
+--- 2025-03-14T15:03:19.823407 - web_search ---
+Parameters: {'query': 'how is my macbook running', 'search_type': 'text', 'multi_search': True}
+Result: Web Search Results:
+
+1. If your Mac runs slowly - Apple Support
+   Your computer's startup disk may not have enough free disk space. To make disk space available, you can move files to another disk or an external storage device, then delete files you no longer need on the startup disk. macOS can also help you optimize storage by storing files in the cloud and helping you identify files you no longer need.Choose Apple menu > System Settings, then click ...
+   URL: https://support.apple.com/guide/mac-help/if-your-mac-runs-slowly-mchlp1731/mac
+
+2. Mac running slow? How to speed up a Mac and make it run faster - Macworld
+   Below we will run through the various checks you should make to find out why your Mac is running slow and speed it up, we'll cover why you need to have around 10% of your Mac's total storage ...
+   URL: https://www.macworld.com/article/668632/how-to-speed-up-a-mac.html
+
+3. How to Fix a Slow or Unresponsive Mac - How-To Geek
+   Apple Diagnostics Your Mac includes a basic... [truncated]
+
+--- 2025-03-14T15:06:11.961713 - web_search ---
+Parameters: {'query': 'yes thank you, can you help me find what are my biggest files that have the biggest gb? i want to make my macbook faster', 'search_type': 'text', 'multi_search': True}
+Result: Web Search Results:
+
+1. Hard drive full? How to find the largest files on Windows 11/10?
+   Similarly, if you want to find the files ranging from 128 MB to 1 GB in size, you have to use the syntax like this: Size:Huge After you start searching in the File Explorer, a new menu, named ...
+   URL: https://www.thewindowsclub.com/hard-drive-full-how-to-find-the-largest-files
+
+2. How to Find the Largest Files in Windows 10: 9 Steps - wikiHow
+   Click the Size button in the toolbar again and select Huge (1 - 4 GB). You can also specify that you want to see all files larger than a certain size by typing a filter into the search bar. If you wanted to see all files larger than 500 MB, you'd type size: >500MB in the search field and press Enter. Replace 500MB with any file size.
+   URL: https://www.wikihow.com/Find-the-Largest-Files-in-Windows-10
+
+3. How to See Biggest Files on Windows 10: A Step-by-Step Guide
+   By focusing on a specific drive, you can narrow down your search and make the proces... [truncated]
+
