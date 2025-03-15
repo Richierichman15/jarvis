@@ -26,6 +26,11 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 if not OPENAI_API_KEY:
     print("Warning: OPENAI_API_KEY not found in environment variables or .env file")
 
+# OpenWeatherMap API configuration
+OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
+if not OPENWEATHER_API_KEY:
+    print("Note: OPENWEATHER_API_KEY not found. Weather API functionality will use web search fallback.")
+
 # Available local models
 LOCAL_MODELS = {
     "llama3": "llama3:8b-instruct-q4_0",     # Good all-rounder
@@ -49,12 +54,12 @@ CONVERSATION_BUFFER_SIZE = 10  # Number of recent messages to keep for context
 
 # Tools configuration
 AVAILABLE_TOOLS = [
-    "web_search",
-    "web_researcher",  # New advanced web research tool
-    "calculator",
-    "file_operations",
-    "system_info",
-    "code_editor",
+    "web_search",        # Search the web for information
+    "web_researcher",    # Advanced research including weather, crypto, etc.
+    "calculator",        # Perform calculations and unit conversions
+    "file_operations",   # Read, write and manage files
+    "system_info",       # Get system information
+    "code_editor",       # Edit and execute code
 ]
 
 # Tool settings

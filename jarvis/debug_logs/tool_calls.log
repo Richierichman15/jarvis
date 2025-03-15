@@ -56,3 +56,68 @@ Result: Web Search Results:
    As of 10 a.m. on Monday, Bitcoin was trading at around $99,200, continuing its downward trend after the initial selloff triggered by AI concerns. FAQs: Why did Bitcoin fall below $100,000? Bitcoin dropped below $100,000 due to concerns over a Chinese AI model from DeepSeek, which sparked a selloff in global markets, including cryptocurrencies.
    URL: https://economictimes.indiatimes.com/news/international/us/why-bitcoin-fell-below-100000-as-chinese-ai-breakthrough-triggers-... [truncated]
 
+--- 2025-03-14T19:19:37.575665 - web_search ---
+Parameters: {'query': 'can you tell me the forcast for oklahoma city and how the weather will be with the winds', 'search_type': 'text', 'multi_search': True}
+Result: Web Search Results:
+
+1. Oklahoma City, OK Weather Forecast | AccuWeather
+   Oklahoma City, OK Weather Forecast, with current conditions, wind, air quality, and what to expect for the next 3 days.
+   URL: https://www.accuweather.com/en/us/oklahoma-city/73102/weather-forecast/350143
+
+2. 10-Day Weather Forecast for Oklahoma City, OK - The Weather Channel
+   Be prepared with the most accurate 10-day forecast for Oklahoma City, OK with highs, lows, chance of precipitation from The Weather Channel and Weather.com
+   URL: https://weather.com/weather/tenday/l/Oklahoma+City+OK?canonicalCityId=b358b38dac17c9b3f4cdf53a671aebc9e30719d5530f6ebd4d74126255d2db36
+
+3. Oklahoma City, OK, United States Weather - The Weather Channel
+   Be prepared with the most accurate 10-day forecast for Oklahoma City, OK, ... 10 Day Weather-Oklahoma City, OK, United States. As of 17:20 CDT ... WNW winds shifting to SSW at 15 to 25 km/h ...
+   URL: https://weather.com/en/weather/tenday/l/Oklahoma+City+OK+United+States?c... [truncated]
+
+--- 2025-03-14T19:24:06.753450 - web_search ---
+Parameters: {'query': 'can you tell me what is the weather for oklahoma city and than tell me the time and weather for kenya narobi', 'search_type': 'text', 'multi_search': True}
+Result: Web Search Results:
+
+1. 10-Day Weather Forecast for Oklahoma City, OK - The Weather Channel
+   Be prepared with the most accurate 10-day forecast for Oklahoma City, OK with highs, lows, chance of precipitation from The Weather Channel and Weather.com
+   URL: https://weather.com/weather/tenday/l/Oklahoma+City+OK?canonicalCityId=892e4a78bb21f14832e15027d25e1c4d
+
+2. Oklahoma City, OK Weather Forecast | AccuWeather
+   Oklahoma City, OK Weather Forecast, with current conditions, wind, air quality, and what to expect for the next 3 days.
+   URL: https://www.accuweather.com/en/us/oklahoma-city/73102/weather-forecast/350143
+
+3. National Weather Service
+   Hazardous Weather Conditions. High Wind Warning in effect from March 14, 07:00 AM CDT until March 14, 10:00 PM CDT; Red Flag Warning in effect from March 14, 07:00 AM CDT until March 14, 10:00 PM CDT; Current conditions at Oklahoma City, Will Rogers World Airport (KOKC) Lat: 35.39°NLon: 97.6°WElev: 1293ft. Mostly Cloudy. 76°F. 24°C ...
+   URL... [truncated]
+
+--- 2025-03-14T19:25:50.834553 - web_search ---
+Parameters: {'query': 'can you use the api to find accurate results of the weather', 'search_type': 'text', 'multi_search': True}
+Result: Web Search Results:
+
+1. API Web Service - National Weather Service
+   The new API will use headers to modify the version and format of the response. Every request, either by browser or application, sends header information every time you visit any website. For example, a commonly used header called "UserAgent" tells a website what type of device you are using so it can tailor the best experience for you.
+   URL: https://www.weather.gov/documentation/services-web-api
+
+2. Guide to using APIs for Weather: How to Access Real-Time ... - DataZn
+   Here are a few reasons why you should consider using weather APIs: Accurate and up-to-date information: Weather APIs provide access to real-time weather data, ensuring that your application always displays the most accurate and current weather information. ... By considering these factors, you can select a weather API that best suits your ...
+   URL: https://www.datazn.ai/blog/api-for-weather
+
+3. Weather API - DTN
+   Seamless Integration - Our user... [truncated]
+
+--- 2025-03-14T19:47:28.464352 - web_search ---
+Parameters: {'query': 'how can i implment training data and knowledge base to stay current with latest information and trends. also i want you to tell me which model you are using to give me the information that you are giving me', 'search_type': 'text', 'multi_search': True}
+Result: No relevant results found.
+
+--- 2025-03-14T19:50:04.698422 - web_search ---
+Parameters: {'query': 'what is the weather like in oklahoma city', 'search_type': 'text', 'multi_search': True}
+Result: Web Search Results:
+
+1. Oklahoma City, OK Weather Forecast | AccuWeather
+   Oklahoma City, OK Weather Forecast, with current conditions, wind, air quality, and what to expect for the next 3 days.
+   URL: https://www.accuweather.com/en/us/oklahoma-city/73102/weather-forecast/350143
+
+2. Oklahoma City, OK Weather - The Weather Channel
+   Be prepared with the most accurate 10-day forecast for Oklahoma City, OK with highs, lows, chance of precipitation from The Weather Channel and Weather.com
+   URL: https://weather.com/weather/tenday/l/Oklahoma+City+OK?canonicalCityId=b358b38dac17c9b3f4cdf53a671aebc9e30719d5530f6ebd4d74126255d2db36
+
+
+

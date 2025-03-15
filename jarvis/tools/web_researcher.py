@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from .web_search import WebSearch  # Import the existing web search tool
 import regex as re
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +39,9 @@ class WebResearcher:
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         self.headers = {"User-Agent": self.user_agent}
         
+        # Get API keys from environment variables
+        self.openweather_api_key = os.environ.get("OPENWEATHER_API_KEY", "")
+        
         # List of supported APIs and their endpoints
         self.apis = {
             "crypto": {
@@ -46,6 +50,7 @@ class WebResearcher:
             },
             "weather": {
                 "openweathermap": "https://api.openweathermap.org/data/2.5/weather?q={location}&appid={api_key}&units=metric",
+                "openweathermap_forecast": "https://api.openweathermap.org/data/2.5/forecast?q={location}&appid={api_key}&units=metric",
             },
             "news": {
                 "newsapi": "https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&apiKey={api_key}",
@@ -71,6 +76,8 @@ class WebResearcher:
         # Determine the best research strategy
         if research_type == "crypto":
             return self.get_crypto_info(query)
+        elif research_type == "weather":
+            return self.get_weather_info(query)
         elif research_type == "news":
             return self.get_news(query)
         elif research_type == "products":
@@ -357,6 +364,177 @@ class WebResearcher:
             
             return results
     
+    def get_weather_info(self, location: str) -> Dict[str, Any]:
+        """Get weather information for a location.
+        
+        Args:
+            location: Location to get weather for (city name, city+country, etc.)
+            
+        Returns:
+            Dictionary with weather information
+        """
+        logger.info(f"Getting weather information for: {location}")
+        
+        # Normalize the location name
+        location = location.strip()
+        
+        # Check cache first - reduced TTL to 30 minutes for accuracy
+        cache_key = f"weather_{location}"
+        if cache_key in self.cache and (time.time() - self.cache[cache_key]["timestamp"]) < 1800:  # 30 minutes TTL for weather
+            logger.info(f"Using cached weather data for {location} (less than 30 minutes old)")
+            return self.cache[cache_key]["data"]
+        
+        results = {
+            "location": location,
+            "current": {},
+            "forecast": [],
+            "sources": [],
+            "timestamp": datetime.now().isoformat(),
+            "fetch_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "success": False
+        }
+        
+        # Try OpenWeatherMap API if we have an API key
+        if self.openweather_api_key:
+            try:
+                # Current weather
+                url = self.apis["weather"]["openweathermap"].format(
+                    location=location,
+                    api_key=self.openweather_api_key
+                )
+                
+                response = requests.get(url, headers=self.headers, timeout=self.timeout)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Extract current weather data
+                    results["current"] = {
+                        "temperature": data["main"]["temp"],
+                        "feels_like": data["main"]["feels_like"],
+                        "humidity": data["main"]["humidity"],
+                        "pressure": data["main"]["pressure"],
+                        "wind_speed": data["wind"]["speed"],
+                        "conditions": data["weather"][0]["main"],
+                        "description": data["weather"][0]["description"],
+                        "icon": f"https://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png",
+                        "city": data["name"],
+                        "country": data["sys"]["country"],
+                        "sunrise": datetime.fromtimestamp(data["sys"]["sunrise"]).strftime("%H:%M"),
+                        "sunset": datetime.fromtimestamp(data["sys"]["sunset"]).strftime("%H:%M")
+                    }
+                    
+                    results["sources"].append({
+                        "name": "OpenWeatherMap",
+                        "url": f"https://openweathermap.org/city/{data['id']}",
+                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                    })
+                    
+                    results["success"] = True
+                    logger.info(f"Successfully fetched current weather for {location} from OpenWeatherMap API")
+                    
+                    # Try to get forecast (5 days, 3-hour intervals)
+                    forecast_url = self.apis["weather"]["openweathermap_forecast"].format(
+                        location=location,
+                        api_key=self.openweather_api_key
+                    )
+                    
+                    forecast_response = requests.get(forecast_url, headers=self.headers, timeout=self.timeout)
+                    
+                    if forecast_response.status_code == 200:
+                        forecast_data = forecast_response.json()
+                        
+                        # Get daily forecasts (one entry per day)
+                        daily_forecasts = {}
+                        
+                        for item in forecast_data["list"]:
+                            # Extract date (without time)
+                            date = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
+                            
+                            if date not in daily_forecasts:
+                                daily_forecasts[date] = {
+                                    "date": date,
+                                    "display_date": datetime.fromtimestamp(item["dt"]).strftime("%A, %b %d"),
+                                    "temps": [],
+                                    "conditions": [],
+                                    "icons": []
+                                }
+                            
+                            daily_forecasts[date]["temps"].append(item["main"]["temp"])
+                            daily_forecasts[date]["conditions"].append(item["weather"][0]["main"])
+                            daily_forecasts[date]["icons"].append(item["weather"][0]["icon"])
+                        
+                        # Process daily forecasts (calculate averages, most common condition)
+                        for date, data in daily_forecasts.items():
+                            from collections import Counter
+                            
+                            # Calculate average temperature
+                            data["avg_temp"] = sum(data["temps"]) / len(data["temps"])
+                            data["min_temp"] = min(data["temps"])
+                            data["max_temp"] = max(data["temps"])
+                            
+                            # Most common condition and icon
+                            data["main_condition"] = Counter(data["conditions"]).most_common(1)[0][0]
+                            data["main_icon"] = Counter(data["icons"]).most_common(1)[0][0]
+                            data["icon_url"] = f"https://openweathermap.org/img/wn/{data['main_icon']}@2x.png"
+                            
+                            # Clean up temporary data
+                            del data["temps"]
+                            del data["conditions"]
+                            del data["icons"]
+                            
+                            results["forecast"].append(data)
+                        
+                        # Sort forecast by date
+                        results["forecast"].sort(key=lambda x: x["date"])
+                        
+                        # Limit to 5 days
+                        results["forecast"] = results["forecast"][:5]
+                        
+                        logger.info(f"Successfully fetched {len(results['forecast'])} days forecast for {location}")
+                        
+                else:
+                    logger.warning(f"Failed to fetch OpenWeatherMap data: HTTP {response.status_code}")
+                    if response.status_code == 401:
+                        logger.error("Invalid API key for OpenWeatherMap")
+                    elif response.status_code == 404:
+                        logger.warning(f"Location '{location}' not found")
+                        results["error"] = f"Location '{location}' not found"
+                    else:
+                        results["error"] = f"OpenWeatherMap API error: {response.status_code}"
+                    
+            except Exception as e:
+                logger.warning(f"Error fetching from OpenWeatherMap: {str(e)}")
+                results["error"] = f"Error fetching weather data: {str(e)}"
+        else:
+            logger.warning("No OpenWeatherMap API key provided")
+            results["error"] = "No weather API key configured"
+        
+        # If API call failed or we don't have an API key, fallback to web search
+        if not results["success"]:
+            logger.info("Weather API request failed, falling back to web search")
+            search_results = self.web_search.search(f"weather forecast {location}", "text")
+            
+            # Format search results
+            results["fallback"] = True
+            results["search_results"] = search_results
+            
+            # Store in cache
+            self.cache[cache_key] = {
+                "timestamp": time.time(),
+                "data": results
+            }
+            
+            return results
+        
+        # Store in cache if successful
+        self.cache[cache_key] = {
+            "timestamp": time.time(),
+            "data": results
+        }
+        
+        return results
+    
     def get_news(self, query: str, days: int = 1) -> Dict[str, Any]:
         """Get latest news on a topic.
         
@@ -592,7 +770,7 @@ class WebResearcher:
         
         Args:
             results: Research results to format
-            research_type: Type of research (general, crypto, news, products, jobs)
+            research_type: Type of research (general, crypto, news, products, jobs, weather)
             
         Returns:
             Formatted results as a string
@@ -629,6 +807,60 @@ class WebResearcher:
                 formatted += f"**Source:** {results['price_source']}\n"
                 if "source_url" in results and results["source_url"]:
                     formatted += f"**URL:** {results['source_url']}\n"
+                
+        elif research_type == "weather":
+            formatted += f"### Weather for {results['location']}\n\n"
+            
+            # Add fetch time for transparency
+            if "fetch_time" in results:
+                formatted += f"*Information fetched at: {results['fetch_time']}*\n\n"
+            
+            # Check if we have current weather data
+            if results.get("success") and results.get("current"):
+                current = results["current"]
+                
+                # Current conditions
+                formatted += f"**Current Conditions:** {current['description'].capitalize()}\n\n"
+                formatted += f"**Temperature:** {current['temperature']}°C (Feels like: {current['feels_like']}°C)\n"
+                formatted += f"**Humidity:** {current['humidity']}%\n"
+                formatted += f"**Wind:** {current['wind_speed']} m/s\n"
+                formatted += f"**Sunrise:** {current['sunrise']} | **Sunset:** {current['sunset']}\n\n"
+                
+                # Forecast (if available)
+                if results.get("forecast"):
+                    formatted += "**5-Day Forecast:**\n\n"
+                    
+                    for day in results["forecast"]:
+                        formatted += f"- **{day['display_date']}**: {day['main_condition']}, "
+                        formatted += f"{day['min_temp']:.1f}°C - {day['max_temp']:.1f}°C\n"
+                    
+                    formatted += "\n"
+                
+                # Add source information
+                formatted += "**Source:**\n\n"
+                for source in results.get("sources", []):
+                    timestamp = source.get("timestamp", "")
+                    timestamp_str = f" (at {timestamp})" if timestamp else ""
+                    formatted += f"- [{source['name']}{timestamp_str}]({source['url']})\n"
+            
+            # Fallback to web search results
+            elif results.get("fallback") and results.get("search_results"):
+                formatted += "**Web Search Results:**\n\n"
+                for i, result in enumerate(results["search_results"], 1):
+                    title = result.get("title", "No title")
+                    body = result.get("body", "")
+                    url = result.get("href", "")
+                    
+                    formatted += f"{i}. **{title}**\n"
+                    formatted += f"   {body}\n"
+                    if url:
+                        formatted += f"   [Read more]({url})\n"
+                    formatted += "\n"
+            
+            # Error case
+            elif "error" in results:
+                formatted += f"**Error:** {results['error']}\n\n"
+                formatted += "Please try again with a different location or check if the weather API key is configured correctly.\n"
                 
         elif research_type == "news":
             formatted += f"### Latest News on {results['topic']}\n\n"

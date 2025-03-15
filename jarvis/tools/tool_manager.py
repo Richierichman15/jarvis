@@ -103,11 +103,13 @@ class ToolManager:
         tool_calls = []
         query = query.lower()
         
-        # Weather related patterns should use web search
+        # Weather related patterns should use web researcher
         weather_patterns = [
             r"(weather|forecast|temperature|rain|snow|precipitation|humidity|climate).*?(in|for|at|today|tomorrow|this week|this weekend)",
             r"(is it|will it).*(rain|snow|sunny|cloudy|warm|cold|hot)",
             r"(what's|what is|how's|how is).*(weather|temperature).*(in|at|for)",
+            r"(weather|temperature).*?now",
+            r"(humidity|wind speed|pressure).*?(in|at)",
         ]
         
         # News related patterns
@@ -175,6 +177,26 @@ class ToolManager:
                         "confidence": 0.8  # Confidence score
                     })
                     break
+        
+        # Check if the query is a weather query that should use the researcher tool
+        if "web_researcher" in self.tools and not tool_calls:
+            for pattern in weather_patterns:
+                if re.search(pattern, query, re.IGNORECASE):
+                    logger.info(f"Detected weather intent in query: {query}")
+                    
+                    # Extract location from the query
+                    location = self._extract_location(query)
+                    
+                    if location:
+                        tool_calls.append({
+                            "tool": "web_researcher",
+                            "params": {
+                                "query": location,
+                                "research_type": "weather"
+                            },
+                            "confidence": 0.9  # High confidence for weather
+                        })
+                        break
         
         # Check if the query matches any calculator patterns
         if "calculator" in self.tools and not tool_calls:
@@ -335,6 +357,42 @@ class ToolManager:
         
         logger.info(f"Detected {len(tool_calls)} tool calls")
         return tool_calls
+    
+    def _extract_location(self, query: str) -> str:
+        """Extract location from a weather query.
+        
+        Args:
+            query: User's weather query
+            
+        Returns:
+            Extracted location or empty string if none found
+        """
+        # Try to extract location using patterns
+        location_patterns = [
+            r"(?:in|for|at)\s+([A-Za-z\s,.]+)(?:$|\?|\.)",
+            r"weather\s+(?:in|for|at)\s+([A-Za-z\s,.]+)(?:$|\?|\.)",
+            r"temperature\s+(?:in|for|at)\s+([A-Za-z\s,.]+)(?:$|\?|\.)",
+            r"forecast\s+(?:in|for|at)\s+([A-Za-z\s,.]+)(?:$|\?|\.)",
+        ]
+        
+        for pattern in location_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+        
+        # If no specific location pattern matches, look for capitalized words
+        # that might be city names (simple heuristic)
+        words = query.split()
+        for word in words:
+            if word[0].isupper() and len(word) > 2 and word.lower() not in [
+                "what", "where", "when", "how", "why", "who", "which",
+                "weather", "forecast", "temperature", "humidity", "will", "today",
+                "tomorrow", "current", "now"
+            ]:
+                return word
+        
+        # Default to empty string if no location found
+        return ""
     
     def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> Optional[str]:
         """Execute a tool with the given parameters.

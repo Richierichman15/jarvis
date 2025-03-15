@@ -1,0 +1,8 @@
+2025-03-14 18:56:56,703 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_185656.log
+2025-03-14 18:56:56,703 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-14 18:56:56,703 - jarvis.tools.tool_manager - INFO - Available tools: web_search, web_researcher, calculator, file_operations, system_info, code_editor
+2025-03-14 19:02:02,888 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 19:02:02,889 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-14 19:02:02,889 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:02:02,913 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:02:20,998 - jarvis.models.model_manager - INFO - Generated response using local model

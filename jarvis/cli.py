@@ -17,6 +17,7 @@ from rich.prompt import Prompt, Confirm
 from pathlib import Path
 
 from .jarvis import Jarvis
+from .dual_jarvis import DualJarvis
 
 
 app = typer.Typer(help="Jarvis AI Assistant")
@@ -338,6 +339,137 @@ def research(
     
     except Exception as e:
         console.print(f"[bold red]Error during research: {str(e)}[/bold red]")
+
+
+@app.command()
+def weather(
+    location: str = typer.Argument(..., help="Location to get weather for (e.g., 'New York', 'London,UK')"),
+    name: str = typer.Option("Boss", help="How Jarvis should address you"),
+    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+):
+    """Get current weather and forecast for a location."""
+    display_startup_message()
+    
+    # Initialize Jarvis (only uses user_name parameter)
+    jarvis = Jarvis(user_name=name)
+    
+    # Show thinking message
+    console.print("[system]Fetching weather data... Please wait.[/system]", style=system_style)
+    
+    # Use the web researcher tool directly
+    web_researcher_tool = jarvis.tool_manager.tools.get("web_researcher")
+    if not web_researcher_tool:
+        console.print("[system]Weather tool is not available.[/system]", style=system_style)
+        return
+    
+    try:
+        # Get weather results
+        results = web_researcher_tool.get_weather_info(location)
+        
+        # Format the results
+        formatted_results = web_researcher_tool.format_research_results(results, "weather")
+        
+        # Display results
+        console.print("\n[bold]Weather Information:[/bold]\n")
+        console.print(Markdown(formatted_results))
+        
+        # Show footer
+        console.print(f"\n[system]Weather data retrieved at {time.strftime('%H:%M:%S')}[/system]", style=system_style)
+    
+    except Exception as e:
+        console.print(f"[bold red]Error retrieving weather data: {str(e)}[/bold red]")
+
+
+@app.command()
+def dual_chat(
+    name: str = typer.Option("Boss", help="How Jarvis should address you"),
+    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+):
+    """Start an interactive dual chat session with Jarvis that compares local and OpenAI models."""
+    # Set OpenAI API key if provided
+    if openai_key:
+        os.environ["OPENAI_API_KEY"] = openai_key
+        
+    # Display startup message
+    display_startup_message()
+    console.print(Panel.fit(
+        "Dual Model Mode: Comparing Local and OpenAI Models", 
+        title="JARVIS", 
+        subtitle="Performance Comparison"
+    ))
+    
+    # Check if OpenAI API key is set
+    if not os.environ.get("OPENAI_API_KEY"):
+        console.print("Warning: OpenAI API key not set. Please provide it with --openai-key or set OPENAI_API_KEY environment variable.", style="bold red")
+        if not Confirm.ask("Continue without OpenAI comparison?", default=False):
+            return 1
+    
+    # Initialize Dual Jarvis
+    jarvis = DualJarvis(user_name=name)
+    
+    # Display introduction
+    intro = jarvis.get_introduction()
+    console.print(f"JARVIS: ", style=assistant_style, end="")
+    console.print(Markdown(intro))
+    
+    # Main interaction loop
+    try:
+        while True:
+            # Get user input
+            user_input = typer.prompt(f"\n{name}", prompt_suffix="")
+            
+            if user_input.lower() in ["exit", "quit", "bye", "goodbye"]:
+                console.print("\nJARVIS: Goodbye! It was nice talking with you.", style=assistant_style)
+                break
+                
+            # Show thinking animation
+            with console.status("[bold green]Thinking (running both models in parallel)...[/bold green]"):
+                # Process query
+                response = jarvis.process_query(user_input)
+                
+            # Display response
+            console.print(f"\nJARVIS: ", style=assistant_style, end="")
+            console.print(Markdown(response))
+            
+    except KeyboardInterrupt:
+        console.print("\n\nJARVIS: Shutting down. Goodbye!", style=assistant_style)
+    except Exception as e:
+        console.print(f"\n\nError: {str(e)}", style="bold red")
+        return 1
+        
+    return 0
+
+
+@app.command()
+def dual_query(
+    question: str = typer.Argument(..., help="Question to ask Jarvis"),
+    name: str = typer.Option("Boss", help="How Jarvis should address you"),
+    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+):
+    """Ask Jarvis a single question and get responses from both local and OpenAI models with performance comparison."""
+    # Set OpenAI API key if provided
+    if openai_key:
+        os.environ["OPENAI_API_KEY"] = openai_key
+        
+    # Check if OpenAI API key is set
+    if not os.environ.get("OPENAI_API_KEY"):
+        console.print("Warning: OpenAI API key not set. Please provide it with --openai-key or set OPENAI_API_KEY environment variable.", style="bold red")
+        if not Confirm.ask("Continue without OpenAI comparison?", default=False):
+            return 1
+            
+    # Initialize Dual Jarvis
+    jarvis = DualJarvis(user_name=name)
+    
+    # Show thinking animation
+    with console.status("[bold green]Thinking (running both models in parallel)...[/bold green]"):
+        # Process query
+        response = jarvis.process_query(question)
+        
+    # Display response
+    console.print(f"JARVIS: ", style=assistant_style, end="")
+    console.print(Markdown(response))
+    
+    return 0
 
 
 if __name__ == "__main__":
