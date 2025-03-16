@@ -19,8 +19,10 @@ from pathlib import Path
 from .jarvis import Jarvis
 from .dual_jarvis import DualJarvis
 
-
+# Create Typer app
 app = typer.Typer(help="Jarvis AI Assistant")
+
+# Create console for rich output
 console = Console()
 
 # Styles
@@ -28,6 +30,9 @@ user_style = Style(color="blue", bold=True)
 assistant_style = Style(color="green")
 system_style = Style(color="yellow", italic=True)
 code_style = Style(color="cyan")
+
+# Export all commands
+__all__ = ['chat', 'query', 'code', 'research', 'weather', 'dual_chat', 'dual_query']
 
 
 def display_startup_message():
@@ -383,26 +388,19 @@ def weather(
 @app.command()
 def dual_chat(
     name: str = typer.Option("Boss", help="How Jarvis should address you"),
-    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)"),
+    claude_key: Optional[str] = typer.Option(None, help="Claude API key (or set CLAUDE_API_KEY env var)")
 ):
-    """Start an interactive dual chat session with Jarvis that compares local and OpenAI models."""
-    # Set OpenAI API key if provided
+    """Start an interactive chat session with both OpenAI and Claude models."""
+    # Set API keys if provided
     if openai_key:
         os.environ["OPENAI_API_KEY"] = openai_key
+    if claude_key:
+        os.environ["CLAUDE_API_KEY"] = claude_key
         
     # Display startup message
     display_startup_message()
-    console.print(Panel.fit(
-        "Dual Model Mode: Comparing Local and OpenAI Models", 
-        title="JARVIS", 
-        subtitle="Performance Comparison"
-    ))
-    
-    # Check if OpenAI API key is set
-    if not os.environ.get("OPENAI_API_KEY"):
-        console.print("Warning: OpenAI API key not set. Please provide it with --openai-key or set OPENAI_API_KEY environment variable.", style="bold red")
-        if not Confirm.ask("Continue without OpenAI comparison?", default=False):
-            return 1
+    console.print(Panel.fit("Dual Model Mode (OpenAI + Claude)", title="JARVIS"))
     
     # Initialize Dual Jarvis
     jarvis = DualJarvis(user_name=name)
@@ -419,11 +417,11 @@ def dual_chat(
             user_input = typer.prompt(f"\n{name}", prompt_suffix="")
             
             if user_input.lower() in ["exit", "quit", "bye", "goodbye"]:
-                console.print("\nJARVIS: Goodbye! It was nice talking with you.", style=assistant_style)
+                console.print("\nJARVIS: Goodbye! It was nice comparing models with you.", style=assistant_style)
                 break
                 
             # Show thinking animation
-            with console.status("[bold green]Thinking (running both models in parallel)...[/bold green]"):
+            with console.status("[bold green]Both models thinking...[/bold green]"):
                 # Process query
                 response = jarvis.process_query(user_input)
                 
@@ -432,7 +430,7 @@ def dual_chat(
             console.print(Markdown(response))
             
     except KeyboardInterrupt:
-        console.print("\n\nJARVIS: Shutting down. Goodbye!", style=assistant_style)
+        console.print("\n\nJARVIS: Shutting down dual mode. Goodbye!", style=assistant_style)
     except Exception as e:
         console.print(f"\n\nError: {str(e)}", style="bold red")
         return 1
@@ -442,26 +440,23 @@ def dual_chat(
 
 @app.command()
 def dual_query(
-    question: str = typer.Argument(..., help="Question to ask Jarvis"),
+    question: str = typer.Argument(..., help="Question to ask both models"),
     name: str = typer.Option("Boss", help="How Jarvis should address you"),
-    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
+    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)"),
+    claude_key: Optional[str] = typer.Option(None, help="Claude API key (or set CLAUDE_API_KEY env var)")
 ):
-    """Ask Jarvis a single question and get responses from both local and OpenAI models with performance comparison."""
-    # Set OpenAI API key if provided
+    """Ask a single question and get responses from both OpenAI and Claude models."""
+    # Set API keys if provided
     if openai_key:
         os.environ["OPENAI_API_KEY"] = openai_key
+    if claude_key:
+        os.environ["CLAUDE_API_KEY"] = claude_key
         
-    # Check if OpenAI API key is set
-    if not os.environ.get("OPENAI_API_KEY"):
-        console.print("Warning: OpenAI API key not set. Please provide it with --openai-key or set OPENAI_API_KEY environment variable.", style="bold red")
-        if not Confirm.ask("Continue without OpenAI comparison?", default=False):
-            return 1
-            
     # Initialize Dual Jarvis
     jarvis = DualJarvis(user_name=name)
     
     # Show thinking animation
-    with console.status("[bold green]Thinking (running both models in parallel)...[/bold green]"):
+    with console.status("[bold green]Both models thinking...[/bold green]"):
         # Process query
         response = jarvis.process_query(question)
         

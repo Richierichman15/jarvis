@@ -1,6 +1,6 @@
 """
 Dual Jarvis AI Assistant.
-This extends the Jarvis class to use both local and OpenAI models in parallel.
+This extends the Jarvis class to use both OpenAI and Claude models in parallel.
 """
 import logging
 from typing import Dict, Any, Optional
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class DualJarvis(Jarvis):
     """
-    Dual Jarvis AI Assistant - Extension of Jarvis that runs both local and OpenAI models.
+    Dual Jarvis AI Assistant - Extension of Jarvis that runs both OpenAI and Claude models.
     This allows comparing the performance and quality of responses between models.
     """
     
@@ -40,7 +40,7 @@ class DualJarvis(Jarvis):
         # Add system introduction to memory
         intro_message = (
             f"Hello {self.user_name}, I am JARVIS in dual-model mode. "
-            "In this mode, I will show you responses from both the local and OpenAI models side by side, "
+            "In this mode, I will show you responses from both OpenAI (GPT-4) and Claude (Claude 3 Sonnet) models side by side, "
             "along with timing information so you can compare their performance. "
             "This allows you to see which model is faster and how their responses differ. "
             "How can I help you today?"
@@ -133,9 +133,8 @@ class DualJarvis(Jarvis):
             response,
             {
                 "model_used": "both",
-                "complexity": response_data["complexity"],
-                "local_time": response_data.get("local_time"),
-                "openai_time": response_data.get("openai_time")
+                "openai_time": response_data.get("openai_time"),
+                "claude_time": response_data.get("claude_time")
             }
         )
         
@@ -154,4 +153,4 @@ class DualJarvis(Jarvis):
                 return message["content"]
         
         # Fallback introduction
-        return f"Hello {self.user_name}, I am JARVIS in dual-model mode. How can I assist you today?" 
+        return f"Hello {self.user_name}, I am JARVIS in dual-model mode (OpenAI + Claude). How can I assist you today?" 

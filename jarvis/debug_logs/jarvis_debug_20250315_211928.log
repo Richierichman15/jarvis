@@ -1,0 +1,30 @@
+2025-03-15 21:19:28,890 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250315_211928.log
+2025-03-15 21:19:28,890 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-15 21:19:28,890 - jarvis.tools.tool_manager - INFO - Available tools: web_search, web_researcher, calculator, file_operations, system_info, code_editor
+2025-03-15 21:19:28,894 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: based on current news and data, where are the wildfires in oklahoma and what direction are they spreading as of march 14-15, 2025? please provide specific locations and spread patterns if available.
+2025-03-15 21:19:28,894 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-15 21:19:28,894 - jarvis.tools.tool_manager - INFO - Executing web search with query: based on current news and data, where are the wildfires in oklahoma and what direction are they spreading as of march 14-15, 2025? please provide specific locations and spread patterns if available.
+2025-03-15 21:19:28,894 - jarvis.tools.web_search - INFO - Performing news search for: based on current news and data, where are the wildfires in oklahoma and what direction are they spreading as of march 14-15, 2025? please provide specific locations and spread patterns if available.
+2025-03-15 21:19:29,149 - primp - INFO - response: https://duckduckgo.com/?q=based+on+current+news+and+data%2C+where+are+the+wildfires+in+oklahoma+and+what+direction+are+they+spreading+as+of+march+14-15%2C+2025%3F+please+provide+specific+locations+and+spread+patterns+if+available. 200
+2025-03-15 21:19:30,253 - primp - INFO - response: https://duckduckgo.com/news.js?l=wt-wt&o=json&noamp=1&q=based+on+current+news+and+data%2C+where+are+the+wildfires+in+oklahoma+and+what+direction+are+they+spreading+as+of+march+14-15%2C+2025%3F+please+provide+specific+locations+and+spread+patterns+if+available.&vqd=4-76538197369980053316809069040214690006&p=-1&df=10 200
+2025-03-15 21:19:31,321 - primp - INFO - response: https://duckduckgo.com/news.js?l=wt-wt&o=json&noamp=1&q=based+on+current+news+and+data%2C+where+are+the+wildfires+in+oklahoma+and+what+direction+are+they+spreading+as+of+march+14-15%2C+2025%3F+please+provide+specific+locations+and+spread+patterns+if+available.&vqd=4-76538197369980053316809069040214690006&p=-1&df=10&s=30 200
+2025-03-15 21:19:31,321 - jarvis.tools.web_search - INFO - Found 3 results for news search
+2025-03-15 21:19:31,321 - jarvis.tools.web_search - INFO - Performing text search for: based on current news and data, where are the wildfires in oklahoma and what direction are they spreading as of march 14-15, 2025? please provide specific locations and spread patterns if available.
+2025-03-15 21:19:33,096 - primp - INFO - response: https://html.duckduckgo.com/html 200
+2025-03-15 21:19:33,106 - jarvis.tools.web_search - INFO - Found 5 results for text search
+2025-03-15 21:19:33,107 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-15 21:19:33,107 - jarvis.models.model_manager - INFO - Using local model
+2025-03-15 21:19:33,124 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-15 21:20:04,014 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-15 21:20:04,275 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-15 21:20:04,623 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-15 21:20:49,948 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 45s)
+2025-03-15 21:20:50,210 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-15 21:20:54,830 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 3/4, timeout: 60s)
+2025-03-15 21:21:55,836 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 60s)
+2025-03-15 21:21:56,299 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-15 21:21:56,911 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 4/4, timeout: 60s)
+2025-03-15 21:22:57,050 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 60s)
+2025-03-15 21:22:57,250 - jarvis.models.model_manager - WARNING - Local model returned an error, trying to fall back to OpenAI
+2025-03-15 21:23:08,854 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-03-15 21:23:08,877 - jarvis.models.model_manager - INFO - Fallback to OpenAI model successful

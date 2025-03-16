@@ -1,15 +1,15 @@
 """
 Dual Model Manager for Jarvis.
-This module handles running both local and OpenAI models in parallel and time them
+This module handles running both OpenAI and Claude models in parallel and time them
 """
 import logging
 import time
 import threading
 from typing import Dict, Any, Optional, List, Tuple
 
-from .local_model import OllamaModel
 from .openai_model import OpenAIModel
-from ..config import COMPLEXITY_THRESHOLD
+from .claude_model import ClaudeModel
+from ..config import MODEL_A, MODEL_B
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -18,29 +18,30 @@ logger = logging.getLogger(__name__)
 
 class DualModelManager:
     """
-    Manager for running both local and OpenAI models in parallel to compare results and performance.
+    Manager for running both OpenAI and Claude models in parallel to compare results and performance.
     """
     
     def __init__(self):
-        """Initialize the dual model manager with local and remote models."""
-        # Initialize local model first
-        self.local_model = OllamaModel()
-        self.local_available = self.local_model.is_available()
-        logger.info(f"Local model available: {self.local_available}")
-        
-        # Try to initialize OpenAI model
+        """Initialize the dual model manager with OpenAI and Claude models."""
+        # Initialize OpenAI model
         self.openai_available = False
         try:
             self.openai_model = OpenAIModel()
-            self.openai_available = self.openai_model.is_available()
-            logger.info(f"OpenAI model available: {self.openai_available}")
-        except ValueError as e:
-            # OpenAI API key not set
-            logger.warning(f"OpenAI model initialization failed: {str(e)}")
-            self.openai_model = None
+            self.openai_available = True
+            logger.info("OpenAI model initialized successfully")
         except Exception as e:
             logger.warning(f"OpenAI model initialization failed: {str(e)}")
             self.openai_model = None
+            
+        # Initialize Claude model
+        self.claude_available = False
+        try:
+            self.claude_model = ClaudeModel()
+            self.claude_available = True
+            logger.info("Claude model initialized successfully")
+        except Exception as e:
+            logger.warning(f"Claude model initialization failed: {str(e)}")
+            self.claude_model = None
     
     def _determine_complexity(self, prompt: str) -> int:
         """Determine the complexity of a prompt on a scale of 1-10.
@@ -88,20 +89,14 @@ class DualModelManager:
         return complexity
     
     def _run_model(self, model, model_name, prompt, system_prompt, results):
-        """Run a model in a separate thread and record the timing.
-        
-        Args:
-            model: The model instance to run
-            model_name: Name of the model for logging
-            prompt: User prompt
-            system_prompt: System instructions
-            results: Dictionary to store results
-        """
+        """Run a model in a separate thread and record the timing."""
         try:
             start_time = time.time()
-            response = model.generate(
-                prompt=prompt,
-                system_prompt=system_prompt
+            response = model.generate_response(
+                messages=[
+                    {"role": "system", "content": system_prompt} if system_prompt else None,
+                    {"role": "user", "content": prompt}
+                ]
             )
             end_time = time.time()
             
@@ -122,7 +117,7 @@ class DualModelManager:
             }
     
     def get_dual_response(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Generate responses from both local and OpenAI models in parallel.
+        """Generate responses from both OpenAI and Claude models in parallel.
         
         Args:
             prompt: The user's query
@@ -131,28 +126,24 @@ class DualModelManager:
         Returns:
             Dictionary with responses from both models and timing information
         """
-        # Determine the complexity of the prompt (1-10)
-        complexity = self._determine_complexity(prompt)
-        logger.info(f"Prompt complexity: {complexity}")
-        
         # Results will be stored here
         results = {}
         threads = []
         
         # Create threads for each model
-        if self.local_available:
-            local_thread = threading.Thread(
-                target=self._run_model,
-                args=(self.local_model, "local", prompt, system_prompt, results)
-            )
-            threads.append(local_thread)
-        
         if self.openai_available:
             openai_thread = threading.Thread(
                 target=self._run_model,
                 args=(self.openai_model, "openai", prompt, system_prompt, results)
             )
             threads.append(openai_thread)
+        
+        if self.claude_available:
+            claude_thread = threading.Thread(
+                target=self._run_model,
+                args=(self.claude_model, "claude", prompt, system_prompt, results)
+            )
+            threads.append(claude_thread)
         
         # Start all threads
         for thread in threads:
@@ -167,51 +158,49 @@ class DualModelManager:
             return {
                 "response": "Error: No models available to generate a response.",
                 "model_used": "none",
-                "complexity": complexity,
                 "success": False,
-                "local_time": None,
                 "openai_time": None,
-                "local_response": None,
-                "openai_response": None
+                "claude_time": None,
+                "openai_response": None,
+                "claude_response": None
             }
         
         # Extract timing information
-        local_time = results.get("local", {}).get("time_taken")
         openai_time = results.get("openai", {}).get("time_taken")
+        claude_time = results.get("claude", {}).get("time_taken")
         
         # Determine which model was faster
         faster_model = None
-        if local_time is not None and openai_time is not None:
-            faster_model = "local" if local_time <= openai_time else "openai"
-            time_difference = abs(local_time - openai_time)
+        if openai_time is not None and claude_time is not None:
+            faster_model = "OpenAI" if openai_time <= claude_time else "Claude"
+            time_difference = abs(openai_time - claude_time)
             
             comparison = (
                 f"\n\n---\n"
                 f"**Performance Comparison:**\n"
-                f"- Local model: {local_time:.2f} seconds\n"
                 f"- OpenAI model: {openai_time:.2f} seconds\n"
-                f"- {faster_model.capitalize()} model was faster by {time_difference:.2f} seconds"
+                f"- Claude model: {claude_time:.2f} seconds\n"
+                f"- {faster_model} model was faster by {time_difference:.2f} seconds"
             )
         else:
             comparison = "\n\n---\n**Performance Comparison:** Could not compare performance as one model failed."
         
         # Format the main response
-        local_response = results.get("local", {}).get("response", "No response from local model")
         openai_response = results.get("openai", {}).get("response", "No response from OpenAI model")
+        claude_response = results.get("claude", {}).get("response", "No response from Claude model")
         
         combined_response = (
-            f"**Local Model Response:**\n{local_response}\n\n"
-            f"**OpenAI Model Response:**\n{openai_response}"
+            f"**OpenAI Model Response:**\n{openai_response}\n\n"
+            f"**Claude Model Response:**\n{claude_response}"
             f"{comparison}"
         )
         
         return {
             "response": combined_response,
             "model_used": "both",
-            "complexity": complexity,
             "success": True,
-            "local_time": local_time,
             "openai_time": openai_time,
-            "local_response": local_response,
-            "openai_response": openai_response
+            "claude_time": claude_time,
+            "openai_response": openai_response,
+            "claude_response": claude_response
         } 

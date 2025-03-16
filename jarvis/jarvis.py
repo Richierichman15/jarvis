@@ -94,7 +94,7 @@ class Jarvis:
             query: User's input query
             
         Returns:
-            Jarvis's response
+            Response from the model
         """
         # Add user query to memory
         self.memory.add_message("user", query)
@@ -121,51 +121,23 @@ class Jarvis:
         # Prepare context for the model
         context = self._prepare_context()
         
-        # If we have a tool response, let's create a more specific prompt
+        # Prepare the prompt based on tool response
         if tool_response and "web_search" in tool_response.lower():
             enhanced_system_prompt = (
                 f"{self.system_prompt}\n\n"
                 f"IMPORTANT: I've just performed a web search for the user. "
                 f"The search results are below. "
                 f"When formulating my response, I should use the information from these search results "
-                f"to provide the most accurate and helpful information. "
-                f"I should NOT make up information or claim I don't have access to information "
-                f"that is clearly available in the search results. "
-                f"I should summarize the relevant information from the search results in a clear, "
-                f"concise manner, citing the sources where appropriate."
+                f"to provide the most accurate and helpful information."
             )
             
-            # Check if we have news results in the response
-            has_news = "NEWS RESULTS:" in tool_response
-            has_images = "IMAGE DESCRIPTIONS:" in tool_response
-            
-            # Create a more specific prompt based on the type of search results
-            if has_news:
-                prompt = (
-                    f"The user asked: {query}\n\n"
-                    f"I performed a news search and found the following information:\n\n"
-                    f"{tool_response}\n\n"
-                    f"Based on these news results, please provide a summary of recent developments "
-                    f"and relevant information to answer {self.user_name}'s query. Include source attribution "
-                    f"where appropriate, and highlight the most recent and relevant information."
-                )
-            elif has_images:
-                prompt = (
-                    f"The user asked: {query}\n\n"
-                    f"I performed a search that included image information and found the following:\n\n"
-                    f"{tool_response}\n\n"
-                    f"Based on these search results, please provide a helpful response to {self.user_name} "
-                    f"that incorporates both textual information and descriptions of relevant images. "
-                    f"Describe what the images show according to their descriptions."
-                )
-            else:
-                prompt = (
-                    f"The user asked: {query}\n\n"
-                    f"I performed a web search and found the following information:\n\n"
-                    f"{tool_response}\n\n"
-                    f"Based on these search results, please provide a helpful and accurate response to {self.user_name}, "
-                    f"citing sources where appropriate. Synthesize the information rather than just listing facts."
-                )
+            prompt = (
+                f"The user asked: {query}\n\n"
+                f"I performed a web search and found the following information:\n\n"
+                f"{tool_response}\n\n"
+                f"Based on these search results, please provide a helpful and accurate response to {self.user_name}, "
+                f"citing sources where appropriate. Synthesize the information rather than just listing facts."
+            )
             
             system_prompt = enhanced_system_prompt
         elif tool_response:
@@ -184,19 +156,16 @@ class Jarvis:
             system_prompt = self.system_prompt
         
         # Get response from the model
-        response_data = self.model_manager.get_response(
+        response = self.model_manager.generate(
             prompt=prompt,
             system_prompt=system_prompt
         )
-        
-        # Extract the response text
-        response = response_data["response"]
         
         # Add assistant response to memory
         self.memory.add_message(
             "assistant", 
             response,
-            {"model_used": response_data["model_used"], "complexity": response_data["complexity"]}
+            {"model_used": "openai"}  # Default to OpenAI since it's our primary model
         )
         
         return response

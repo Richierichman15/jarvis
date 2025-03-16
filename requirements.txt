@@ -42,4 +42,7 @@ langchain-openai>=0.0.5
 # Web researcher additional dependencies
 html5lib>=1.1
 lxml>=4.9.0
-chardet>=5.1.0 
+chardet>=5.1.0
+
+# Anthropic package
+anthropic>=0.18.1  # Claude API client 

@@ -21,10 +21,13 @@ os.makedirs(DEBUG_LOGS_DIR, exist_ok=True)  # Ensure debug logs directory exists
 # OpenAI API configuration
 # First check for API key in environment, then use default if not available
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-
-# Check if we need to set the API key in environment
 if not OPENAI_API_KEY:
     print("Warning: OPENAI_API_KEY not found in environment variables or .env file")
+
+# Claude API configuration
+CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
+if not CLAUDE_API_KEY:
+    print("Warning: CLAUDE_API_KEY not found in environment variables or .env file")
 
 # OpenWeatherMap API configuration
 OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
@@ -42,7 +45,12 @@ LOCAL_MODELS = {
 LOCAL_MODEL_NAME = LOCAL_MODELS["llama3"]  # Default model
 LOCAL_MODEL_BASE_URL = "http://localhost:11434/api"  # Ollama API endpoint
 
-OPENAI_MODEL = "gpt-4o-mini"  # Default OpenAI model to use for complex reasoning
+OPENAI_MODEL = "gpt-4-turbo-preview"  # Latest GPT-4 model
+CLAUDE_MODEL = "claude-3-sonnet-20240229"  # Latest Claude 3 Sonnet model
+
+# Default models for comparison
+MODEL_A = "openai"  # First model for comparison
+MODEL_B = "claude"  # Second model for comparison
 
 # Intelligence threshold - above this complexity we switch to OpenAI
 # Scale of 1-10, where 10 is the most complex
