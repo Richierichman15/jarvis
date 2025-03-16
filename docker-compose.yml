@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  jarvis:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./jarvis/memory:/app/jarvis/memory
+      - ./jarvis/debug_logs:/app/jarvis/debug_logs
+      - ./.env:/app/.env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+      - LOCAL_MODEL_BASE_URL=http://ollama:11434/api
+    depends_on:
+      - ollama
+    command: python main.py --web --host 0.0.0.0 --port 5000
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ollama_data: 

@@ -3,8 +3,28 @@ Main entry point for Jarvis AI Assistant.
 """
 import sys
 import argparse
-from jarvis.cli import app
+import typer
+from jarvis.cli import (
+    chat,
+    query,
+    code,
+    research,
+    weather,
+    dual_chat,
+    dual_query
+)
 from jarvis.web_interface import run_web_server
+
+app = typer.Typer(help="Jarvis AI Assistant")
+
+# Register commands
+app.command()(chat)
+app.command()(query)
+app.command()(code)
+app.command()(research)
+app.command()(weather)
+app.command()(dual_chat)
+app.command()(dual_query)
 
 if __name__ == "__main__":
     # Check for web interface flag
@@ -22,4 +42,4 @@ if __name__ == "__main__":
         sys.exit(run_web_server(host=args.host, port=args.port, user_name=args.name))
     else:
         # CLI mode
-        sys.exit(app())
+        app()

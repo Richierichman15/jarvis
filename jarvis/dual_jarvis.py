@@ -1,100 +1,63 @@
 """
-Jarvis AI Assistant.
-This is the main class that integrates all components together.
+Dual Jarvis AI Assistant.
+This extends the Jarvis class to use both OpenAI and Claude models in parallel.
 """
-import os
-import time
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
-from .models.model_manager import ModelManager
-from .memory.conversation_memory import ConversationMemory
-from .tools.tool_manager import ToolManager
+from .jarvis import Jarvis
+from .models.dual_model_manager import DualModelManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class Jarvis:
+class DualJarvis(Jarvis):
     """
-    Jarvis AI Assistant - Your personal AI companion.
-    Modeled after the AI from Iron Man, this assistant uses a hybrid approach
-    with local and cloud AI models for intelligence.
+    Dual Jarvis AI Assistant - Extension of Jarvis that runs both OpenAI and Claude models.
+    This allows comparing the performance and quality of responses between models.
     """
     
     def __init__(self, user_name: str = "Boss"):
         """
-        Initialize Jarvis with all necessary components.
+        Initialize Dual Jarvis with all necessary components.
         
         Args:
             user_name: How Jarvis should address the user
         """
-        self.user_name = user_name
-        self.model_manager = ModelManager()
-        self.memory = ConversationMemory()
-        self.tool_manager = ToolManager()
+        # Call the parent constructor first
+        super().__init__(user_name=user_name)
+        
+        # Replace the model manager with our dual model manager
+        self.model_manager = DualModelManager()
         
         # Add system introduction to memory
-        self._initialize_system_messages()
+        self._initialize_dual_system_messages()
     
-    def _initialize_system_messages(self):
-        """Initialize system messages and introduction."""
+    def _initialize_dual_system_messages(self):
+        """Initialize system messages for the dual mode."""
         # Add system introduction to memory
         intro_message = (
-            f"Hello {self.user_name}, I am JARVIS - Just A Rather Very Intelligent System. "
-            "I'm here to assist you with various tasks, answer questions, and provide information. "
-            "I can use tools like web search to find information for you, and I can remember our conversations. "
+            f"Hello {self.user_name}, I am JARVIS in dual-model mode. "
+            "In this mode, I will show you responses from both OpenAI (GPT-4) and Claude (Claude 3 Sonnet) models side by side, "
+            "along with timing information so you can compare their performance. "
+            "This allows you to see which model is faster and how their responses differ. "
             "How can I help you today?"
         )
         
-        # System message for model context
-        self.system_prompt = (
-            "You are JARVIS (Just A Rather Very Intelligent System), an advanced AI assistant inspired by "
-            "the AI from Iron Man. Your responses should be helpful, informative, and concise. "
-            f"Address the user as {self.user_name}. Use a friendly, slightly formal tone. "
-            "If you don't know something, say so clearly rather than making up information. "
-            "You have access to various tools that you can use to help answer questions."
-        )
-        
         # Record the introduction in memory
-        self.memory.add_message("system", self.system_prompt)
         self.memory.add_message("assistant", intro_message)
     
-    def _prepare_context(self) -> str:
-        """
-        Prepare context for the model based on conversation history.
-        
-        Returns:
-            Context string to provide to the model
-        """
-        return self.memory.format_for_context()
-    
-    def _should_use_tool(self, query: str) -> Optional[Dict[str, Any]]:
-        """
-        Determine if a tool should be used for the given query.
-        
-        Args:
-            query: User's input query
-            
-        Returns:
-            Tool call information or None
-        """
-        tool_calls = self.tool_manager.detect_tool_calls(query)
-        if tool_calls:
-            # For now, just use the first detected tool call
-            return tool_calls[0]
-        return None
-        
     def process_query(self, query: str) -> str:
         """
-        Process a user query and return a response.
+        Process a user query and return responses from both models.
         
         Args:
             query: User's input query
             
         Returns:
-            Response from the model
+            Combined response from both models with performance metrics
         """
         # Add user query to memory
         self.memory.add_message("user", query)
@@ -155,24 +118,31 @@ class Jarvis:
             )
             system_prompt = self.system_prompt
         
-        # Get response from the model
-        response = self.model_manager.generate(
+        # Get dual responses from both models
+        response_data = self.model_manager.get_dual_response(
             prompt=prompt,
             system_prompt=system_prompt
         )
+        
+        # Extract the response text (combined from both models)
+        response = response_data["response"]
         
         # Add assistant response to memory
         self.memory.add_message(
             "assistant", 
             response,
-            {"model_used": "openai"}  # Default to OpenAI since it's our primary model
+            {
+                "model_used": "both",
+                "openai_time": response_data.get("openai_time"),
+                "claude_time": response_data.get("claude_time")
+            }
         )
         
         return response
         
     def get_introduction(self) -> str:
         """
-        Get Jarvis's introduction message.
+        Get Dual Jarvis's introduction message.
         
         Returns:
             Introduction message
@@ -183,4 +153,4 @@ class Jarvis:
                 return message["content"]
         
         # Fallback introduction
-        return f"Hello {self.user_name}, I am JARVIS. How can I assist you today?" 
+        return f"Hello {self.user_name}, I am JARVIS in dual-model mode (OpenAI + Claude). How can I assist you today?" 

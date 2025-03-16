@@ -7,3 +7,4 @@
 2025-03-14 14:46:38,119 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2025 14:46:38] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
 2025-03-14 14:46:50,824 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2025 14:46:50] "GET / HTTP/1.1" 200 -
 2025-03-14 14:47:03,339 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2025 14:47:03] "GET / HTTP/1.1" 200 -
+2025-03-14 14:57:13,995 - werkzeug - INFO -  * Detected change in '/Users/gitonga-nyaga/github/jarvis/jarvis/web_interface.py', reloading

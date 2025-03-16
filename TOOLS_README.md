@@ -12,7 +12,19 @@ This README provides an overview of the tools implemented for the Jarvis AI Assi
   - Result summarization for easier readability
   - Error handling and timeout configuration
 
-### 2. Calculator
+### 2. Web Researcher
+- **File**: `jarvis/tools/web_researcher.py`
+- **Description**: Advanced web research capabilities including data from APIs and web scraping.
+- **Key Features**:
+  - Weather forecasts for locations worldwide (using OpenWeatherMap API)
+  - Cryptocurrency price tracking with multiple sources
+  - News aggregation and filtering
+  - Product price comparisons
+  - Job listing searches
+  - Enhanced web search with credibility assessment
+  - Smart caching with source-specific TTLs
+
+### 3. Calculator
 - **File**: `jarvis/tools/calculator.py`
 - **Description**: Performs mathematical operations, unit conversions, and equation solving.
 - **Key Features**:
@@ -21,7 +33,7 @@ This README provides an overview of the tools implemented for the Jarvis AI Assi
   - Basic equation solving
   - Input validation and error handling
 
-### 3. File Operations
+### 4. File Operations
 - **File**: `jarvis/tools/file_operations.py`
 - **Description**: Handles file system operations safely.
 - **Key Features**:
@@ -31,7 +43,7 @@ This README provides an overview of the tools implemented for the Jarvis AI Assi
   - Security checks for safe paths
   - Comprehensive error handling
 
-### 4. System Information
+### 5. System Information
 - **File**: `jarvis/tools/system_info.py`
 - **Description**: Provides system resource usage and hardware information.
 - **Key Features**:
@@ -41,7 +53,7 @@ This README provides an overview of the tools implemented for the Jarvis AI Assi
   - Network statistics
   - Overall system information
 
-### 5. Debug Tool
+### 6. Debug Tool
 - **File**: `jarvis/tools/debug.py`
 - **Description**: Internal tool for debugging Jarvis components.
 - **Key Features**:

@@ -1,31 +1,50 @@
 """
-OpenAI model handler for Jarvis using the OpenAI API.
+OpenAI model implementation for Jarvis.
 """
 import os
-from typing import Dict, List, Any, Optional
-
-from openai import OpenAI
-from ..config import OPENAI_API_KEY, OPENAI_MODEL
-
+import openai
+from typing import Dict, List, Optional, Union
 
 class OpenAIModel:
-    """Interface for OpenAI models via their API."""
+    """OpenAI model implementation."""
     
-    def __init__(self, api_key: str = OPENAI_API_KEY, model_name: str = OPENAI_MODEL):
-        """Initialize the OpenAI model.
-        
-        Args:
-            api_key: OpenAI API key
-            model_name: Name of the OpenAI model to use
-        """
-        # Try to get the API key from the environment first, then use the provided key
-        self.api_key = os.environ.get("OPENAI_API_KEY", "") or api_key
+    def __init__(self, api_key: Optional[str] = None):
+        """Initialize OpenAI model with API key."""
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         if not self.api_key:
-            raise ValueError("OpenAI API key is required. Set it in the environment or pass it to the constructor.")
+            raise ValueError("OpenAI API key not found in environment or .env file")
+            
+        self.client = openai.OpenAI(api_key=self.api_key)
+        self.model = "gpt-4-turbo-preview"  # Using the latest GPT-4 model
         
-        self.model_name = model_name
-        self.client = OpenAI(api_key=self.api_key)
-        
+    def generate_response(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+    ) -> str:
+        """Generate a response using the OpenAI API."""
+        try:
+            # Create the chat completion
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            error_msg = f"Error generating response from OpenAI API: {str(e)}"
+            print(error_msg)
+            return error_msg
+            
+    def estimate_tokens(self, text: str) -> int:
+        """Estimate the number of tokens in the text."""
+        # GPT-4 uses roughly 4 characters per token on average
+        return len(text) // 4
+
     def generate(self, 
                 prompt: str, 
                 system_prompt: Optional[str] = None,
@@ -51,7 +70,7 @@ class OpenAIModel:
         
         try:
             response = self.client.chat.completions.create(
-                model=self.model_name,
+                model=self.model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens
@@ -72,7 +91,7 @@ class OpenAIModel:
         try:
             # Simple test query to check if API is responding
             response = self.client.chat.completions.create(
-                model=self.model_name,
+                model=self.model,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=1
             )

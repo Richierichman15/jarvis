@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis System Monitoring Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="mb-4 text-center">Jarvis System Monitoring Dashboard</h1>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="diskChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchSystemStatus() {
+            try {
+                const response = await fetch('/dashboard', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                // Return dummy data structure in case of error
+                return {
+                    history: {
+                        cpu: [{ timestamp: new Date().toISOString(), percent: 0 }],
+                        memory: [{ timestamp: new Date().toISOString(), percent: 0 }],
+                        disk: [{ timestamp: new Date().toISOString(), percent: 0 }],
+                        temperature: [{ timestamp: new Date().toISOString(), value: 0 }]
+                    },
+                    cpu: { cpu_percent: 0, success: false },
+                    memory: { percent: 0, success: false },
+                    disk: { disks: [{ percent: 0 }], success: false },
+                    temperature: { temperatures: { system: [{ current: 0 }] }, success: false }
+                };
+            }
+        }
+
+        function renderChart(ctx, label, data, color) {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [new Date().toLocaleTimeString()],
+                    datasets: [{
+                        label: label,
+                        data: [0],  // Start with zero
+                        borderColor: color,
+                        backgroundColor: color,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        async function updateCharts(charts) {
+            try {
+                const systemStatus = await fetchSystemStatus();
+                
+                // Update CPU chart
+                if (systemStatus.cpu && systemStatus.cpu.success) {
+                    charts.cpu.data.labels.push(new Date().toLocaleTimeString());
+                    charts.cpu.data.datasets[0].data.push(systemStatus.cpu.cpu_percent || 0);
+                    
+                    // Limit data points to keep chart clean
+                    if (charts.cpu.data.labels.length > 20) {
+                        charts.cpu.data.labels.shift();
+                        charts.cpu.data.datasets[0].data.shift();
+                    }
+                }
+                
+                // Update Memory chart
+                if (systemStatus.memory && systemStatus.memory.success) {
+                    charts.memory.data.labels.push(new Date().toLocaleTimeString());
+                    charts.memory.data.datasets[0].data.push(systemStatus.memory.percent || 0);
+                    
+                    if (charts.memory.data.labels.length > 20) {
+                        charts.memory.data.labels.shift();
+                        charts.memory.data.datasets[0].data.shift();
+                    }
+                }
+                
+                // Update Disk chart
+                if (systemStatus.disk && systemStatus.disk.success && systemStatus.disk.disks && systemStatus.disk.disks.length > 0) {
+                    charts.disk.data.labels.push(new Date().toLocaleTimeString());
+                    charts.disk.data.datasets[0].data.push(systemStatus.disk.disks[0].percent || 0);
+                    
+                    if (charts.disk.data.labels.length > 20) {
+                        charts.disk.data.labels.shift();
+                        charts.disk.data.datasets[0].data.shift();
+                    }
+                }
+                
+                // Update Temperature chart - handle various potential structures
+                if (systemStatus.temperature && systemStatus.temperature.success) {
+                    let tempValue = 0;
+                    const temps = systemStatus.temperature.temperatures;
+                    if (temps) {
+                        const keys = Object.keys(temps);
+                        if (keys.length > 0 && temps[keys[0]] && temps[keys[0]].length > 0) {
+                            tempValue = temps[keys[0]][0].current || 0;
+                        }
+                    }
+                    
+                    charts.temperature.data.labels.push(new Date().toLocaleTimeString());
+                    charts.temperature.data.datasets[0].data.push(tempValue);
+                    
+                    if (charts.temperature.data.labels.length > 20) {
+                        charts.temperature.data.labels.shift();
+                        charts.temperature.data.datasets[0].data.shift();
+                    }
+                }
+
+                // Update all charts
+                Object.values(charts).forEach(chart => chart.update());
+            } catch (error) {
+                console.error('Error updating charts:', error);
+            }
+        }
+
+        async function initDashboard() {
+            // Create empty charts initially
+            const charts = {
+                cpu: renderChart(document.getElementById('cpuChart'), 'CPU Usage (%)', [], 'rgba(255, 99, 132, 1)'),
+                memory: renderChart(document.getElementById('memoryChart'), 'Memory Usage (%)', [], 'rgba(54, 162, 235, 1)'),
+                disk: renderChart(document.getElementById('diskChart'), 'Disk Usage (%)', [], 'rgba(255, 206, 86, 1)'),
+                temperature: renderChart(document.getElementById('temperatureChart'), 'Temperature (°C)', [], 'rgba(75, 192, 192, 1)')
+            };
+
+            // Update immediately then set interval
+            await updateCharts(charts);
+            setInterval(() => updateCharts(charts), 10000); // Update every 10 seconds
+        }
+
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html> 

@@ -1,0 +1,174 @@
+2025-03-14 19:23:09,929 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_192309.log
+2025-03-14 19:23:09,929 - jarvis.tools.tool_manager - INFO - Debug tool initialized
+2025-03-14 19:23:09,929 - jarvis.tools.tool_manager - INFO - Available tools: web_search, web_researcher, calculator, file_operations, system_info, code_editor
+2025-03-14 19:24:05,506 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: can you tell me what is the weather for oklahoma city and than tell me the time and weather for kenya narobi
+2025-03-14 19:24:05,507 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-14 19:24:05,507 - jarvis.tools.tool_manager - INFO - Executing web search with query: can you tell me what is the weather for oklahoma city and than tell me the time and weather for kenya narobi
+2025-03-14 19:24:05,507 - jarvis.tools.web_search - INFO - Performing text search for: can you tell me what is the weather for oklahoma city and than tell me the time and weather for kenya narobi
+2025-03-14 19:24:06,740 - primp - INFO - response: https://html.duckduckgo.com/html 200
+2025-03-14 19:24:06,752 - jarvis.tools.web_search - INFO - Found 5 results for text search
+2025-03-14 19:24:06,754 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-14 19:24:06,754 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:24:06,792 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:24:33,154 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:25:49,557 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: can you use the api to find accurate results of the weather
+2025-03-14 19:25:49,558 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-14 19:25:49,558 - jarvis.tools.tool_manager - INFO - Executing web search with query: can you use the api to find accurate results of the weather
+2025-03-14 19:25:49,558 - jarvis.tools.web_search - INFO - Performing text search for: can you use the api to find accurate results of the weather
+2025-03-14 19:25:50,812 - primp - INFO - response: https://html.duckduckgo.com/html 200
+2025-03-14 19:25:50,834 - jarvis.tools.web_search - INFO - Found 5 results for text search
+2025-03-14 19:25:50,835 - jarvis.models.model_manager - INFO - Prompt complexity: 6
+2025-03-14 19:25:50,835 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:25:50,861 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:26:20,892 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:26:20,896 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:26:20,959 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:26:55,246 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:27:53,571 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 19:27:53,573 - jarvis.models.model_manager - INFO - Prompt complexity: 6
+2025-03-14 19:27:53,573 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:27:53,605 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:28:23,666 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:28:23,697 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:28:23,909 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:28:48,590 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:33:40,495 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 19:33:40,499 - jarvis.models.model_manager - INFO - Prompt complexity: 6
+2025-03-14 19:33:40,499 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:33:40,542 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:34:10,570 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:34:10,577 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:34:10,621 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:34:40,017 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:38:06,560 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 19:38:06,562 - jarvis.models.model_manager - INFO - Prompt complexity: 6
+2025-03-14 19:38:06,562 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:38:06,601 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:38:36,711 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:38:36,735 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:38:36,930 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:39:22,686 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 45s)
+2025-03-14 19:39:23,668 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:39:25,443 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 3/4, timeout: 60s)
+2025-03-14 19:40:18,963 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:43:22,121 - jarvis.tools.tool_manager - INFO - Detected 0 tool calls
+2025-03-14 19:43:22,122 - jarvis.models.model_manager - INFO - Prompt complexity: 6
+2025-03-14 19:43:22,122 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:43:22,145 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:43:52,166 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:43:52,170 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:43:52,202 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:44:31,433 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:47:18,125 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: how can i implment training data and knowledge base to stay current with latest information and trends. also i want you to tell me which model you are using to give me the information that you are giving me
+2025-03-14 19:47:18,126 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-14 19:47:18,126 - jarvis.tools.tool_manager - INFO - Executing web search with query: how can i implment training data and knowledge base to stay current with latest information and trends. also i want you to tell me which model you are using to give me the information that you are giving me
+2025-03-14 19:47:18,128 - jarvis.tools.web_search - INFO - Performing news search for: how can i implment training data and knowledge base to stay current with latest information and trends. also i want you to tell me which model you are using to give me the information that you are giving me
+2025-03-14 19:47:18,141 - jarvis.tools.web_search - ERROR - Search failed on attempt 1: https://duckduckgo.com RuntimeError: error sending request for url (https://duckduckgo.com/?q=how+can+i+implment+training+data+and+knowledge+base+to+stay+current+with+latest+information+and+trends.+also+i+want+you+to+tell+me+which+model+you+are+using+to+give+me+the+information+that+you+are+giving+me): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:19,901 - jarvis.tools.web_search - ERROR - Search failed on attempt 2: https://duckduckgo.com RuntimeError: error sending request for url (https://duckduckgo.com/?q=how+can+i+implment+training+data+and+knowledge+base+to+stay+current+with+latest+information+and+trends.+also+i+want+you+to+tell+me+which+model+you+are+using+to+give+me+the+information+that+you+are+giving+me): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:21,660 - jarvis.tools.web_search - ERROR - Search failed on attempt 3: https://duckduckgo.com RuntimeError: error sending request for url (https://duckduckgo.com/?q=how+can+i+implment+training+data+and+knowledge+base+to+stay+current+with+latest+information+and+trends.+also+i+want+you+to+tell+me+which+model+you+are+using+to+give+me+the+information+that+you+are+giving+me): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:21,660 - jarvis.tools.web_search - INFO - Performing text search for: how can i implment training data and knowledge base to stay current with latest information and trends. also i want you to tell me which model you are using to give me the information that you are giving me
+2025-03-14 19:47:22,666 - duckduckgo_search.DDGS - INFO - Error to search using html backend: https://html.duckduckgo.com/html RuntimeError: error sending request for url (https://html.duckduckgo.com/html): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:23,424 - duckduckgo_search.DDGS - INFO - Error to search using lite backend: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:23,424 - jarvis.tools.web_search - ERROR - Search failed on attempt 1: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:25,187 - duckduckgo_search.DDGS - INFO - Error to search using lite backend: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:25,944 - duckduckgo_search.DDGS - INFO - Error to search using html backend: https://html.duckduckgo.com/html RuntimeError: error sending request for url (https://html.duckduckgo.com/html): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:25,944 - jarvis.tools.web_search - ERROR - Search failed on attempt 2: https://html.duckduckgo.com/html RuntimeError: error sending request for url (https://html.duckduckgo.com/html): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:27,705 - duckduckgo_search.DDGS - INFO - Error to search using lite backend: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:28,462 - duckduckgo_search.DDGS - INFO - Error to search using html backend: https://html.duckduckgo.com/html RuntimeError: error sending request for url (https://html.duckduckgo.com/html): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:28,462 - jarvis.tools.web_search - ERROR - Search failed on attempt 3: https://html.duckduckgo.com/html RuntimeError: error sending request for url (https://html.duckduckgo.com/html): client error (Connect)
+
+Caused by:
+    0: client error (Connect)
+    1: dns error: failed to lookup address information: nodename nor servname provided, or not known
+    2: failed to lookup address information: nodename nor servname provided, or not known
+2025-03-14 19:47:28,467 - jarvis.models.model_manager - INFO - Prompt complexity: 3
+2025-03-14 19:47:28,467 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:47:28,494 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:47:58,522 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:47:58,525 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:47:58,575 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:48:28,619 - jarvis.models.model_manager - INFO - Generated response using local model
+2025-03-14 19:49:30,181 - jarvis.tools.tool_manager - INFO - Detected web search intent in query: what is the weather like in oklahoma city
+2025-03-14 19:49:30,181 - jarvis.tools.tool_manager - INFO - Detected 1 tool calls
+2025-03-14 19:49:30,182 - jarvis.tools.tool_manager - INFO - Executing web search with query: what is the weather like in oklahoma city
+2025-03-14 19:49:30,182 - jarvis.tools.web_search - INFO - Performing text search for: what is the weather like in oklahoma city
+2025-03-14 19:49:40,193 - duckduckgo_search.DDGS - INFO - Error to search using html backend: https://html.duckduckgo.com/html RuntimeError: error sending request for url (https://html.duckduckgo.com/html): operation timed out
+
+Caused by:
+    operation timed out
+2025-03-14 19:49:50,951 - duckduckgo_search.DDGS - INFO - Error to search using lite backend: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): operation timed out
+
+Caused by:
+    operation timed out
+2025-03-14 19:49:50,952 - jarvis.tools.web_search - ERROR - Search failed on attempt 1: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): operation timed out
+
+Caused by:
+    operation timed out
+2025-03-14 19:50:02,713 - duckduckgo_search.DDGS - INFO - Error to search using lite backend: https://lite.duckduckgo.com/lite/ RuntimeError: error sending request for url (https://lite.duckduckgo.com/lite/): operation timed out
+
+Caused by:
+    operation timed out
+2025-03-14 19:50:04,681 - primp - INFO - response: https://html.duckduckgo.com/html 200
+2025-03-14 19:50:04,696 - jarvis.tools.web_search - INFO - Found 5 results for text search
+2025-03-14 19:50:04,700 - jarvis.models.model_manager - INFO - Prompt complexity: 4
+2025-03-14 19:50:04,700 - jarvis.models.model_manager - INFO - Using local model
+2025-03-14 19:50:04,734 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 1/4, timeout: 30s)
+2025-03-14 19:50:34,757 - jarvis.models.local_model - ERROR - Timeout when calling Ollama API (timeout was 30s)
+2025-03-14 19:50:34,760 - jarvis.models.local_model - INFO - Retrying with longer timeout...
+2025-03-14 19:50:34,867 - jarvis.models.local_model - INFO - Sending request to Ollama API: http://localhost:11434/api/generate (attempt 2/4, timeout: 45s)
+2025-03-14 19:50:59,486 - jarvis.models.model_manager - INFO - Generated response using local model

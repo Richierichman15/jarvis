@@ -8,6 +8,8 @@ An AI assistant inspired by Iron Man's JARVIS, built with a hybrid approach usin
 - **Memory**: Remembers conversation history for context
 - **Tools**: Can search the web and use other tools to help answer questions
 - **Beautiful CLI**: Stylish command-line interface for interacting with JARVIS
+- **Dual Model Mode**: Compare responses and performance of local and OpenAI models side by side
+- **Docker Support**: Run Jarvis and Ollama in containers for easy deployment
 
 ## Requirements
 
@@ -17,16 +19,32 @@ An AI assistant inspired by Iron Man's JARVIS, built with a hybrid approach usin
 
 ## Installation
 
+### Standard Installation
+
 1. Clone this repository
 2. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
 3. Make sure Ollama is installed and running
-4. Pull the DeepSeek Coder model (or another model of your choice):
+4. Pull the needed models:
    ```
-   ollama pull deepseek-coder
+   ollama pull llama3:8b-instruct-q4_0
    ```
+
+### Docker Installation
+
+For containerized deployment (includes Ollama):
+
+1. Make sure you have Docker and Docker Compose installed
+2. Clone this repository
+3. Start the containers:
+   ```
+   docker-compose up -d
+   ```
+4. Access the web interface at http://localhost:5000
+
+See [DOCKER_README.md](DOCKER_README.md) for detailed Docker instructions.
 
 ## Usage
 
@@ -46,18 +64,42 @@ Ask JARVIS a single question:
 python main.py query "What is the capital of France?" --name "Your Name"
 ```
 
-### Using OpenAI
+### Dual Model Mode
 
-To use OpenAI for more complex reasoning, set your API key:
+Compare local and OpenAI models in real-time to see which is faster and how responses differ:
 
 ```bash
-export OPENAI_API_KEY=your_api_key_here
+# Interactive dual model chat
+python main.py dual_chat --openai-key your_api_key_here
+
+# Single dual model query
+python main.py dual_query "What is quantum computing?" --openai-key your_api_key_here
 ```
 
-Or pass it directly:
+Both commands will show responses from the local model and OpenAI side by side, along with performance metrics.
+
+### Weather Information
+
+Get weather information for any location:
 
 ```bash
-python main.py chat --openai-key your_api_key_here
+python main.py weather "New York" 
+```
+
+For the best weather data, set up an OpenWeatherMap API key:
+
+```bash
+export OPENWEATHER_API_KEY=your_api_key_here
+```
+
+See [WEATHER_README.md](WEATHER_README.md) for detailed setup instructions.
+
+### Web Interface
+
+Start the web interface:
+
+```bash
+python main.py --web
 ```
 
 ## Project Structure
