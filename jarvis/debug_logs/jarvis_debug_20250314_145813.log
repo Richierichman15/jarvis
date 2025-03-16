@@ -1,7 +1,0 @@
-2025-03-14 14:58:13,174 - jarvis.tools.debug - INFO - Debug tool initialized, logging to /Users/gitonga-nyaga/github/jarvis/jarvis/debug_logs/jarvis_debug_20250314_145813.log
-2025-03-14 14:58:13,174 - jarvis.tools.tool_manager - INFO - Debug tool initialized
-2025-03-14 14:58:13,174 - jarvis.tools.tool_manager - INFO - Available tools: web_search, calculator, file_operations, system_info, code_editor
-2025-03-14 14:58:13,207 - werkzeug - WARNING -  * Debugger is active!
-2025-03-14 14:58:13,222 - werkzeug - INFO -  * Debugger PIN: 114-853-611
-2025-03-14 14:58:17,952 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2025 14:58:17] "GET / HTTP/1.1" 200 -
-2025-03-14 14:58:24,873 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2025 14:58:24] "GET / HTTP/1.1" 200 -
