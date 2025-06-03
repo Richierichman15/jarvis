@@ -13,7 +13,8 @@ from jarvis.cli import (
     dual_chat,
     dual_query
 )
-from jarvis.web_interface import run_web_server
+# Comment out web interface import
+# from jarvis.web_interface import run_web_server
 
 app = typer.Typer(help="Jarvis AI Assistant")
 
@@ -27,6 +28,8 @@ app.command()(dual_chat)
 app.command()(dual_query)
 
 if __name__ == "__main__":
+    # Comment out web interface related code
+    """
     # Check for web interface flag
     parser = argparse.ArgumentParser(description="Jarvis AI Assistant")
     parser.add_argument("--web", action="store_true", help="Start the web interface")
@@ -43,3 +46,6 @@ if __name__ == "__main__":
     else:
         # CLI mode
         app()
+    """
+    # Directly run CLI mode
+    app()
