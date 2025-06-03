@@ -55,6 +55,23 @@
             </div>
         </header>
 
+        <!-- Dashboard Categories -->
+        <section class="dashboard-section">
+            <h2>SYSTEM INTERFACE</h2>
+            <div class="category-grid">
+                {% for category, items in categories.items() %}
+                <div class="category-card">
+                    <h3>{{ category }}</h3>
+                    <ul class="category-items">
+                        {% for item in items %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
         <!-- Available Quests -->
         <section class="quests-section">
             <h2>AVAILABLE QUESTS</h2>
@@ -69,7 +86,7 @@
                         <p class="quest-description">{{ task.description }}</p>
                         <div class="quest-footer">
                             <span class="reward">{{ task.reward }}</span>
-                            <button onclick="completeQuest({{ loop.index }})" class="complete-btn">Complete</button>
+                            <button onclick="completeQuest({{ loop.index }}, '{{ task.name }}')" class="complete-btn">Complete</button>
                         </div>
                     </div>
                     {% endif %}

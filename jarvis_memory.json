@@ -128,9 +128,9 @@
     }
   ],
   "stats": {
-    "name": "Unknown",
-    "class": "Adventurer",
-    "title": "Novice",
+    "name": "Gitonga",
+    "class": "lost",
+    "title": "Hungry",
     "level": 1,
     "health": 5,
     "stamina": 100,

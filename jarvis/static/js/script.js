@@ -1,19 +1,27 @@
 // Function to complete a quest
-async function completeQuest(taskIndex) {
+async function completeQuest(taskIndex, questName) {
     try {
         const response = await fetch('/api/complete_task', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ task_index: taskIndex })
+            body: JSON.stringify({ 
+                task_index: taskIndex,
+                quest_name: questName 
+            })
         });
         
         const data = await response.json();
         
         if (data.success) {
-            // Refresh the page to show updated stats and quests
-            location.reload();
+            // Show the notification in a modal overlay
+            showNotificationModal(data.notification);
+            
+            // After notification timeout, refresh the page
+            setTimeout(() => {
+                location.reload();
+            }, 5000);
         } else {
             alert('Failed to complete quest: ' + data.error);
         }
@@ -21,6 +29,45 @@ async function completeQuest(taskIndex) {
         console.error('Error completing quest:', error);
         alert('Failed to complete quest. Please try again.');
     }
+}
+
+// Function to show notification modal
+function showNotificationModal(notification) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-80';
+    
+    // Create notification content
+    const content = `
+        <div class="w-[420px] p-8 notification-container">
+            <h2 class="notification-header mb-4">
+                <span class="mr-2">⚡</span> NOTIFICATION
+            </h2>
+
+            <div class="notification-type mb-2">
+                [${notification.type}:]
+            </div>
+            <div class="notification-message mb-6">
+                "${notification.message}"
+            </div>
+
+            <div class="flex justify-center items-center">
+                <div class="check-icon-wrapper">
+                    <svg class="check-icon" viewBox="0 0 24 24">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    overlay.innerHTML = content;
+    document.body.appendChild(overlay);
+    
+    // Remove overlay after 5 seconds
+    setTimeout(() => {
+        overlay.remove();
+    }, 5000);
 }
 
 // Function to get quest suggestions
@@ -48,6 +95,27 @@ function toggleCompletedQuests() {
     } else {
         completedSection.style.display = 'none';
         button.textContent = 'Show History';
+    }
+}
+
+// Function to create a custom notification
+async function createNotification(type, message) {
+    try {
+        const response = await fetch('/api/notify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ type, message })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.redirect) {
+            window.location.href = data.redirect;
+        }
+    } catch (error) {
+        console.error('Error creating notification:', error);
     }
 }
 

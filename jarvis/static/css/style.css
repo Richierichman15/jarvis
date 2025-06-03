@@ -321,4 +321,64 @@ body.dark-theme {
     .quest-list {
         grid-template-columns: 1fr;
     }
+}
+
+/* Dashboard Categories */
+.dashboard-section {
+    margin-bottom: 40px;
+}
+
+.dashboard-section h2 {
+    color: var(--secondary-color);
+    text-shadow: 0 0 10px var(--secondary-color);
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 2em;
+}
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.category-card {
+    background-color: var(--background-light);
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid var(--primary-color);
+    transition: all 0.3s ease;
+}
+
+.category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(0, 255, 157, 0.2);
+}
+
+.category-card h3 {
+    color: var(--primary-color);
+    margin: 0 0 15px 0;
+    font-size: 1.3em;
+    text-shadow: 0 0 5px var(--primary-color);
+}
+
+.category-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.category-items li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.category-items li:last-child {
+    border-bottom: none;
+}
+
+.category-items li:hover {
+    color: var(--primary-color);
+    transform: translateX(5px);
 } 
