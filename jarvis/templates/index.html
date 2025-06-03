@@ -3,126 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System - Level Up Your Life</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>System - Available Quests</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="dark-theme">
-    <div class="container">
-        <!-- Character Profile -->
-        <header class="character-profile">
-            <div class="profile-header">
-                <div class="profile-main">
-                    <h1 class="character-name">{{ stats.name|default('Unknown') }}</h1>
-                    <div class="character-titles">
-                        <span class="character-class">{{ stats.class|default('Adventurer') }}</span>
-                        <span class="character-title">{{ stats.title|default('Novice') }}</span>
+<body class="bg-black text-white min-h-screen p-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white tracking-wider text-glow mb-4">AVAILABLE QUESTS</h1>
+            <p class="text-xl text-white/80">Choose your next mission, {{ session.username }}</p>
+        </div>
+
+        <!-- Quest Categories -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <button class="category-btn active" onclick="filterQuests('all')">All Quests</button>
+            <button class="category-btn" onclick="filterQuests('pending')">Available</button>
+            <button class="category-btn" onclick="filterQuests('completed')">Completed</button>
+        </div>
+
+        <!-- Quest Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {% for task in tasks %}
+            <div class="quest-card {{ task.status }} bg-black border border-white/30 rounded-xl p-6 shadow-lg relative overflow-hidden">
+                <!-- Grid pattern background -->
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                
+                <!-- Quest Content -->
+                <div class="relative z-10">
+                    <!-- Quest Header -->
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xl font-bold text-white text-glow">{{ task.name }}</h3>
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold bg-black border border-white/30">
+                            {{ task.difficulty }}-RANK
+                        </span>
                     </div>
-                </div>
-                <div class="rank-display">
-                    <h2>RANK {{ stats.rank }}</h2>
-                    <div class="progress-bar">
-                        <div class="progress" style="width: {{ (stats.rank_xp / rank_requirements[stats.rank]) * 100 }}%"></div>
-                    </div>
-                    <p>XP: {{ stats.rank_xp }} / {{ rank_requirements[stats.rank] }}</p>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-item level">
-                    <span class="stat-label">Level</span>
-                    <span class="stat-value">{{ stats.level }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Strength</span>
-                    <span class="stat-value">{{ stats.strength }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Stamina</span>
-                    <span class="stat-value">{{ stats.stamina|default(0) }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Intelligence</span>
-                    <span class="stat-value">{{ stats.intelligence }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Health</span>
-                    <span class="stat-value">{{ stats.health }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Wealth</span>
-                    <span class="stat-value">{{ stats.wealth }}</span>
-                </div>
-            </div>
-        </header>
-
-        <!-- Dashboard Categories -->
-        <section class="dashboard-section">
-            <h2>SYSTEM INTERFACE</h2>
-            <div class="category-grid">
-                {% for category, items in categories.items() %}
-                <div class="category-card">
-                    <h3>{{ category }}</h3>
-                    <ul class="category-items">
-                        {% for item in items %}
-                        <li>{{ item }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endfor %}
-            </div>
-        </section>
-
-        <!-- Available Quests -->
-        <section class="quests-section">
-            <h2>AVAILABLE QUESTS</h2>
-            <div class="quest-list">
-                {% for task in tasks %}
-                    {% if task.status == 'pending' %}
-                    <div class="quest-card {{ task.difficulty.lower() }}-rank">
-                        <div class="quest-header">
-                            <h3>{{ task.name }}</h3>
-                            <span class="rank-badge">{{ task.difficulty }}-RANK</span>
+                    
+                    <!-- Quest Description -->
+                    <p class="text-white/80 mb-6">{{ task.description }}</p>
+                    
+                    <!-- Quest Footer -->
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-white/60">Reward:</span>
+                            <span class="text-white text-glow">{{ task.reward }}</span>
                         </div>
-                        <p class="quest-description">{{ task.description }}</p>
-                        <div class="quest-footer">
-                            <span class="reward">{{ task.reward }}</span>
-                            <button onclick="completeQuest({{ loop.index }}, '{{ task.name }}')" class="complete-btn">Complete</button>
-                        </div>
+                        
+                        {% if task.status == 'pending' %}
+                        <button 
+                            onclick="completeQuest({{ loop.index }}, '{{ task.name }}')"
+                            class="quest-btn group"
+                        >
+                            Complete
+                        </button>
+                        {% else %}
+                        <span class="completed-badge">
+                            ✓ Completed
+                        </span>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                {% endfor %}
+                </div>
             </div>
-        </section>
+            {% endfor %}
+        </div>
 
         <!-- Action Buttons -->
-        <section class="actions-section">
-            <button onclick="suggestQuests()" class="action-btn suggest-btn">Get Suggestions</button>
-            <button onclick="toggleCompletedQuests()" class="action-btn history-btn">Show History</button>
-        </section>
-
-        <!-- Completed Quests Section (Hidden by default) -->
-        <section class="completed-quests-section" style="display: none;">
-            <h2>COMPLETED QUESTS</h2>
-            <div class="quest-list">
-                {% for task in tasks %}
-                    {% if task.status == 'completed' %}
-                    <div class="quest-card {{ task.difficulty.lower() }}-rank completed">
-                        <div class="quest-header">
-                            <h3>{{ task.name }}</h3>
-                            <span class="rank-badge">{{ task.difficulty }}-RANK</span>
-                        </div>
-                        <p class="quest-description">{{ task.description }}</p>
-                        <div class="quest-footer">
-                            <span class="reward">{{ task.reward }}</span>
-                            <span class="completed-badge">✓ Completed</span>
-                        </div>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </section>
+        <div class="flex justify-center gap-6 mt-12">
+            <button onclick="suggestQuests()" class="menu-button group">
+                <span>Get Suggestions</span>
+                <i class="fas fa-lightbulb text-white group-hover:text-glow"></i>
+            </button>
+            <button onclick="toggleCompletedQuests()" class="menu-button group">
+                <span>Toggle History</span>
+                <i class="fas fa-history text-white group-hover:text-glow"></i>
+            </button>
+        </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <style>
+        /* Custom CSS for the grid pattern background and text glow */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .text-glow {
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: black;
+        }
+
+        /* Category button styling */
+        .category-btn {
+            background-color: black;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        .category-btn:hover, .category-btn.active {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+            transform: translateY(-2px);
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        /* Quest button styling */
+        .quest-btn {
+            background-color: black;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        .quest-btn:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+            transform: translateY(-2px);
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        /* Menu button styling */
+        .menu-button {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background-color: black;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        .menu-button:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Completed badge */
+        .completed-badge {
+            color: #00ff00;
+            text-shadow: 
+                0 0 5px #00ff00,
+                0 0 10px #00ff00;
+            font-size: 0.875rem;
+        }
+
+        /* Quest card states */
+        .quest-card.completed {
+            opacity: 0.7;
+        }
+
+        /* Add a subtle blue glow to borders */
+        .border {
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+    </style>
+
+    <script>
+        function filterQuests(status) {
+            const cards = document.querySelectorAll('.quest-card');
+            cards.forEach(card => {
+                if (status === 'all' || card.classList.contains(status)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            // Update active button
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        async function completeQuest(taskIndex, questName) {
+            try {
+                const response = await fetch('/api/complete_task', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        task_index: taskIndex,
+                        quest_name: questName 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show the notification in a modal overlay
+                    showNotificationModal(data.notification);
+                    
+                    // After notification timeout, refresh the page
+                    setTimeout(() => {
+                        location.reload();
+                    }, 5000);
+                } else {
+                    alert('Failed to complete quest: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error completing quest:', error);
+                alert('Failed to complete quest. Please try again.');
+            }
+        }
+
+        async function suggestQuests() {
+            try {
+                const response = await fetch('/api/suggest_tasks');
+                const data = await response.json();
+                location.reload();
+            } catch (error) {
+                console.error('Error getting quest suggestions:', error);
+                alert('Failed to get quest suggestions. Please try again.');
+            }
+        }
+
+        function toggleCompletedQuests() {
+            const completedCards = document.querySelectorAll('.quest-card.completed');
+            completedCards.forEach(card => {
+                card.style.display = card.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+    </script>
 </body>
 </html> 

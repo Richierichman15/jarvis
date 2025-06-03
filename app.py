@@ -66,6 +66,24 @@ def dashboard():
                          tasks=system.tasks,
                          session=session)
 
+@app.route('/quests')
+def show_quests():
+    """Render the quests page"""
+    return render_template('index.html',
+                         categories=DASHBOARD_CATEGORIES,
+                         stats=system.stats,
+                         tasks=system.tasks,
+                         session=session)
+
+@app.route('/character-status')
+def character_status():
+    """Render the character status page"""
+    if "username" not in session:
+        session["username"] = "User"  # Set default username
+    return render_template('status.html',
+                         stats=system.stats,
+                         rank_requirements=system.rank_requirements)
+
 @app.route('/notification/<notification_type>')
 def show_notification(notification_type):
     """Show a notification"""
