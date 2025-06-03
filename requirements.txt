@@ -29,7 +29,7 @@ ollama>=0.1.5
 huggingface_hub>=0.21.0
 
 # Tools
-langchain-community>=0.0.13
+langchain-community>=0.0.27
 beautifulsoup4>=4.12.0
 
 # Memory & Storage
@@ -53,4 +53,8 @@ flask-cors>=4.0.0  # For API CORS support
 werkzeug>=2.0.0  # For middleware
 pyjwt>=2.8.0  # For JWT authentication
 cryptography>=42.0.0  # For secure operations
-gunicorn>=21.0.0  # For production API serving 
+gunicorn>=21.0.0  # For production API serving
+
+Flask==3.0.2
+langchain-core==0.1.27
+langchain-ollama==0.0.3 
