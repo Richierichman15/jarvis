@@ -27,21 +27,66 @@ body.dark-theme {
     padding: 20px;
 }
 
-/* Stats Header */
-.stats-header {
+/* Character Profile */
+.character-profile {
     background-color: var(--background-light);
     border-radius: 10px;
     padding: 20px;
     margin-bottom: 30px;
+    box-shadow: 0 0 20px rgba(0, 255, 157, 0.1);
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-main {
+    flex: 1;
+}
+
+.character-name {
+    font-size: 2.5em;
+    margin: 0;
+    color: var(--primary-color);
+    text-shadow: 0 0 10px var(--primary-color);
+}
+
+.character-titles {
+    margin-top: 5px;
+}
+
+.character-class,
+.character-title {
+    display: inline-block;
+    padding: 4px 8px;
+    margin-right: 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.character-class {
+    color: var(--secondary-color);
+    border: 1px solid var(--secondary-color);
+}
+
+.character-title {
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
 }
 
 .rank-display {
-    text-align: center;
-    margin-bottom: 20px;
+    text-align: right;
+    min-width: 200px;
 }
 
-.rank-display h1 {
-    font-size: 3em;
+.rank-display h2 {
+    font-size: 2em;
     margin: 0;
     color: var(--primary-color);
     text-shadow: 0 0 10px var(--primary-color);
@@ -53,6 +98,7 @@ body.dark-theme {
     height: 20px;
     margin: 10px 0;
     overflow: hidden;
+    border: 1px solid rgba(0, 255, 157, 0.3);
 }
 
 .progress {
@@ -73,18 +119,33 @@ body.dark-theme {
     border-radius: 5px;
     padding: 15px;
     text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.2);
+}
+
+.stat-item.level {
+    background: linear-gradient(45deg, var(--background-dark), rgba(0, 255, 157, 0.1));
+    border-color: var(--primary-color);
 }
 
 .stat-label {
     display: block;
     font-size: 0.9em;
     margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .stat-value {
     display: block;
-    font-size: 1.5em;
+    font-size: 1.8em;
     color: var(--primary-color);
+    text-shadow: 0 0 10px var(--primary-color);
 }
 
 /* Quests Section */
@@ -186,6 +247,10 @@ body.dark-theme {
 /* Action Buttons */
 .actions-section {
     text-align: center;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 30px;
 }
 
 .action-btn {
@@ -202,6 +267,41 @@ body.dark-theme {
 .action-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 0 15px var(--secondary-color);
+}
+
+.history-btn {
+    background-color: var(--background-light);
+    border: 2px solid var(--secondary-color);
+}
+
+/* Completed Quests Section */
+.completed-quests-section {
+    margin-top: 30px;
+}
+
+.completed-quests-section h2 {
+    color: var(--primary-color);
+    text-shadow: 0 0 10px var(--primary-color);
+    margin-bottom: 20px;
+    opacity: 0.7;
+}
+
+.quest-card.completed {
+    opacity: 0.7;
+    filter: grayscale(30%);
+}
+
+.completed-badge {
+    color: var(--primary-color);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.completed-badge::before {
+    content: '✓';
+    font-size: 1.2em;
 }
 
 /* Mobile Responsiveness */

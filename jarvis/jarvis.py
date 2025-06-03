@@ -57,11 +57,15 @@ class Jarvis:
         self.conversation_history = []
         self.tasks = []
         self.stats = {
-            "health": 0,
+            "name": "Unknown",
+            "class": "Adventurer",
+            "title": "Novice",
+            "level": 1,
+            "health": 100,
+            "stamina": 100,
             "intelligence": 0,
             "strength": 0,
             "wealth": 0,
-            "level": 1,
             "experience": 0,
             "rank": "E",
             "rank_xp": 0
@@ -178,9 +182,15 @@ class Jarvis:
         """Suggest tasks based on current stats"""
         suggestions = []
         
-        # Find lowest stats
+        # Find lowest stats (excluding non-numeric stats)
+        numeric_stats = {
+            stat: value 
+            for stat, value in self.stats.items() 
+            if stat in ['health', 'intelligence', 'strength', 'wealth']
+        }
+        
         lowest_stats = sorted(
-            [(stat, value) for stat, value in self.stats.items() if stat != "experience"],
+            numeric_stats.items(),
             key=lambda x: x[1]
         )[:2]  # Get 2 lowest stats
         

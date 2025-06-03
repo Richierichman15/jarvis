@@ -37,6 +37,20 @@ async function suggestQuests() {
     }
 }
 
+// Function to toggle completed quests visibility
+function toggleCompletedQuests() {
+    const completedSection = document.querySelector('.completed-quests-section');
+    const button = document.querySelector('.history-btn');
+    
+    if (completedSection.style.display === 'none') {
+        completedSection.style.display = 'block';
+        button.textContent = 'Hide History';
+    } else {
+        completedSection.style.display = 'none';
+        button.textContent = 'Show History';
+    }
+}
+
 // Add animation when quest cards appear
 document.addEventListener('DOMContentLoaded', () => {
     const questCards = document.querySelectorAll('.quest-card');

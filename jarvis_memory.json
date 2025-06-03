@@ -72,9 +72,9 @@
       "difficulty": "E",
       "reward": "Health +5",
       "deadline": null,
-      "status": "pending",
+      "status": "completed",
       "created_at": "2025-06-03T08:05:56.071339",
-      "completed_at": null
+      "completed_at": "2025-06-03T11:13:53.039229"
     },
     {
       "name": "Learning Sprint",
@@ -105,16 +105,40 @@
       "status": "pending",
       "created_at": "2025-06-03T08:09:55.112138",
       "completed_at": null
+    },
+    {
+      "name": "Learning Sprint",
+      "description": "Study a new topic for 30 minutes",
+      "difficulty": "D",
+      "reward": "Intelligence +5",
+      "deadline": null,
+      "status": "pending",
+      "created_at": "2025-06-03T11:23:32.084553",
+      "completed_at": null
+    },
+    {
+      "name": "Quick Workout",
+      "description": "Complete a 20-minute workout session",
+      "difficulty": "D",
+      "reward": "Strength +5",
+      "deadline": null,
+      "status": "pending",
+      "created_at": "2025-06-03T11:23:32.086825",
+      "completed_at": null
     }
   ],
   "stats": {
-    "health": 0,
+    "name": "Unknown",
+    "class": "Adventurer",
+    "title": "Novice",
+    "level": 1,
+    "health": 5,
+    "stamina": 100,
     "intelligence": 0,
     "strength": 0,
     "wealth": 0,
-    "level": 1,
-    "experience": 0,
+    "experience": 10,
     "rank": "E",
-    "rank_xp": 0
+    "rank_xp": 10
   }
 }

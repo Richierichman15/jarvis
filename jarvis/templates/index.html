@@ -8,31 +8,45 @@
 </head>
 <body class="dark-theme">
     <div class="container">
-        <!-- Header with Stats -->
-        <header class="stats-header">
-            <div class="rank-display">
-                <h1>RANK {{ stats.rank }}</h1>
-                <div class="progress-bar">
-                    <div class="progress" style="width: {{ (stats.rank_xp / rank_requirements[stats.rank]) * 100 }}%"></div>
+        <!-- Character Profile -->
+        <header class="character-profile">
+            <div class="profile-header">
+                <div class="profile-main">
+                    <h1 class="character-name">{{ stats.name|default('Unknown') }}</h1>
+                    <div class="character-titles">
+                        <span class="character-class">{{ stats.class|default('Adventurer') }}</span>
+                        <span class="character-title">{{ stats.title|default('Novice') }}</span>
+                    </div>
                 </div>
-                <p>XP: {{ stats.rank_xp }} / {{ rank_requirements[stats.rank] }}</p>
+                <div class="rank-display">
+                    <h2>RANK {{ stats.rank }}</h2>
+                    <div class="progress-bar">
+                        <div class="progress" style="width: {{ (stats.rank_xp / rank_requirements[stats.rank]) * 100 }}%"></div>
+                    </div>
+                    <p>XP: {{ stats.rank_xp }} / {{ rank_requirements[stats.rank] }}</p>
+                </div>
             </div>
+
             <div class="stats-grid">
-                <div class="stat-item">
+                <div class="stat-item level">
                     <span class="stat-label">Level</span>
                     <span class="stat-value">{{ stats.level }}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">Health</span>
-                    <span class="stat-value">{{ stats.health }}</span>
+                    <span class="stat-label">Strength</span>
+                    <span class="stat-value">{{ stats.strength }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Stamina</span>
+                    <span class="stat-value">{{ stats.stamina|default(0) }}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Intelligence</span>
                     <span class="stat-value">{{ stats.intelligence }}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">Strength</span>
-                    <span class="stat-value">{{ stats.strength }}</span>
+                    <span class="stat-label">Health</span>
+                    <span class="stat-value">{{ stats.health }}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Wealth</span>
@@ -46,21 +60,19 @@
             <h2>AVAILABLE QUESTS</h2>
             <div class="quest-list">
                 {% for task in tasks %}
-                <div class="quest-card {{ task.difficulty.lower() }}-rank">
-                    <div class="quest-header">
-                        <h3>{{ task.name }}</h3>
-                        <span class="rank-badge">{{ task.difficulty }}-RANK</span>
+                    {% if task.status == 'pending' %}
+                    <div class="quest-card {{ task.difficulty.lower() }}-rank">
+                        <div class="quest-header">
+                            <h3>{{ task.name }}</h3>
+                            <span class="rank-badge">{{ task.difficulty }}-RANK</span>
+                        </div>
+                        <p class="quest-description">{{ task.description }}</p>
+                        <div class="quest-footer">
+                            <span class="reward">{{ task.reward }}</span>
+                            <button onclick="completeQuest({{ loop.index }})" class="complete-btn">Complete</button>
+                        </div>
                     </div>
-                    <p class="quest-description">{{ task.description }}</p>
-                    <div class="quest-footer">
-                        <span class="reward">{{ task.reward }}</span>
-                        {% if task.status == 'pending' %}
-                        <button onclick="completeQuest({{ loop.index }})" class="complete-btn">Complete</button>
-                        {% else %}
-                        <span class="completed-badge">✓ Completed</span>
-                        {% endif %}
-                    </div>
-                </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         </section>
@@ -68,6 +80,29 @@
         <!-- Action Buttons -->
         <section class="actions-section">
             <button onclick="suggestQuests()" class="action-btn suggest-btn">Get Suggestions</button>
+            <button onclick="toggleCompletedQuests()" class="action-btn history-btn">Show History</button>
+        </section>
+
+        <!-- Completed Quests Section (Hidden by default) -->
+        <section class="completed-quests-section" style="display: none;">
+            <h2>COMPLETED QUESTS</h2>
+            <div class="quest-list">
+                {% for task in tasks %}
+                    {% if task.status == 'completed' %}
+                    <div class="quest-card {{ task.difficulty.lower() }}-rank completed">
+                        <div class="quest-header">
+                            <h3>{{ task.name }}</h3>
+                            <span class="rank-badge">{{ task.difficulty }}-RANK</span>
+                        </div>
+                        <p class="quest-description">{{ task.description }}</p>
+                        <div class="quest-footer">
+                            <span class="reward">{{ task.reward }}</span>
+                            <span class="completed-badge">✓ Completed</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
         </section>
     </div>
 
