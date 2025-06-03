@@ -12,7 +12,18 @@
         <!-- Header -->
         <div class="text-center mb-12">
             <h1 class="text-5xl font-bold text-white tracking-wider text-glow mb-4">AVAILABLE QUESTS</h1>
-            <p class="text-xl text-white/80">Choose your next mission, {{ session.username }}</p>
+            <p class="text-xl text-white/80 mb-6">Choose your next mission, {{ session.username }}</p>
+            
+            <!-- Level and XP Progress -->
+            <div class="max-w-md mx-auto">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg font-semibold text-glow">Level {{ stats.level }}</span>
+                    <span class="text-sm text-white/70">{{ stats.experience }}/{{ stats.level * 150 }} XP</span>
+                </div>
+                <div class="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full progress-glow" style="width: {{ (stats.experience / (stats.level * 150) * 100)|round }}%"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Quest Categories -->
@@ -182,6 +193,28 @@
         /* Add a subtle blue glow to borders */
         .border {
             box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        /* Progress bar glow effect */
+        .progress-glow {
+            box-shadow: 0 0 10px #0066ff,
+                       0 0 20px #0066ff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 10px #0066ff,
+                           0 0 20px #0066ff;
+            }
+            50% {
+                box-shadow: 0 0 15px #0066ff,
+                           0 0 30px #0066ff;
+            }
+            100% {
+                box-shadow: 0 0 10px #0066ff,
+                           0 0 20px #0066ff;
+            }
         }
     </style>
 

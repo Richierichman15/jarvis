@@ -15,8 +15,8 @@
             <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0 rounded-xl"></div>
             
             <div class="bg-black border border-white/30 rounded-xl p-8 shadow-lg relative z-10">
-                <h1 class="text-5xl font-bold text-white text-center mb-12 tracking-wider text-glow">SYSTEM</h1>
-                
+                <h1 class="text-5xl font-bold text-white text-center mb-8 tracking-wider text-glow">SYSTEM</h1>
+                <h1 class="text-2xl font-bold text-white text-center mb-8 tracking-wider text-glow">Welcome Gitonga</h1>
                 <div class="flex flex-col gap-4">
                     <a href="{{ url_for('show_quests') }}" class="menu-button group">
                         <i class="fas fa-play text-white group-hover:text-glow"></i>
@@ -28,22 +28,12 @@
                         <span>Stats & Skills</span>
                     </a>
                     
-                    <a href="{{ url_for('dashboard') }}" class="menu-button group">
+                    <a href="{{ url_for('inventory') }}" class="menu-button group">
                         <i class="fas fa-bag-shopping text-white group-hover:text-glow"></i>
                         <span>Inventory</span>
                     </a>
                     
-                    <a href="{{ url_for('dashboard') }}" class="menu-button group">
-                        <i class="fas fa-cog text-white group-hover:text-glow"></i>
-                        <span>Settings</span>
-                    </a>
-                    
-                    <a href="{{ url_for('dashboard') }}" class="menu-button group">
-                        <i class="fas fa-history text-white group-hover:text-glow"></i>
-                        <span>History</span>
-                    </a>
-                    
-                    <a href="{{ url_for('dashboard') }}" class="menu-button group">
+                    <a href="{{ url_for('world_map') }}" class="menu-button group">
                         <i class="fas fa-globe text-white group-hover:text-glow"></i>
                         <span>World Map</span>
                     </a>
@@ -109,6 +99,7 @@
         .border {
             box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
         }
+
     </style>
 </body>
 </html>

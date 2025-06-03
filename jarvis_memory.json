@@ -139,6 +139,16 @@
     "wealth": 0,
     "experience": 10,
     "rank": "E",
-    "rank_xp": 10
+    "rank_xp": 10,
+    "inventory": [
+      {
+        "id": 1,
+        "name": "Macbook",
+        "type": "Equipment",
+        "quantity": 1,
+        "description": "",
+        "acquired_at": "2025-06-03T15:42:38.369731"
+      }
+    ]
   }
 }

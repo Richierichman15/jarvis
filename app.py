@@ -1,6 +1,7 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from jarvis import Jarvis
 import os
+from datetime import datetime
 
 app = Flask(__name__, 
            template_folder='jarvis/templates',
@@ -83,6 +84,15 @@ def character_status():
     return render_template('status.html',
                          stats=system.stats,
                          rank_requirements=system.rank_requirements)
+
+@app.route('/inventory')
+def inventory():
+    """Render the inventory page"""
+    if "username" not in session:
+        session["username"] = "User"
+    return render_template('inventory.html',
+                         stats=system.stats,
+                         inventory=system.stats.get('inventory', []))
 
 @app.route('/notification/<notification_type>')
 def show_notification(notification_type):
@@ -180,6 +190,87 @@ def suggest_tasks():
     """Get task suggestions"""
     system.suggest_tasks()
     return jsonify([task.to_dict() for task in system.tasks])
+
+@app.route('/api/inventory', methods=['POST'])
+def add_inventory_item():
+    """Add a new item to inventory"""
+    data = request.json
+    if 'inventory' not in system.stats:
+        system.stats['inventory'] = []
+    
+    item = {
+        'id': len(system.stats['inventory']) + 1,
+        'name': data.get('name'),
+        'type': data.get('type'),
+        'quantity': data.get('quantity', 1),
+        'description': data.get('description', ''),
+        'acquired_at': datetime.now().isoformat()
+    }
+    
+    system.stats['inventory'].append(item)
+    system.save_memory()
+    return jsonify({'success': True, 'item': item})
+
+@app.route('/api/inventory/<int:item_id>', methods=['PUT'])
+def update_inventory_item(item_id):
+    """Update an inventory item"""
+    data = request.json
+    inventory = system.stats.get('inventory', [])
+    
+    for item in inventory:
+        if item['id'] == item_id:
+            item.update({
+                'name': data.get('name', item['name']),
+                'type': data.get('type', item['type']),
+                'quantity': data.get('quantity', item['quantity']),
+                'description': data.get('description', item['description'])
+            })
+            system.save_memory()
+            return jsonify({'success': True, 'item': item})
+    
+    return jsonify({'success': False, 'error': 'Item not found'}), 404
+
+@app.route('/api/inventory/<int:item_id>', methods=['DELETE'])
+def delete_inventory_item(item_id):
+    """Delete an inventory item"""
+    if 'inventory' not in system.stats:
+        return jsonify({'success': False, 'error': 'Inventory not found'}), 404
+    
+    inventory = system.stats['inventory']
+    for i, item in enumerate(inventory):
+        if item['id'] == item_id:
+            del inventory[i]
+            system.save_memory()
+            return jsonify({'success': True})
+    
+    return jsonify({'success': False, 'error': 'Item not found'}), 404
+
+@app.route('/world-map')
+def world_map():
+    """Render the world map page"""
+    if "username" not in session:
+        session["username"] = "User"
+    return render_template('world_map.html',
+                         stats=system.stats,
+                         current_location=system.stats.get('current_location', {
+                             'lat': 35.4676,  # Oklahoma City coordinates
+                             'lng': -97.5164,
+                             'name': 'Oklahoma City'
+                         }))
+
+@app.route('/api/update-location', methods=['POST'])
+def update_location():
+    """Update the user's current location"""
+    data = request.json
+    location = {
+        'lat': data.get('lat'),
+        'lng': data.get('lng'),
+        'name': data.get('name', 'Unknown Location'),
+        'updated_at': datetime.now().isoformat()
+    }
+    system.stats['current_location'] = location
+    system.save_memory()
+    return jsonify({'success': True, 'location': location})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5002) 
