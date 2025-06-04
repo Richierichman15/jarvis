@@ -3,11 +3,68 @@ from jarvis import Jarvis
 import os
 from datetime import datetime
 import json
+import firebase_admin
+from firebase_admin import credentials, messaging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Required Firebase environment variables
+REQUIRED_FIREBASE_VARS = [
+    "FIREBASE_TYPE",
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_PRIVATE_KEY_ID",
+    "FIREBASE_PRIVATE_KEY",
+    "FIREBASE_CLIENT_EMAIL",
+    "FIREBASE_CLIENT_ID",
+    "FIREBASE_AUTH_URI",
+    "FIREBASE_TOKEN_URI",
+    "FIREBASE_AUTH_PROVIDER_X509_CERT_URL",
+    "FIREBASE_CLIENT_X509_CERT_URL",
+    "VAPIDKEY" 
+]
 
 app = Flask(__name__, 
            template_folder='jarvis/templates',
            static_folder='jarvis/static')
-app.secret_key = os.urandom(24)  # Required for session management
+app.secret_key = os.urandom(24)
+
+# Initialize Firebase Admin with credentials from environment variables
+firebase_enabled = False  # Flag to track if Firebase is properly initialized
+
+def validate_firebase_env():
+    """Validate that all required Firebase environment variables are present"""
+    missing_vars = [var for var in REQUIRED_FIREBASE_VARS if not os.getenv(var)]
+    if missing_vars:
+        raise ValueError(f"Missing required Firebase environment variables: {', '.join(missing_vars)}")
+
+try:
+    # Validate environment variables
+    validate_firebase_env()
+    
+    # Create credentials dictionary
+    firebase_creds = {
+        "type": os.getenv("FIREBASE_TYPE"),
+        "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+        "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+        "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
+        "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+        "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+        "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+        "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+        "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
+        "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL")
+    }
+    
+    cred = credentials.Certificate(firebase_creds)
+    firebase_admin.initialize_app(cred)
+    firebase_enabled = True
+    print("✅ Firebase Admin SDK initialized successfully!")
+except ValueError as ve:
+    print(f"⚠️  Firebase initialization skipped: {str(ve)}")
+except Exception as e:
+    print(f"❌ Error initializing Firebase Admin SDK: {str(e)}")
 
 system = Jarvis()  # Initialize our System
 
@@ -213,9 +270,42 @@ def toggle_quest_active():
         'error': 'No task index provided'
     }), 400
 
+@app.route('/api/save-notification-token', methods=['POST'])
+def save_notification_token():
+    """Save the FCM token for the user"""
+    if not firebase_enabled:
+        return jsonify({'success': False, 'error': 'Firebase is not properly configured'})
+        
+    data = request.json
+    token = data.get('token')
+    if token:
+        session['fcm_token'] = token
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'No token provided'})
+
+def send_notification(token, title, body, data=None):
+    """Send a notification to a specific device"""
+    if not firebase_enabled:
+        return {'success': False, 'error': 'Firebase is not properly configured'}
+        
+    try:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            data=data or {},
+            token=token,
+        )
+        response = messaging.send(message)
+        return {'success': True, 'response': response}
+    except Exception as e:
+        print(f"Error sending notification: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
 @app.route('/api/complete_task', methods=['POST'])
 def complete_task():
-    """Complete a task"""
+    """Complete a task and send notification"""
     task_index = request.json.get('task_index')
     quest_name = request.json.get('quest_name', 'Unknown Quest')
     
@@ -227,16 +317,24 @@ def complete_task():
             notification = {
                 'type': 'Quest Completed',
                 'message': quest_name,
-                'xp_gained': system.stats.get('last_xp_gained', 100),  # You might want to get this from your system
-                'rewards': system.stats.get('last_rewards', ['Experience Points +100'])  # And this too
+                'xp_gained': system.stats.get('last_xp_gained', 100),
+                'rewards': system.stats.get('last_rewards', ['Experience Points +100'])
             }
+            
+            # Send push notification if Firebase is enabled and token exists
+            if firebase_enabled and 'fcm_token' in session:
+                notification_result = send_notification(
+                    token=session['fcm_token'],
+                    title=f'Quest Completed: {quest_name}',
+                    body=f'You gained {notification["xp_gained"]} XP!',
+                    data={'quest_name': quest_name}
+                )
+                if not notification_result['success']:
+                    print(f"Failed to send notification: {notification_result.get('error')}")
             
             return jsonify({
                 'success': True,
-                'notification': {
-                    'type': 'Quest Completed',
-                    'message': quest_name
-                }
+                'notification': notification
             })
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)})
@@ -328,6 +426,17 @@ def update_location():
     system.stats['current_location'] = location
     system.save_memory()
     return jsonify({'success': True, 'location': location})
+
+@app.route('/api/firebase-config')
+def firebase_config():
+    """Return Firebase configuration including VAPID key"""
+    if not firebase_enabled:
+        return jsonify({'success': False, 'error': 'Firebase is not properly configured'})
+    
+    return jsonify({
+        'success': True,
+        'vapidKey': os.getenv('VAPIDKEY')
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5002) 

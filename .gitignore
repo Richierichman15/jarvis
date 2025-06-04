@@ -44,3 +44,5 @@ Thumbs.db
 jarvis/memory/
 jarvis/debug_logs/
 *.log
+
+node_modules/

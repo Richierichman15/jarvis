@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Life Mastery - Skill Tree</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="/static/js/firebase-init.js"></script>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js"></script>
+    <!-- Firebase Messaging -->
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-messaging.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
@@ -400,8 +405,17 @@
         }
     </style>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
+    <script type="module">
+        import { requestNotificationPermission } from '/static/js/firebase-init.js';
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Request notification permission when the page loads
+            try {
+                await requestNotificationPermission();
+            } catch (error) {
+                console.error('Error setting up notifications:', error);
+            }
+
             const svg = document.getElementById('connections');
             const container = svg.parentElement;
             const containerRect = container.getBoundingClientRect();
