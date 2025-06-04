@@ -18,6 +18,7 @@ from pygments.util import ClassNotFound
 
 from .jarvis import Jarvis
 from .tools.code_editor import CodeEditorTool
+from .firebase_service import get_firebase_service
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -26,9 +27,16 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "templates"))
 
-# Initialize Jarvis
+# Initialize Jarvis and Firebase
 jarvis_instance = None
 code_editor = CodeEditorTool()
+firebase_service = get_firebase_service()
+
+# Initialize Firebase on startup
+@app.before_first_request
+def initialize_firebase():
+    """Initialize Firebase service when the app starts."""
+    firebase_service.initialize()
 
 
 def get_jarvis(user_name="User"):
@@ -146,6 +154,215 @@ def diff_code():
     # Calculate diff
     diff_result = code_editor.diff(original, modified)
     return jsonify({"diff": diff_result})
+
+
+# Firebase notification API endpoints
+@app.route("/api/firebase-config", methods=["GET"])
+def get_firebase_config():
+    """Get Firebase configuration for frontend."""
+    try:
+        config = firebase_service.get_config()
+        return jsonify(config)
+    except Exception as e:
+        logger.error(f"Error getting Firebase config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/save-notification-token", methods=["POST"])
+def save_notification_token():
+    """Save FCM token for a user."""
+    try:
+        data = request.json
+        token = data.get("token")
+        user_id = data.get("userId", "default_user")
+        
+        if not token:
+            return jsonify({"success": False, "error": "No token provided"}), 400
+        
+        success = firebase_service.save_user_token(user_id, token)
+        
+        if success:
+            return jsonify({"success": True, "message": "Token saved successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to save token"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error saving notification token: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/send-notification", methods=["POST"])
+def send_notification():
+    """Send a notification to a user."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        title = data.get("title", "")
+        message = data.get("message", "")
+        delay = data.get("delay", 0)  # in seconds
+        
+        if not title or not message:
+            return jsonify({"success": False, "error": "Title and message are required"}), 400
+        
+        success = firebase_service.send_notification(
+            user_id, title, message, 
+            data={"type": "custom"}, 
+            delay_seconds=delay
+        )
+        
+        if success:
+            return jsonify({"success": True, "message": "Notification sent successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to send notification"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error sending notification: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/add-xp", methods=["POST"])
+def add_xp():
+    """Add XP to a user."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        amount = data.get("amount", 0)
+        reason = data.get("reason", "")
+        
+        if amount <= 0:
+            return jsonify({"success": False, "error": "Amount must be greater than 0"}), 400
+        
+        result = firebase_service.add_user_xp(user_id, amount, reason)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error adding XP: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/load-progress", methods=["POST"])
+def load_progress():
+    """Load user progress."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        
+        result = firebase_service.get_user_progress(user_id)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error loading progress: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/save-progress", methods=["POST"])
+def save_progress():
+    """Save user progress."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        progress = data.get("progress", {})
+        
+        success = firebase_service.save_user_progress(user_id, progress)
+        
+        if success:
+            return jsonify({"success": True, "message": "Progress saved successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to save progress"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error saving progress: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/create-side-quest", methods=["POST"])
+def create_side_quest():
+    """Create a side quest for a user."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        title = data.get("title", "")
+        description = data.get("description", "")
+        xp_reward = data.get("xpReward", 50)
+        difficulty = data.get("difficulty", "medium")
+        
+        if not title or not description:
+            return jsonify({"success": False, "error": "Title and description are required"}), 400
+        
+        success = firebase_service.create_side_quest(
+            user_id, title, description, xp_reward, difficulty
+        )
+        
+        if success:
+            return jsonify({"success": True, "message": "Side quest created successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to create side quest"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error creating side quest: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/send-reminder", methods=["POST"])
+def send_reminder():
+    """Send a reminder notification."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        message = data.get("message", "")
+        delay_minutes = data.get("delayMinutes", 60)
+        
+        if not message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+        
+        success = firebase_service.send_reminder(user_id, message, delay_minutes)
+        
+        if success:
+            return jsonify({"success": True, "message": "Reminder scheduled successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to schedule reminder"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error sending reminder: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/send-engagement", methods=["POST"])
+def send_engagement():
+    """Send an engagement notification."""
+    try:
+        data = request.json
+        user_id = data.get("userId", "default_user")
+        
+        success = firebase_service.send_engagement_notification(user_id)
+        
+        if success:
+            return jsonify({"success": True, "message": "Engagement notification sent successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to send engagement notification"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error sending engagement notification: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/sync-progress", methods=["POST"])
+def sync_progress():
+    """Sync progress in background (for service worker)."""
+    try:
+        # This endpoint is called by the service worker for background sync
+        # For now, just return success
+        return jsonify({"success": True, "message": "Progress synced"})
+        
+    except Exception as e:
+        logger.error(f"Error syncing progress: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/notification")
+def notification_page():
+    """Serve the notification page."""
+    return render_template("notification.html")
 
 
 # Create a simple HTML template for the index page
