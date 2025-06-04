@@ -37,15 +37,6 @@
             <!-- Map -->
             <div id="map" class="w-full h-[600px] rounded-xl overflow-hidden border border-white/30 shadow-lg"></div>
             
-            <!-- Coordinates Display -->
-            <div class="absolute bottom-4 right-4 bg-black/80 p-4 rounded-lg border border-white/30 z-20">
-                <p class="text-sm font-mono">
-                    LAT: <span id="lat" class="text-glow">{{ current_location.lat }}</span>
-                </p>
-                <p class="text-sm font-mono">
-                    LNG: <span id="lng" class="text-glow">{{ current_location.lng }}</span>
-                </p>
-            </div>
             
             <!-- Location Update Button -->
             <button onclick="updateCurrentLocation()" class="absolute top-4 right-4 menu-button group z-20">

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Life Mastery - Skill Tree</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -12,6 +12,9 @@
                 extend: {
                     colors: {
                         'cyber-blue': '#0066ff',
+                        'cyber-red': '#ef4444',
+                        'cyber-green': '#22c55e',
+                        'cyber-purple': '#a855f7'
                     }
                 }
             }
@@ -19,35 +22,35 @@
     </script>
 </head>
 <body class="bg-black text-white min-h-screen">
-    <div class="container mx-auto p-8">
+    <div class="container mx-auto p-4 md:p-8">
         <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-4 text-glow">LIFE MASTERY TREE</h1>
-            <div class="flex justify-center gap-8">
-                <div class="bg-black border border-white/30 rounded p-4 relative overflow-hidden">
+        <div class="text-center mb-4 md:mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold mb-4 text-glow">LIFE MASTERY TREE</h1>
+            <div class="flex justify-center gap-4 md:gap-8">
+                <div class="bg-black border border-white/30 rounded p-3 md:p-4 relative overflow-hidden">
                     <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
                     <div class="relative z-10">
-                        <span class="text-white/60">Level</span>
-                        <span class="text-2xl font-bold text-glow ml-2">{{ stats.level }}</span>
+                        <span class="text-white/60 text-sm md:text-base">Level</span>
+                        <span class="text-xl md:text-2xl font-bold text-glow ml-2">{{ stats.level }}</span>
                     </div>
                 </div>
-                <div class="bg-black border border-white/30 rounded p-4 relative overflow-hidden">
+                <div class="bg-black border border-white/30 rounded p-3 md:p-4 relative overflow-hidden">
                     <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
                     <div class="relative z-10">
-                        <span class="text-white/60">Skill Points</span>
-                        <span class="text-2xl font-bold text-glow ml-2">3</span>
+                        <span class="text-white/60 text-sm md:text-base">Skill Points</span>
+                        <span class="text-xl md:text-2xl font-bold text-glow ml-2">{{ skill_points }}</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Skill Tree Container -->
-        <div class="relative w-full h-[800px] bg-black border border-white/30 rounded-lg overflow-hidden">
+        <!-- Skill Tree Container - Adjust height based on screen size -->
+        <div class="relative w-full h-[500px] md:h-[800px] bg-black border border-white/30 rounded-lg overflow-hidden touch-none">
             <!-- Grid Background -->
             <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
             
             <!-- SVG for connections -->
-            <svg class="absolute inset-0 w-full h-full z-10">
+            <svg class="absolute inset-0 w-full h-full z-10" id="connections">
                 <defs>
                     <filter id="glow">
                         <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
@@ -57,22 +60,6 @@
                         </feMerge>
                     </filter>
                 </defs>
-                <!-- Central to Category Connections -->
-                <line x1="50%" y1="50%" x2="30%" y2="30%" class="skill-connection"/>
-                <line x1="50%" y1="50%" x2="70%" y2="30%" class="skill-connection"/>
-                <line x1="50%" y1="50%" x2="30%" y2="70%" class="skill-connection"/>
-                <line x1="50%" y1="50%" x2="70%" y2="70%" class="skill-connection"/>
-                
-                <!-- Category to Skill Connections -->
-                <line x1="30%" y1="30%" x2="20%" y2="20%" class="skill-connection-sub"/>
-                <line x1="30%" y1="30%" x2="40%" y2="20%" class="skill-connection-sub"/>
-                <line x1="70%" y1="30%" x2="60%" y2="20%" class="skill-connection-sub"/>
-                <line x1="70%" y1="30%" x2="80%" y2="20%" class="skill-connection-sub"/>
-                
-                <line x1="30%" y1="70%" x2="20%" y2="80%" class="skill-connection-sub"/>
-                <line x1="30%" y1="70%" x2="40%" y2="80%" class="skill-connection-sub"/>
-                <line x1="70%" y1="70%" x2="60%" y2="80%" class="skill-connection-sub"/>
-                <line x1="70%" y1="70%" x2="80%" y2="80%" class="skill-connection-sub"/>
             </svg>
 
             <!-- Central Node - YOU -->
@@ -82,104 +69,50 @@
                     <div class="relative z-10 text-center">
                         <span class="text-3xl mb-1">👤</span>
                         <div class="text-xl font-bold text-glow">YOU</div>
+                        <div class="text-sm text-white/60">Level {{ stats.level }}</div>
                     </div>
                 </div>
             </div>
 
             <!-- Category Nodes -->
-            <div class="absolute top-[30%] left-[30%] -translate-x-1/2 -translate-y-1/2 z-20">
-                <div class="skill-node group combat">
-                    <span class="skill-tooltip">Combat Skills</span>
-                    <div class="text-2xl">⚔️</div>
-                    <div class="text-sm font-bold">COMBAT</div>
+            {% for category_id, category in skills_config.categories.items() %}
+            <div class="absolute" style="top: {{ category.position.y }}%; left: {{ category.position.x }}%; transform: translate(-50%, -50%); z-index: 20;">
+                <div class="skill-node group {{ category.name.lower() }}" style="border-color: {{ category.color }};">
+                    <span class="skill-tooltip">{{ category.description }}</span>
+                    <div class="text-2xl">{{ category.icon }}</div>
+                    <div class="text-sm font-bold">{{ category.name.upper() }}</div>
                 </div>
             </div>
 
-            <div class="absolute top-[30%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-20">
-                <div class="skill-node group intelligence">
-                    <span class="skill-tooltip">Intelligence Skills</span>
-                    <div class="text-2xl">🧠</div>
-                    <div class="text-sm font-bold">INTELLIGENCE</div>
+            <!-- Skills for this category -->
+            {% for skill in category.skills %}
+            <div class="absolute" style="top: {{ skill.position.y }}%; left: {{ skill.position.x }}%; transform: translate(-50%, -50%); z-index: 15;">
+                <div class="skill-node-small group {% if skill.unlocked %}unlocked{% else %}locked{% endif %}"
+                     data-skill-id="{{ skill.id }}"
+                     data-parent-skills="{{ skill.requirements.parent_skills|join(',') }}"
+                     style="border-color: {% if skill.unlocked %}{{ category.color }}{% else %}rgba(255,255,255,0.3){% endif %};">
+                    <span class="skill-tooltip">
+                        <div class="font-bold">{{ skill.name }}</div>
+                        <div class="text-xs">{{ skill.description }}</div>
+                        {% if not skill.unlocked %}
+                        <div class="text-xs text-red-400">
+                            Requires Level {{ skill.requirements.level }}
+                            {% if skill.requirements.parent_skills %}
+                            <br>Requires: {{ skill.requirements.parent_skills|join(', ') }}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </span>
+                    <div class="text-xl">{{ skill.icon }}</div>
                 </div>
             </div>
-
-            <div class="absolute top-[70%] left-[30%] -translate-x-1/2 -translate-y-1/2 z-20">
-                <div class="skill-node group wealth">
-                    <span class="skill-tooltip">Wealth Skills</span>
-                    <div class="text-2xl">💰</div>
-                    <div class="text-sm font-bold">WEALTH</div>
-                </div>
-            </div>
-
-            <div class="absolute top-[70%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-20">
-                <div class="skill-node group spiritual">
-                    <span class="skill-tooltip">Spiritual Skills</span>
-                    <div class="text-2xl">🧘</div>
-                    <div class="text-sm font-bold">SPIRITUAL</div>
-                </div>
-            </div>
-
-            <!-- Skill Nodes -->
-            <!-- Combat Skills -->
-            <div class="absolute top-[20%] left-[20%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Strength Training</span>
-                    <div class="text-xl">💪</div>
-                </div>
-            </div>
-            <div class="absolute top-[20%] left-[40%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Defense</span>
-                    <div class="text-xl">🛡️</div>
-                </div>
-            </div>
-
-            <!-- Intelligence Skills -->
-            <div class="absolute top-[20%] left-[60%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Programming</span>
-                    <div class="text-xl">💻</div>
-                </div>
-            </div>
-            <div class="absolute top-[20%] left-[80%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Research</span>
-                    <div class="text-xl">🔍</div>
-                </div>
-            </div>
-
-            <!-- Wealth Skills -->
-            <div class="absolute top-[80%] left-[20%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Investment</span>
-                    <div class="text-xl">📊</div>
-                </div>
-            </div>
-            <div class="absolute top-[80%] left-[40%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Business</span>
-                    <div class="text-xl">🏦</div>
-                </div>
-            </div>
-
-            <!-- Spiritual Skills -->
-            <div class="absolute top-[80%] left-[60%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Meditation</span>
-                    <div class="text-xl">🧘</div>
-                </div>
-            </div>
-            <div class="absolute top-[80%] left-[80%] -translate-x-1/2 -translate-y-1/2">
-                <div class="skill-node-small group">
-                    <span class="skill-tooltip">Nature</span>
-                    <div class="text-xl">🌿</div>
-                </div>
-            </div>
+            {% endfor %}
+            {% endfor %}
         </div>
 
         <!-- Navigation -->
-        <div class="mt-8 text-center">
-            <a href="{{ url_for('index') }}" class="menu-button">
+        <div class="mt-4 md:mt-8 text-center">
+            <a href="{{ url_for('index') }}" class="menu-button text-sm md:text-base">
                 <span>RETURN TO MAIN MENU</span>
                 <i class="fas fa-home text-white"></i>
             </a>
@@ -209,17 +142,25 @@
 
         /* Skill connections */
         .skill-connection {
+            fill: none;
             stroke: #0066ff;
-            stroke-width: 3;
+            stroke-width: 2;
             opacity: 0.6;
             filter: url(#glow);
             transition: all 0.3s ease;
         }
 
+        .skill-connection.main-line {
+            stroke-width: 3;
+            opacity: 0.8;
+        }
+
         .skill-connection-sub {
+            fill: none;
             stroke: #0066ff;
-            stroke-width: 2;
-            opacity: 0.3;
+            stroke-width: 1.5;
+            opacity: 0.4;
+            filter: url(#glow);
             transition: all 0.3s ease;
         }
 
@@ -339,6 +280,256 @@
         .animate-pulse {
             animation: pulse 2s infinite;
         }
+
+        /* Add category-specific colors */
+        .combat { border-color: #ef4444; }
+        .intelligence { border-color: #3b82f6; }
+        .wealth { border-color: #22c55e; }
+        .spirit { border-color: #a855f7; }
+
+        /* Locked skill styling */
+        .skill-node-small.locked {
+            opacity: 0.5;
+            background: rgba(255,255,255,0.1);
+            cursor: not-allowed;
+        }
+
+        .skill-node-small.unlocked:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px currentColor;
+        }
+
+        /* Enhanced tooltip */
+        .skill-tooltip {
+            min-width: 200px;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid currentColor;
+            padding: 8px 12px;
+            text-align: center;
+        }
+
+        /* Enhanced glow effect */
+        #glow feGaussianBlur {
+            stdDeviation: 3;
+        }
+
+        /* Hover effects */
+        .skill-node:hover ~ .skill-connection,
+        .skill-node-small:hover ~ .skill-connection-sub {
+            opacity: 1;
+            stroke-width: 3;
+        }
+
+        .main-line:hover {
+            opacity: 1;
+            stroke-width: 4;
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            .skill-node-large {
+                width: 100px;
+                height: 100px;
+                font-size: 0.9em;
+            }
+
+            .skill-node {
+                width: 70px;
+                height: 70px;
+                font-size: 0.8em;
+            }
+
+            .skill-node-small {
+                width: 45px;
+                height: 45px;
+                font-size: 0.75em;
+            }
+
+            .skill-tooltip {
+                min-width: 150px;
+                font-size: 10px;
+                white-space: normal;
+                max-width: 200px;
+            }
+
+            /* Adjust tooltip position for better mobile visibility */
+            .group:hover .skill-tooltip {
+                top: -60px;
+            }
+
+            /* Enhance touch targets */
+            .skill-node,
+            .skill-node-small,
+            .skill-node-large {
+                touch-action: none;
+            }
+
+            /* Adjust connection line thickness for mobile */
+            .skill-connection {
+                stroke-width: 1.5;
+            }
+
+            .skill-connection-sub {
+                stroke-width: 1;
+            }
+
+            .main-line {
+                stroke-width: 2;
+            }
+        }
+
+        /* Add pinch-zoom prevention */
+        .touch-none {
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Add smooth touch feedback */
+        @media (hover: none) {
+            .skill-node:active,
+            .skill-node-small:active,
+            .skill-node-large:active {
+                transform: scale(1.1);
+                transition: transform 0.2s;
+            }
+        }
     </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const svg = document.getElementById('connections');
+            const container = svg.parentElement;
+            const containerRect = container.getBoundingClientRect();
+            
+            // Helper function to create SVG path
+            function createPath(className) {
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('class', className);
+                return path;
+            }
+
+            // Get container center coordinates
+            const centerX = containerRect.width / 2;
+            const centerY = containerRect.height / 2;
+            
+            // Define the four main diagonal lines (X pattern)
+            const diagonalLength = Math.min(containerRect.width, containerRect.height) * 0.35;
+            const angles = [45, 135, 225, 315]; // Angles for X pattern
+            
+            // Draw main X pattern from center
+            angles.forEach(angle => {
+                const radians = (angle * Math.PI) / 180;
+                const endX = centerX + Math.cos(radians) * diagonalLength;
+                const endY = centerY + Math.sin(radians) * diagonalLength;
+                
+                const path = createPath('skill-connection main-line');
+                path.setAttribute('d', `M ${centerX} ${centerY} L ${endX} ${endY}`);
+                svg.appendChild(path);
+            });
+
+            // Draw connections to category nodes
+            const categories = document.querySelectorAll('.skill-node');
+            categories.forEach(category => {
+                const rect = category.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                // Calculate relative position within the container
+                const categoryX = rect.left - containerRect.left + rect.width/2;
+                const categoryY = rect.top - containerRect.top + rect.height/2;
+                
+                // Find nearest diagonal line and connect to it
+                const angle = Math.atan2(categoryY - centerY, categoryX - centerX) * 180 / Math.PI;
+                const nearestMainAngle = angles.reduce((prev, curr) => 
+                    Math.abs(curr - angle) < Math.abs(prev - angle) ? curr : prev
+                );
+                
+                const radians = (nearestMainAngle * Math.PI) / 180;
+                const intersectionX = centerX + Math.cos(radians) * (diagonalLength * 0.6);
+                const intersectionY = centerY + Math.sin(radians) * (diagonalLength * 0.6);
+                
+                const path = createPath('skill-connection');
+                path.setAttribute('d', `
+                    M ${intersectionX} ${intersectionY}
+                    Q ${(intersectionX + categoryX) / 2} ${(intersectionY + categoryY) / 2},
+                      ${categoryX} ${categoryY}
+                `);
+                svg.appendChild(path);
+            });
+
+            // Draw connections between skills with 45-degree angles
+            const skills = document.querySelectorAll('.skill-node-small');
+            skills.forEach(skill => {
+                const skillId = skill.dataset.skillId;
+                const parentSkills = skill.dataset.parentSkills;
+                
+                if (parentSkills && parentSkills !== '') {
+                    parentSkills.split(',').forEach(parentId => {
+                        const parent = document.querySelector(`[data-skill-id="${parentId}"]`);
+                        if (parent) {
+                            const parentRect = parent.getBoundingClientRect();
+                            const skillRect = skill.getBoundingClientRect();
+                            
+                            // Calculate relative positions
+                            const startX = parentRect.left - containerRect.left + parentRect.width/2;
+                            const startY = parentRect.top - containerRect.top + parentRect.height/2;
+                            const endX = skillRect.left - containerRect.left + skillRect.width/2;
+                            const endY = skillRect.top - containerRect.top + skillRect.height/2;
+                            
+                            // Calculate control point for curved path
+                            const midX = (startX + endX) / 2;
+                            const midY = (startY + endY) / 2;
+                            const cpX = midX + (endY - startY) * 0.2;
+                            const cpY = midY - (endX - startX) * 0.2;
+                            
+                            // Create curved path
+                            const path = createPath('skill-connection-sub');
+                            path.setAttribute('d', `
+                                M ${startX} ${startY}
+                                Q ${cpX} ${cpY},
+                                  ${endX} ${endY}
+                            `);
+                            svg.appendChild(path);
+                        }
+                    });
+                }
+            });
+
+            // Prevent default touch behaviors
+            document.addEventListener('touchmove', function(e) {
+                if (e.target.closest('.skill-tree-container')) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            // Handle touch events for skill nodes
+            const nodes = document.querySelectorAll('.skill-node, .skill-node-small, .skill-node-large');
+            nodes.forEach(node => {
+                node.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    // Show tooltip
+                    const tooltip = this.querySelector('.skill-tooltip');
+                    if (tooltip) {
+                        tooltip.style.opacity = '1';
+                        tooltip.style.top = '-60px';
+                    }
+                });
+
+                node.addEventListener('touchend', function() {
+                    // Hide tooltip after a delay
+                    const tooltip = this.querySelector('.skill-tooltip');
+                    if (tooltip) {
+                        setTimeout(() => {
+                            tooltip.style.opacity = '0';
+                        }, 1500);
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

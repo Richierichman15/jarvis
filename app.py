@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 from jarvis import Jarvis
 import os
 from datetime import datetime
+import json
 
 app = Flask(__name__, 
            template_folder='jarvis/templates',
@@ -90,9 +91,27 @@ def character_skills():
     """Render the character skills page"""
     if "username" not in session:
         session["username"] = "User"
+    
+    # Load the skills configuration
+    with open('jarvis/skills_config.json', 'r') as f:
+        skills_config = json.load(f)
+    
+    # Calculate skill points based on level
+    skill_points = skills_config['skill_points']['starting_points'] + (system.stats.get('level', 1) - 1) * skills_config['skill_points']['per_level']
+    
+    # Determine which skills are unlocked based on level and prerequisites
+    for category in skills_config['categories'].values():
+        for skill in category['skills']:
+            skill['unlocked'] = (
+                system.stats.get('level', 1) >= skill['requirements']['level'] and
+                all(parent in system.stats.get('unlocked_skills', []) for parent in skill['requirements']['parent_skills'])
+            )
+    
     return render_template('skills.html',
                          stats=system.stats,
-                         rank_requirements=system.rank_requirements)
+                         rank_requirements=system.rank_requirements,
+                         skills_config=skills_config,
+                         skill_points=skill_points)
 
 @app.route('/inventory')
 def inventory():
