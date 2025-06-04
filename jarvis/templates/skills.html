@@ -3,82 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Character Skills - JARVIS</title>
+    <title>Life Mastery - Skill Tree</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         'cyber-blue': '#0066ff',
-                    },
-                    boxShadow: {
-                        'neon': '0 0 5px #0066ff, 0 0 10px #0066ff, 0 0 20px #0066ff',
-                    },
+                    }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-black text-white min-h-screen p-8">
-    <div class="max-w-6xl mx-auto">
-        <!-- Header with Rank -->
-        <div class="text-center mb-16 relative">
-            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6 relative">
-                <h1 class="text-4xl font-bold mb-2 text-white shadow-neon">{{ stats.name | default('User') }}</h1>
-                <p class="text-xl text-white/80 mb-2">{{ stats.class }} | {{ stats.title }}</p>
-                <div class="absolute top-4 right-4 text-right">
-                    <div class="text-2xl font-bold text-white shadow-neon">RANK {{ stats.rank }}</div>
-                    <div class="text-sm text-white/80">XP: {{ stats.rank_xp }}/{{ rank_requirements[stats.rank] }}</div>
+<body class="bg-black text-white min-h-screen">
+    <div class="container mx-auto p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-4 text-glow">LIFE MASTERY TREE</h1>
+            <div class="flex justify-center gap-8">
+                <div class="bg-black border border-white/30 rounded p-4 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                    <div class="relative z-10">
+                        <span class="text-white/60">Level</span>
+                        <span class="text-2xl font-bold text-glow ml-2">{{ stats.level }}</span>
+                    </div>
+                </div>
+                <div class="bg-black border border-white/30 rounded p-4 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                    <div class="relative z-10">
+                        <span class="text-white/60">Skill Points</span>
+                        <span class="text-2xl font-bold text-glow ml-2">3</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Navigation Boxes -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-            <a href="{{ url_for('character_status') }}" class="bg-black border-2 border-cyber-blue/50 rounded p-6 hover:shadow-neon transition-all duration-300">
-                <h2 class="text-3xl font-bold text-white shadow-neon">Stats</h2>
-            </a>
-            <a href="{{ url_for('character_skills') }}" class="bg-black border-2 border-cyber-blue/50 rounded p-6 hover:shadow-neon transition-all duration-300">
-                <h2 class="text-3xl font-bold text-white shadow-neon">Skills</h2>
-            </a>
+        <!-- Skill Tree Container -->
+        <div class="relative w-full h-[800px] bg-black border border-white/30 rounded-lg overflow-hidden">
+            <!-- Grid Background -->
+            <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+            
+            <!-- SVG for connections -->
+            <svg class="absolute inset-0 w-full h-full z-10">
+                <defs>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                <!-- Central to Category Connections -->
+                <line x1="50%" y1="50%" x2="30%" y2="30%" class="skill-connection"/>
+                <line x1="50%" y1="50%" x2="70%" y2="30%" class="skill-connection"/>
+                <line x1="50%" y1="50%" x2="30%" y2="70%" class="skill-connection"/>
+                <line x1="50%" y1="50%" x2="70%" y2="70%" class="skill-connection"/>
+                
+                <!-- Category to Skill Connections -->
+                <line x1="30%" y1="30%" x2="20%" y2="20%" class="skill-connection-sub"/>
+                <line x1="30%" y1="30%" x2="40%" y2="20%" class="skill-connection-sub"/>
+                <line x1="70%" y1="30%" x2="60%" y2="20%" class="skill-connection-sub"/>
+                <line x1="70%" y1="30%" x2="80%" y2="20%" class="skill-connection-sub"/>
+                
+                <line x1="30%" y1="70%" x2="20%" y2="80%" class="skill-connection-sub"/>
+                <line x1="30%" y1="70%" x2="40%" y2="80%" class="skill-connection-sub"/>
+                <line x1="70%" y1="70%" x2="60%" y2="80%" class="skill-connection-sub"/>
+                <line x1="70%" y1="70%" x2="80%" y2="80%" class="skill-connection-sub"/>
+            </svg>
+
+            <!-- Central Node - YOU -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                <div class="skill-node-large group">
+                    <div class="absolute inset-0 bg-cyber-blue/20 rounded-full animate-pulse"></div>
+                    <div class="relative z-10 text-center">
+                        <span class="text-3xl mb-1">👤</span>
+                        <div class="text-xl font-bold text-glow">YOU</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Nodes -->
+            <div class="absolute top-[30%] left-[30%] -translate-x-1/2 -translate-y-1/2 z-20">
+                <div class="skill-node group combat">
+                    <span class="skill-tooltip">Combat Skills</span>
+                    <div class="text-2xl">⚔️</div>
+                    <div class="text-sm font-bold">COMBAT</div>
+                </div>
+            </div>
+
+            <div class="absolute top-[30%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-20">
+                <div class="skill-node group intelligence">
+                    <span class="skill-tooltip">Intelligence Skills</span>
+                    <div class="text-2xl">🧠</div>
+                    <div class="text-sm font-bold">INTELLIGENCE</div>
+                </div>
+            </div>
+
+            <div class="absolute top-[70%] left-[30%] -translate-x-1/2 -translate-y-1/2 z-20">
+                <div class="skill-node group wealth">
+                    <span class="skill-tooltip">Wealth Skills</span>
+                    <div class="text-2xl">💰</div>
+                    <div class="text-sm font-bold">WEALTH</div>
+                </div>
+            </div>
+
+            <div class="absolute top-[70%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-20">
+                <div class="skill-node group spiritual">
+                    <span class="skill-tooltip">Spiritual Skills</span>
+                    <div class="text-2xl">🧘</div>
+                    <div class="text-sm font-bold">SPIRITUAL</div>
+                </div>
+            </div>
+
+            <!-- Skill Nodes -->
+            <!-- Combat Skills -->
+            <div class="absolute top-[20%] left-[20%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Strength Training</span>
+                    <div class="text-xl">💪</div>
+                </div>
+            </div>
+            <div class="absolute top-[20%] left-[40%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Defense</span>
+                    <div class="text-xl">🛡️</div>
+                </div>
+            </div>
+
+            <!-- Intelligence Skills -->
+            <div class="absolute top-[20%] left-[60%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Programming</span>
+                    <div class="text-xl">💻</div>
+                </div>
+            </div>
+            <div class="absolute top-[20%] left-[80%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Research</span>
+                    <div class="text-xl">🔍</div>
+                </div>
+            </div>
+
+            <!-- Wealth Skills -->
+            <div class="absolute top-[80%] left-[20%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Investment</span>
+                    <div class="text-xl">📊</div>
+                </div>
+            </div>
+            <div class="absolute top-[80%] left-[40%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Business</span>
+                    <div class="text-xl">🏦</div>
+                </div>
+            </div>
+
+            <!-- Spiritual Skills -->
+            <div class="absolute top-[80%] left-[60%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Meditation</span>
+                    <div class="text-xl">🧘</div>
+                </div>
+            </div>
+            <div class="absolute top-[80%] left-[80%] -translate-x-1/2 -translate-y-1/2">
+                <div class="skill-node-small group">
+                    <span class="skill-tooltip">Nature</span>
+                    <div class="text-xl">🌿</div>
+                </div>
+            </div>
         </div>
 
-        <!-- Current Level Display -->
-        <div class="bg-black border-2 border-cyber-blue/50 rounded p-8 mb-16 text-center">
-            <h2 class="text-2xl text-white/80 mb-4">CURRENT LEVEL</h2>
-            <div class="text-8xl font-bold text-white shadow-neon">{{ stats.level }}</div>
-        </div>
-
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            <!-- Strength -->
-            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
-                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">STRENGTH</h3>
-                <div class="text-6xl text-center text-white shadow-neon mb-4">{{ stats.strength }}</div>
-            </div>
-            <!-- Vitality (Health) -->
-            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
-                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">VITALITY</h3>
-                <div class="text-4xl text-center text-white shadow-neon mb-4">{{ stats.health }}/100</div>
-            </div>
-            <!-- Intelligence -->
-            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
-                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">INTELLIGENCE</h3>
-                <div class="text-6xl text-center text-white shadow-neon mb-4">{{ stats.intelligence }}</div>
-            </div>
-            <!-- Wealth -->
-            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
-                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">WEALTH</h3>
-                <div class="text-6xl text-center text-white shadow-neon mb-4">{{ stats.wealth }}</div>
-            </div>
-        </div>
-
-        <!-- Navigation Button -->
-        <div class="text-center">
-            <a href="{{ url_for('index') }}" class="inline-block bg-black border-2 border-cyber-blue/50 rounded px-8 py-3 text-white shadow-neon hover:shadow-neon transition-all duration-300">
-                MAIN MENU
+        <!-- Navigation -->
+        <div class="mt-8 text-center">
+            <a href="{{ url_for('index') }}" class="menu-button">
+                <span>RETURN TO MAIN MENU</span>
+                <i class="fas fa-home text-white"></i>
             </a>
         </div>
     </div>
@@ -86,11 +189,141 @@
     <style>
         body {
             font-family: 'Orbitron', sans-serif;
-            background-color: #000;
-            color: #fff;
+            background-color: black;
         }
 
-        .shadow-neon {
+        /* Grid pattern background */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Text glow effect */
+        .text-glow {
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        /* Skill connections */
+        .skill-connection {
+            stroke: #0066ff;
+            stroke-width: 3;
+            opacity: 0.6;
+            filter: url(#glow);
+            transition: all 0.3s ease;
+        }
+
+        .skill-connection-sub {
+            stroke: #0066ff;
+            stroke-width: 2;
+            opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+
+        /* Node styles */
+        .skill-node-large {
+            width: 140px;
+            height: 140px;
+            background: radial-gradient(circle, rgba(0,102,255,0.2) 0%, rgba(0,0,0,0.8) 100%);
+            border: 4px solid #0066ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 30px rgba(0,102,255,0.3);
+        }
+
+        .skill-node {
+            width: 100px;
+            height: 100px;
+            background: rgba(0,102,255,0.1);
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(0,102,255,0.3);
+        }
+
+        .skill-node-small {
+            width: 60px;
+            height: 60px;
+            background: rgba(0,102,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0,102,255,0.3);
+        }
+
+        /* Hover effects */
+        .skill-node:hover,
+        .skill-node-small:hover,
+        .skill-node-large:hover {
+            border-color: #0066ff;
+            box-shadow: 0 0 30px rgba(0,102,255,0.6);
+            transform: scale(1.1);
+        }
+
+        /* Tooltip */
+        .skill-tooltip {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,102,255,0.9);
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .group:hover .skill-tooltip {
+            opacity: 1;
+            top: -50px;
+        }
+
+        /* Menu button styling */
+        .menu-button {
+            display: flex;
+            align-items: center;
+            gap: 3rem;
+            background-color: black;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0,102,255,0.3);
+        }
+
+        .menu-button:hover {
+            border-color: rgba(255,255,255,0.5);
+            box-shadow: 0 0 20px rgba(0,102,255,0.5);
+            transform: translateY(-2px);
+        }
+
+        .menu-button i {
+            font-size: 1.5rem;
+            transition: text-shadow 0.3s ease;
+        }
+
+        .menu-button:hover i {
             text-shadow: 
                 0 0 5px #0066ff,
                 0 0 10px #0066ff,
@@ -98,10 +331,14 @@
         }
 
         @keyframes pulse {
-            0% { opacity: 0.8; }
-            50% { opacity: 1; }
-            100% { opacity: 0.8; }
+            0% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 0.5; }
+        }
+
+        .animate-pulse {
+            animation: pulse 2s infinite;
         }
     </style>
 </body>
-</html> 
+</html>
