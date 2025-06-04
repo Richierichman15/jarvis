@@ -49,6 +49,20 @@
                 </ul>
             </div>
             {% endfor %}
+
+            <!-- Dashboard Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {% for category, items in categories.items() %}
+                <!-- ... existing dashboard items ... -->
+                {% endfor %}
+            </div>
+
+            <!-- Navigation Button -->
+            <div class="flex justify-center mt-8">
+                <a href="{{ url_for('index') }}" class="px-6 py-3 bg-black border border-white/30 rounded-lg hover:border-blue-500 transition-all duration-300 text-white text-glow">
+                    Main Menu
+                </a>
+            </div>
         </div>
     </div>
 

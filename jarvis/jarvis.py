@@ -57,9 +57,9 @@ class Jarvis:
         self.conversation_history = []
         self.tasks = []
         self.stats = {
-            "name": "Unknown",
-            "class": "Adventurer",
-            "title": "Novice",
+            "name": "Gitonga",
+            "class": "lost",
+            "title": "Hunger",
             "level": 1,
             "health": 100,
             "stamina": 100,
@@ -94,12 +94,39 @@ class Jarvis:
                 with open(self.memory_file, 'r') as f:
                     data = json.load(f)
                     self.conversation_history = data.get("conversations", [])
-                    self.tasks = [Task.from_dict(t) for t in data.get("tasks", [])]
+                    
+                    # Load top-level tasks
+                    tasks_data = data.get("tasks", [])
+                    self.tasks = []
+                    
+                    for task_data in tasks_data:
+                        if isinstance(task_data, dict):
+                            if "quests" in task_data:
+                                # Handle nested quests
+                                for quest in task_data["quests"]:
+                                    task = Task(
+                                        name=quest["name"],
+                                        description=quest["description"],
+                                        difficulty=quest["difficulty"],
+                                        reward=quest["reward"],
+                                        deadline=quest.get("deadline"),
+                                        status=quest.get("status", "pending")
+                                    )
+                                    task.created_at = quest.get("created_at", datetime.now().isoformat())
+                                    task.completed_at = quest.get("completed_at")
+                                    self.tasks.append(task)
+                            elif "name" in task_data:
+                                # Handle regular tasks
+                                self.tasks.append(Task.from_dict(task_data))
+                    
                     # Update stats while preserving defaults
-                    loaded_stats = data.get("stats", {})
-                    for key, value in loaded_stats.items():
-                        if key in self.stats:
-                            self.stats[key] = value
+                    for item in tasks_data:
+                        if isinstance(item, dict) and "stats" in item:
+                            loaded_stats = item["stats"]
+                            for key, value in loaded_stats.items():
+                                if key in self.stats:
+                                    self.stats[key] = value
+                            break
         except Exception as e:
             print(f"Error loading memory: {e}")
     

@@ -117,38 +117,247 @@
       "completed_at": null
     },
     {
-      "name": "Quick Workout",
-      "description": "Complete a 20-minute workout session",
-      "difficulty": "D",
-      "reward": "Strength +5",
-      "deadline": null,
-      "status": "pending",
-      "created_at": "2025-06-03T11:23:32.086825",
-      "completed_at": null
-    }
-  ],
-  "stats": {
-    "name": "Gitonga",
-    "class": "lost",
-    "title": "Hungry",
-    "level": 1,
-    "health": 5,
-    "stamina": 100,
-    "intelligence": 0,
-    "strength": 0,
-    "wealth": 0,
-    "experience": 10,
-    "rank": "E",
-    "rank_xp": 10,
-    "inventory": [
-      {
-        "id": 1,
-        "name": "Macbook",
-        "type": "Equipment",
-        "quantity": 1,
-        "description": "",
-        "acquired_at": "2025-06-03T15:42:38.369731"
+      "quests": [
+        {
+          "name": "Morning Routine: Hydrate & Stretch",
+          "description": "Drink 16oz of water immediately upon waking and complete 5 minutes of dynamic stretching.",
+          "difficulty": "D",
+          "reward": "Health +1, Discipline +1, Energy +1",
+          "deadline": "Daily (Morning)",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Deep Work Session: Project X",
+          "description": "Dedicate 90 minutes of uninterrupted, focused work on Project X. Eliminate distractions.",
+          "difficulty": "C",
+          "reward": "Intelligence +3, Focus +2, Wealth +25",
+          "deadline": "Daily (Work Hours)",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Skill Acquisition: Learn 1 New Concept (Coding)",
+          "description": "Spend 30 minutes actively learning and understanding a new programming concept (e.g., a specific data structure, a new library function, a design pattern).",
+          "difficulty": "C",
+          "reward": "Intelligence +2, Problem-Solving +1, Experience +10",
+          "deadline": "Daily",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Financial Growth: Track Daily Expenses",
+          "description": "Log all expenditures for the day to maintain financial awareness.",
+          "difficulty": "D",
+          "reward": "Wealth +5 (Knowledge), FinancialLiteracy +1",
+          "deadline": "Daily (End of Day)",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Physical Challenge: 10 Push-ups, 10 Sit-ups",
+          "description": "Complete 10 standard push-ups and 10 standard sit-ups with proper form.",
+          "difficulty": "E",
+          "reward": "Strength +1, Stamina +1",
+          "deadline": "Daily",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Networking: Reach out to 1 Contact",
+          "description": "Send a meaningful message (not just a 'hello') to a professional or personal contact you haven't spoken to recently.",
+          "difficulty": "C",
+          "reward": "SocialCapital +2, Opportunity +1",
+          "deadline": "Weekly",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Reading Challenge: 15 Pages of Non-Fiction",
+          "description": "Read and take notes on at least 15 pages of a non-fiction book related to business, personal development, or a new skill.",
+          "difficulty": "C",
+          "reward": "Intelligence +2, Wisdom +1",
+          "deadline": "Daily",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Idea Generation: Brainstorm 3 New Income Streams",
+          "description": "Spend 20 minutes brainstorming and briefly outlining at least three distinct potential income-generating ideas, no matter how small or large.",
+          "difficulty": "B",
+          "reward": "Creativity +3, WealthOpportunity +1, Entrepreneurship +1",
+          "deadline": "Bi-Weekly",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        },
+        {
+          "name": "Self-Reflection: Daily Journal Entry",
+          "description": "Write at least 5 sentences reflecting on your day, challenges, successes, and lessons learned.",
+          "difficulty": "D",
+          "reward": "Wisdom +1, EmotionalIntelligence +1",
+          "deadline": "Daily (Evening)",
+          "status": "pending",
+          "created_at": "2025-06-03T16:00:00",
+          "completed_at": null
+        }
+      ],
+      "stats": {
+        "name": "Gitonga",
+        "class": "Aspirant",
+        "title": "The Versatile Seeker",
+        "level": 1,
+        "health": 10,
+        "strength": 5,
+        "intelligence": 15,
+        "wealth": 10,
+        "wisdom": 5,
+        "charisma": 7,
+        "luck": 5,
+        "experience": 0,
+        "rank": "E",
+        "rank_xp": 0
+      },
+      "traits": [
+        {
+          "name": "Growth Mindset",
+          "description": "Belief that abilities and intelligence can be developed through dedication and hard work.",
+          "level": 1,
+          "effect": "Increases XP gain by 5% for learning-related quests."
+        },
+        {
+          "name": "Financial Acumen",
+          "description": "A natural inclination towards understanding and managing money.",
+          "level": 1,
+          "effect": "Increases Wealth gain from financial quests by 2%."
+        }
+      ],
+      "skills": [
+        {
+          "name": "Basic Coding (Python)",
+          "level": 1,
+          "experience": 0,
+          "max_experience": 100,
+          "description": "Fundamental understanding of Python syntax and basic data structures.",
+          "type": "Technical"
+        },
+        {
+          "name": "Communication",
+          "level": 1,
+          "experience": 0,
+          "max_experience": 100,
+          "description": "Ability to clearly convey ideas verbally and in writing.",
+          "type": "Soft"
+        },
+        {
+          "name": "Time Management",
+          "level": 1,
+          "experience": 0,
+          "max_experience": 100,
+          "description": "Effectively allocating time to tasks and projects.",
+          "type": "Organizational"
+        }
+      ],
+      "goals": [
+        {
+          "id": "G001",
+          "name": "Achieve Financial Independence",
+          "description": "Reach a state where passive income covers all living expenses.",
+          "category": "Wealth",
+          "target_value": null,
+          "current_value": null,
+          "status": "active",
+          "priority": "High",
+          "sub_goals": [
+            {
+              "id": "SG001-1",
+              "name": "Build Emergency Fund",
+              "description": "Save 6 months of living expenses.",
+              "category": "Wealth",
+              "target_value": "Calculated (e.g., $15,000)",
+              "current_value": "$0",
+              "status": "active"
+            },
+            {
+              "id": "SG001-2",
+              "name": "Invest in Low-Cost Index Funds",
+              "description": "Begin regular contributions to a diversified investment portfolio.",
+              "category": "Wealth",
+              "target_value": "First $1,000 invested",
+              "current_value": "$0",
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "id": "G002",
+          "name": "Become Proficient in 3 Programming Languages",
+          "description": "Reach an advanced level of proficiency in Python, JavaScript, and one other language (e.g., Go/Rust).",
+          "category": "Skill Development",
+          "target_value": null,
+          "current_value": null,
+          "status": "active",
+          "priority": "High",
+          "sub_goals": [
+            {
+              "id": "SG002-1",
+              "name": "Complete Python Advanced Course",
+              "description": "Finish an online course covering advanced Python topics (e.g., decorators, metaclasses, async programming).",
+              "category": "Skill Development",
+              "target_value": "Course Completion",
+              "current_value": "0%",
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "id": "G003",
+          "name": "Physical Peak Performance",
+          "description": "Achieve optimal physical health, strength, and endurance.",
+          "category": "Health",
+          "target_value": "Specific fitness metrics (e.g., run a 5k in X minutes, Y push-ups)",
+          "current_value": null,
+          "status": "active",
+          "priority": "Medium"
+        },
+        {
+          "id": "G004",
+          "name": "Master Public Speaking",
+          "description": "Be able to confidently deliver engaging presentations to large audiences.",
+          "category": "Soft Skills",
+          "target_value": "Give 3 successful presentations to groups > 20 people",
+          "current_value": "0 presentations",
+          "status": "active",
+          "priority": "Medium"
+        }
+      ],
+      "inventory": [],
+      "current_circumstances": {
+        "occupation": "Currently in X role / Student in Y field",
+        "income_sources": ["Salary from Job A", "Side Hustle B (currently inactive)"],
+        "time_availability_daily_hours": {
+          "dedicated_learning": 2,
+          "dedicated_work": 8,
+          "dedicated_health": 1
+        },
+        "key_projects": [
+          {"name": "Solo Leveling App", "status": "In Progress"},
+          {"name": "Client Project Z", "status": "Pending"}
+        ],
+        "current_challenges": [
+          {"name": "Procrastination on new tasks", "severity": "Medium"},
+          {"name": "Difficulty staying consistent with diet", "severity": "Medium"}
+        ],
+        "learning_preferences": "Hands-on projects, reading, online courses",
+        "financial_status_summary": "Starting from scratch, actively working towards building wealth."
       }
-    ]
-  }
+    }
+  ]
 }

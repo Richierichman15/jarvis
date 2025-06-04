@@ -28,8 +28,8 @@
 
         <!-- Quest Categories -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <button class="category-btn active" onclick="filterQuests('all')">All Quests</button>
-            <button class="category-btn" onclick="filterQuests('pending')">Available</button>
+            <button class="category-btn active" onclick="filterQuests('all')">Available</button>
+            <button class="category-btn" onclick="filterQuests('active')">Active Quests</button>
             <button class="category-btn" onclick="filterQuests('completed')">Completed</button>
         </div>
 
@@ -45,9 +45,20 @@
                     <!-- Quest Header -->
                     <div class="flex justify-between items-start mb-4">
                         <h3 class="text-xl font-bold text-white text-glow">{{ task.name }}</h3>
-                        <span class="px-3 py-1 rounded-full text-sm font-semibold bg-black border border-white/30">
-                            {{ task.difficulty }}-RANK
-                        </span>
+                        <div class="flex gap-2">
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold bg-black border border-white/30">
+                                {{ task.difficulty }}-RANK
+                            </span>
+                            {% if task.status == 'pending' %}
+                            <button 
+                                onclick="toggleQuestActive({{ loop.index }}, '{{ task.name }}')"
+                                class="px-3 py-1 rounded-full text-sm font-semibold bg-black border border-white/30 hover:border-blue-500 hover:text-blue-500 transition-all"
+                                data-active="false"
+                            >
+                                Activate
+                            </button>
+                            {% endif %}
+                        </div>
                     </div>
                     
                     <!-- Quest Description -->
@@ -84,10 +95,10 @@
                 <span>Get Suggestions</span>
                 <i class="fas fa-lightbulb text-white group-hover:text-glow"></i>
             </button>
-            <button onclick="toggleCompletedQuests()" class="menu-button group">
-                <span>Toggle History</span>
-                <i class="fas fa-history text-white group-hover:text-glow"></i>
-            </button>
+            <a href="{{ url_for('index') }}" class="menu-button group">
+                <span>Main Menu</span>
+                <i class="fas fa-home text-white group-hover:text-glow"></i>
+            </a>
         </div>
     </div>
 
@@ -216,13 +227,46 @@
                            0 0 20px #0066ff;
             }
         }
+
+        /* Active quest styling */
+        .quest-card.active {
+            border-color: #0066ff;
+            box-shadow: 0 0 15px rgba(0, 102, 255, 0.5);
+        }
+
+        .quest-card.active::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid #0066ff;
+            border-radius: 0.75rem;
+            animation: activeGlow 2s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes activeGlow {
+            0% {
+                box-shadow: 0 0 10px #0066ff,
+                           0 0 20px #0066ff;
+            }
+            50% {
+                box-shadow: 0 0 15px #0066ff,
+                           0 0 30px #0066ff;
+            }
+            100% {
+                box-shadow: 0 0 10px #0066ff,
+                           0 0 20px #0066ff;
+            }
+        }
     </style>
 
     <script>
         function filterQuests(status) {
             const cards = document.querySelectorAll('.quest-card');
             cards.forEach(card => {
-                if (status === 'all' || card.classList.contains(status)) {
+                if (status === 'all' && !card.classList.contains('completed') || 
+                    (status === 'active' && card.getAttribute('data-status') === 'active') ||
+                    (status === 'completed' && card.classList.contains('completed'))) {
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
@@ -284,6 +328,52 @@
             completedCards.forEach(card => {
                 card.style.display = card.style.display === 'none' ? 'block' : 'none';
             });
+        }
+
+        async function toggleQuestActive(taskIndex, questName) {
+            const button = event.target;
+            const isActive = button.getAttribute('data-active') === 'true';
+            const questCard = button.closest('.quest-card');
+            
+            try {
+                // Toggle active state
+                button.setAttribute('data-active', !isActive);
+                button.textContent = isActive ? 'Activate' : 'Deactivate';
+                
+                if (!isActive) {
+                    // Add active class to quest card
+                    questCard.classList.add('active');
+                    questCard.setAttribute('data-status', 'active');
+                } else {
+                    // Remove active class from quest card
+                    questCard.classList.remove('active');
+                    questCard.setAttribute('data-status', 'pending');
+                }
+                
+                // Here you would typically make an API call to update the quest status
+                // For now, we'll just update the UI
+                const response = await fetch('/api/toggle_quest_active', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        task_index: taskIndex,
+                        quest_name: questName,
+                        is_active: !isActive
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update quest status');
+                }
+            } catch (error) {
+                console.error('Error toggling quest status:', error);
+                // Revert the UI changes if the API call fails
+                button.setAttribute('data-active', isActive);
+                button.textContent = isActive ? 'Deactivate' : 'Activate';
+                questCard.classList.toggle('active');
+            }
         }
     </script>
 </body>

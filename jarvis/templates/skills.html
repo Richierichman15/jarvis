@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Character Skills - JARVIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber-blue': '#0066ff',
+                    },
+                    boxShadow: {
+                        'neon': '0 0 5px #0066ff, 0 0 10px #0066ff, 0 0 20px #0066ff',
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-black text-white min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header with Rank -->
+        <div class="text-center mb-16 relative">
+            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6 relative">
+                <h1 class="text-4xl font-bold mb-2 text-white shadow-neon">{{ stats.name | default('User') }}</h1>
+                <p class="text-xl text-white/80 mb-2">{{ stats.class }} | {{ stats.title }}</p>
+                <div class="absolute top-4 right-4 text-right">
+                    <div class="text-2xl font-bold text-white shadow-neon">RANK {{ stats.rank }}</div>
+                    <div class="text-sm text-white/80">XP: {{ stats.rank_xp }}/{{ rank_requirements[stats.rank] }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Boxes -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+            <a href="{{ url_for('character_status') }}" class="bg-black border-2 border-cyber-blue/50 rounded p-6 hover:shadow-neon transition-all duration-300">
+                <h2 class="text-3xl font-bold text-white shadow-neon">Stats</h2>
+            </a>
+            <a href="{{ url_for('character_skills') }}" class="bg-black border-2 border-cyber-blue/50 rounded p-6 hover:shadow-neon transition-all duration-300">
+                <h2 class="text-3xl font-bold text-white shadow-neon">Skills</h2>
+            </a>
+        </div>
+
+        <!-- Current Level Display -->
+        <div class="bg-black border-2 border-cyber-blue/50 rounded p-8 mb-16 text-center">
+            <h2 class="text-2xl text-white/80 mb-4">CURRENT LEVEL</h2>
+            <div class="text-8xl font-bold text-white shadow-neon">{{ stats.level }}</div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+            <!-- Strength -->
+            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
+                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">STRENGTH</h3>
+                <div class="text-6xl text-center text-white shadow-neon mb-4">{{ stats.strength }}</div>
+            </div>
+            <!-- Vitality (Health) -->
+            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
+                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">VITALITY</h3>
+                <div class="text-4xl text-center text-white shadow-neon mb-4">{{ stats.health }}/100</div>
+            </div>
+            <!-- Intelligence -->
+            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
+                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">INTELLIGENCE</h3>
+                <div class="text-6xl text-center text-white shadow-neon mb-4">{{ stats.intelligence }}</div>
+            </div>
+            <!-- Wealth -->
+            <div class="bg-black border-2 border-cyber-blue/50 rounded p-6">
+                <h3 class="text-2xl font-bold text-white shadow-neon mb-4">WEALTH</h3>
+                <div class="text-6xl text-center text-white shadow-neon mb-4">{{ stats.wealth }}</div>
+            </div>
+        </div>
+
+        <!-- Navigation Button -->
+        <div class="text-center">
+            <a href="{{ url_for('index') }}" class="inline-block bg-black border-2 border-cyber-blue/50 rounded px-8 py-3 text-white shadow-neon hover:shadow-neon transition-all duration-300">
+                MAIN MENU
+            </a>
+        </div>
+    </div>
+
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #000;
+            color: #fff;
+        }
+
+        .shadow-neon {
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+    </style>
+</body>
+</html> 

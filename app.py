@@ -51,7 +51,7 @@ notifications = []
 def index():
     """Render the main page"""
     if "username" not in session:
-        session["username"] = "User"  # Set default username
+        session["username"] = "Gitonga"  # Set default username
     return render_template('start_menu.html', 
                          stats=system.stats,
                          rank_requirements=system.rank_requirements,
@@ -70,7 +70,7 @@ def dashboard():
 @app.route('/quests')
 def show_quests():
     """Render the quests page"""
-    return render_template('index.html',
+    return render_template('quest.html',
                          categories=DASHBOARD_CATEGORIES,
                          stats=system.stats,
                          tasks=system.tasks,
@@ -80,8 +80,17 @@ def show_quests():
 def character_status():
     """Render the character status page"""
     if "username" not in session:
-        session["username"] = "User"  # Set default username
+        session["username"] = "Gitonga"  # Set default username
     return render_template('status.html',
+                         stats=system.stats,
+                         rank_requirements=system.rank_requirements)
+
+@app.route('/character-skills')
+def character_skills():
+    """Render the character skills page"""
+    if "username" not in session:
+        session["username"] = "User"
+    return render_template('skills.html',
                          stats=system.stats,
                          rank_requirements=system.rank_requirements)
 
@@ -155,6 +164,35 @@ def get_stats():
 def get_tasks():
     """Get all tasks"""
     return jsonify([task.to_dict() for task in system.tasks])
+
+@app.route('/api/toggle_quest_active', methods=['POST'])
+def toggle_quest_active():
+    """Toggle a quest's active status"""
+    data = request.json
+    task_index = data.get('task_index')
+    is_active = data.get('is_active', False)
+    
+    if task_index is not None:
+        try:
+            # Update the task's active status in the system
+            task = system.tasks[task_index - 1]  # Convert to 0-based index
+            task.active = is_active
+            system.save_memory()
+            
+            return jsonify({
+                'success': True,
+                'message': f"Quest {'activated' if is_active else 'deactivated'} successfully"
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 400
+    
+    return jsonify({
+        'success': False,
+        'error': 'No task index provided'
+    }), 400
 
 @app.route('/api/complete_task', methods=['POST'])
 def complete_task():

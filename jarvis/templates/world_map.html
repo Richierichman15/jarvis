@@ -35,7 +35,7 @@
             <div class="absolute inset-0 bg-grid-pattern opacity-10 z-10 pointer-events-none"></div>
             
             <!-- Map -->
-            <div id="map" class="w-full h-[600px] rounded-xl border border-white/30 shadow-lg"></div>
+            <div id="map" class="w-full h-[600px] rounded-xl overflow-hidden border border-white/30 shadow-lg"></div>
             
             <!-- Coordinates Display -->
             <div class="absolute bottom-4 right-4 bg-black/80 p-4 rounded-lg border border-white/30 z-20">
@@ -52,6 +52,16 @@
                 <i class="fas fa-location-crosshairs text-white group-hover:text-glow"></i>
                 <span>Update Location</span>
             </button>
+
+            <!-- Navigation Button -->
+            <div class="flex justify-center gap-6 mt-8">
+                <button onclick="saveLocation()" class="px-6 py-3 bg-black border border-white/30 rounded-lg hover:border-blue-500 transition-all duration-300 text-white text-glow">
+                    Save Location
+                </button>
+                <a href="{{ url_for('index') }}" class="px-6 py-3 bg-black border border-white/30 rounded-lg hover:border-blue-500 transition-all duration-300 text-white text-glow">
+                    Main Menu
+                </a>
+            </div>
         </div>
     </div>
 
