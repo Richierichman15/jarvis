@@ -11,7 +11,6 @@ beautifulsoup4>=4.12.0
 
 # Code editor tools
 pygments>=2.15.0
-flask>=2.0.0
 
 # System tools
 psutil>=5.9.0
@@ -30,14 +29,15 @@ huggingface_hub>=0.21.0
 
 # Tools
 langchain-community>=0.0.27
-beautifulsoup4>=4.12.0
+langchain>=0.1.0
+langchain-core==0.1.27
+langchain-ollama==0.1.1
+langchain-openai>=0.0.5
 
 # Memory & Storage
 chromadb>=0.4.22
 
 # UI/CLI
-langchain>=0.1.0
-langchain-openai>=0.0.5
 tabulate>=0.9.0  # For CLI tables
 
 # Web researcher additional dependencies
@@ -48,13 +48,22 @@ chardet>=5.1.0
 # Anthropic package
 anthropic>=0.18.1  # Claude API client
 
-# API and security dependencies
+# Web framework and API dependencies
+Flask==2.3.3
 flask-cors>=4.0.0  # For API CORS support
 werkzeug>=2.0.0  # For middleware
+
+# Authentication and security
 pyjwt>=2.8.0  # For JWT authentication
 cryptography>=42.0.0  # For secure operations
+
+# Production serving
 gunicorn>=21.0.0  # For production API serving
 
-Flask==3.0.2
-langchain-core==0.1.27
-langchain-ollama==0.0.3 
+# Firebase and notifications
+firebase-admin==6.2.0
+
+# Daily quest system dependencies
+schedule==1.2.0  # For scheduling notifications
+json5==0.9.14  # For enhanced JSON handling
+typing-extensions==4.8.0  # For type hints 
