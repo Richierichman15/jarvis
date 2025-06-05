@@ -1,0 +1,528 @@
+{
+    "categories": {
+        "combat": {
+            "name": "Combat",
+            "icon": "⚔️",
+            "description": "Physical training and combat abilities",
+            "color": "#ef4444",
+            "position": {
+                "x": 30,
+                "y": 30
+            },
+            "skills": [
+                {
+                    "id": "early_riser",
+                    "name": "Early Riser",
+                    "icon": "🌅",
+                    "description": "Wake up at 5 AM consistently",
+                    "position": {
+                        "x": 20,
+                        "y": 20
+                    },
+                    "requirements": {
+                        "level": 1,
+                        "parent_skills": []
+                    },
+                    "rewards": {
+                        "strength": 1,
+                        "discipline": 2,
+                        "energy": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Wake up at 5 AM for 7 consecutive days",
+                            "progress": 0,
+                            "target": 7
+                        }
+                    ]
+                },
+                {
+                    "id": "pushup_master",
+                    "name": "50 Pushups Daily",
+                    "icon": "💪",
+                    "description": "Complete 50 pushups every day",
+                    "position": {
+                        "x": 40,
+                        "y": 20
+                    },
+                    "requirements": {
+                        "level": 2,
+                        "parent_skills": ["early_riser"]
+                    },
+                    "rewards": {
+                        "strength": 3,
+                        "endurance": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Complete 50 pushups in a day",
+                            "progress": 0,
+                            "target": 50
+                        },
+                        {
+                            "description": "Maintain for 30 days",
+                            "progress": 0,
+                            "target": 30
+                        }
+                    ]
+                },
+                {
+                    "id": "workout_planner",
+                    "name": "Weekly Workout Plan",
+                    "icon": "📋",
+                    "description": "Create and follow a structured weekly workout plan",
+                    "position": {
+                        "x": 20,
+                        "y": 40
+                    },
+                    "requirements": {
+                        "level": 3,
+                        "parent_skills": ["pushup_master"]
+                    },
+                    "rewards": {
+                        "strength": 2,
+                        "intelligence": 1,
+                        "discipline": 3
+                    },
+                    "challenges": [
+                        {
+                            "description": "Create a detailed workout plan",
+                            "progress": 0,
+                            "target": 1
+                        },
+                        {
+                            "description": "Complete all planned workouts for 4 weeks",
+                            "progress": 0,
+                            "target": 4
+                        }
+                    ]
+                },
+                {
+                    "id": "runner",
+                    "name": "Runner",
+                    "icon": "🏃",
+                    "description": "Develop running endurance and speed",
+                    "position": {
+                        "x": 40,
+                        "y": 40
+                    },
+                    "requirements": {
+                        "level": 2,
+                        "parent_skills": ["early_riser"]
+                    },
+                    "rewards": {
+                        "endurance": 4,
+                        "agility": 3,
+                        "health": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Run 5km without stopping",
+                            "progress": 0,
+                            "target": 1
+                        },
+                        {
+                            "description": "Run 3 times per week for a month",
+                            "progress": 0,
+                            "target": 12
+                        }
+                    ]
+                }
+            ]
+        },
+        "intelligence": {
+            "name": "Intelligence",
+            "icon": "🧠",
+            "description": "Mental capabilities and technical skills",
+            "color": "#3b82f6",
+            "position": {
+                "x": 70,
+                "y": 30
+            },
+            "skills": [
+                {
+                    "id": "basic_coding",
+                    "name": "Code Basics",
+                    "icon": "💻",
+                    "description": "Learn fundamental programming concepts",
+                    "position": {
+                        "x": 60,
+                        "y": 20
+                    },
+                    "requirements": {
+                        "level": 1,
+                        "parent_skills": []
+                    },
+                    "rewards": {
+                        "intelligence": 2,
+                        "problem_solving": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Complete a basic programming course",
+                            "progress": 0,
+                            "target": 1
+                        },
+                        {
+                            "description": "Build 3 small projects",
+                            "progress": 0,
+                            "target": 3
+                        }
+                    ]
+                },
+                {
+                    "id": "daily_reader",
+                    "name": "Daily Reader",
+                    "icon": "📚",
+                    "description": "Read educational content daily",
+                    "position": {
+                        "x": 80,
+                        "y": 20
+                    },
+                    "requirements": {
+                        "level": 1,
+                        "parent_skills": []
+                    },
+                    "rewards": {
+                        "intelligence": 2,
+                        "wisdom": 1,
+                        "vocabulary": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Read 30 minutes daily for 30 days",
+                            "progress": 0,
+                            "target": 30
+                        }
+                    ]
+                },
+                {
+                    "id": "critical_thinker",
+                    "name": "Critical Thinker",
+                    "icon": "🤔",
+                    "description": "Develop advanced analytical skills",
+                    "position": {
+                        "x": 60,
+                        "y": 40
+                    },
+                    "requirements": {
+                        "level": 2,
+                        "parent_skills": ["daily_reader"]
+                    },
+                    "rewards": {
+                        "intelligence": 3,
+                        "wisdom": 2,
+                        "problem_solving": 3
+                    },
+                    "challenges": [
+                        {
+                            "description": "Solve complex problems daily",
+                            "progress": 0,
+                            "target": 30
+                        }
+                    ]
+                },
+                {
+                    "id": "tech_innovator",
+                    "name": "Tech Innovator",
+                    "icon": "🚀",
+                    "description": "Master modern technology",
+                    "position": {
+                        "x": 80,
+                        "y": 40
+                    },
+                    "requirements": {
+                        "level": 3,
+                        "parent_skills": ["basic_coding"]
+                    },
+                    "rewards": {
+                        "intelligence": 3,
+                        "innovation": 3,
+                        "tech_mastery": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Build a complex technical project",
+                            "progress": 0,
+                            "target": 1
+                        }
+                    ]
+                },
+                {
+                    "id": "ai_master",
+                    "name": "AI Master",
+                    "icon": "🤖",
+                    "description": "Master AI concepts and applications",
+                    "position": {
+                        "x": 70,
+                        "y": 50
+                    },
+                    "requirements": {
+                        "level": 4,
+                        "parent_skills": ["tech_innovator", "critical_thinker"]
+                    },
+                    "rewards": {
+                        "intelligence": 4,
+                        "tech_mastery": 3,
+                        "future_vision": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Complete an AI/ML course",
+                            "progress": 0,
+                            "target": 1
+                        },
+                        {
+                            "description": "Build an AI-powered application",
+                            "progress": 0,
+                            "target": 1
+                        }
+                    ]
+                }
+            ]
+        },
+        "wealth": {
+            "name": "Wealth",
+            "icon": "💰",
+            "description": "Financial growth and prosperity",
+            "color": "#22c55e",
+            "position": {
+                "x": 30,
+                "y": 70
+            },
+            "skills": [
+                {
+                    "id": "budget_master",
+                    "name": "Budget Master",
+                    "icon": "📊",
+                    "description": "Create and maintain a detailed budget",
+                    "position": {
+                        "x": 20,
+                        "y": 60
+                    },
+                    "requirements": {
+                        "level": 1,
+                        "parent_skills": []
+                    },
+                    "rewards": {
+                        "wealth": 2,
+                        "discipline": 1,
+                        "organization": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Track expenses for 30 days",
+                            "progress": 0,
+                            "target": 30
+                        }
+                    ]
+                },
+                {
+                    "id": "side_hustle",
+                    "name": "Side Hustle Starter",
+                    "icon": "🌱",
+                    "description": "Start your first side income stream",
+                    "position": {
+                        "x": 40,
+                        "y": 60
+                    },
+                    "requirements": {
+                        "level": 2,
+                        "parent_skills": ["budget_master"]
+                    },
+                    "rewards": {
+                        "wealth": 3,
+                        "entrepreneurship": 2,
+                        "confidence": 1
+                    },
+                    "challenges": [
+                        {
+                            "description": "Generate first $100 from side hustle",
+                            "progress": 0,
+                            "target": 100
+                        }
+                    ]
+                },
+                {
+                    "id": "sales_expert",
+                    "name": "Sales Expert",
+                    "icon": "🤝",
+                    "description": "Master the art of selling",
+                    "position": {
+                        "x": 20,
+                        "y": 80
+                    },
+                    "requirements": {
+                        "level": 3,
+                        "parent_skills": ["side_hustle"]
+                    },
+                    "rewards": {
+                        "charisma": 3,
+                        "wealth": 3,
+                        "negotiation": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Complete 10 successful sales",
+                            "progress": 0,
+                            "target": 10
+                        }
+                    ]
+                },
+                {
+                    "id": "asset_builder",
+                    "name": "Asset Builder",
+                    "icon": "🏗️",
+                    "description": "Build and manage income-generating assets",
+                    "position": {
+                        "x": 40,
+                        "y": 80
+                    },
+                    "requirements": {
+                        "level": 4,
+                        "parent_skills": ["side_hustle"]
+                    },
+                    "rewards": {
+                        "wealth": 4,
+                        "wisdom": 2,
+                        "passive_income": 3
+                    },
+                    "challenges": [
+                        {
+                            "description": "Create 3 different income streams",
+                            "progress": 0,
+                            "target": 3
+                        }
+                    ]
+                }
+            ]
+        },
+        "spirit": {
+            "name": "Spirit",
+            "icon": "🧘",
+            "description": "Inner peace and personal growth",
+            "color": "#a855f7",
+            "position": {
+                "x": 70,
+                "y": 70
+            },
+            "skills": [
+                {
+                    "id": "daily_meditation",
+                    "name": "Daily Meditation",
+                    "icon": "🧘",
+                    "description": "Practice 10 minutes of daily meditation",
+                    "position": {
+                        "x": 60,
+                        "y": 60
+                    },
+                    "requirements": {
+                        "level": 1,
+                        "parent_skills": []
+                    },
+                    "rewards": {
+                        "spirit": 2,
+                        "focus": 2,
+                        "peace": 1
+                    },
+                    "challenges": [
+                        {
+                            "description": "Meditate 10 minutes daily for 30 days",
+                            "progress": 0,
+                            "target": 30
+                        }
+                    ]
+                },
+                {
+                    "id": "journaling",
+                    "name": "Daily Journaling",
+                    "icon": "📔",
+                    "description": "Maintain a daily journal",
+                    "position": {
+                        "x": 80,
+                        "y": 60
+                    },
+                    "requirements": {
+                        "level": 1,
+                        "parent_skills": []
+                    },
+                    "rewards": {
+                        "spirit": 1,
+                        "wisdom": 2,
+                        "self_awareness": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Journal 5 days per week",
+                            "progress": 0,
+                            "target": 20
+                        }
+                    ]
+                },
+                {
+                    "id": "monk_mode",
+                    "name": "Monk Mode",
+                    "icon": "🙏",
+                    "description": "One week of intense focus and discipline",
+                    "position": {
+                        "x": 60,
+                        "y": 80
+                    },
+                    "requirements": {
+                        "level": 3,
+                        "parent_skills": ["daily_meditation", "journaling"]
+                    },
+                    "rewards": {
+                        "spirit": 4,
+                        "discipline": 3,
+                        "wisdom": 2
+                    },
+                    "challenges": [
+                        {
+                            "description": "Complete 7 days of monk mode",
+                            "progress": 0,
+                            "target": 7
+                        }
+                    ]
+                },
+                {
+                    "id": "mindfulness_master",
+                    "name": "Mindfulness Master",
+                    "icon": "🌟",
+                    "description": "Achieve advanced mindfulness practices",
+                    "position": {
+                        "x": 80,
+                        "y": 80
+                    },
+                    "requirements": {
+                        "level": 4,
+                        "parent_skills": ["monk_mode"]
+                    },
+                    "rewards": {
+                        "spirit": 5,
+                        "wisdom": 3,
+                        "peace": 3
+                    },
+                    "challenges": [
+                        {
+                            "description": "30-day advanced meditation practice",
+                            "progress": 0,
+                            "target": 30
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "skill_points": {
+        "per_level": 2,
+        "starting_points": 3
+    },
+    "level_requirements": {
+        "1": 0,
+        "2": 100,
+        "3": 250,
+        "4": 500,
+        "5": 1000
+    }
+} 

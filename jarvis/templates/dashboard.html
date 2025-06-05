@@ -3,182 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jarvis System Monitoring Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { background-color: #f8f9fa; }
-        .card { margin-bottom: 20px; }
-    </style>
+    <title>System Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="container py-5">
-        <h1 class="mb-4 text-center">Jarvis System Monitoring Dashboard</h1>
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <canvas id="cpuChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <canvas id="memoryChart"></canvas>
-                    </div>
-                </div>
-            </div>
+<body class="bg-black text-white min-h-screen p-4">
+    <a href="{{ url_for('logout') }}" class="fixed top-4 right-4 menu-button group">
+        <span>Logout</span>
+        <i class="fas fa-sign-out-alt text-white group-hover:text-glow"></i>
+    </a>
+    
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white tracking-wider text-glow mb-4">SYSTEM INTERFACE</h1>
+            <p class="text-xl text-white/80">Welcome, {{ session.username }}</p>
         </div>
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <canvas id="diskChart"></canvas>
-                    </div>
-                </div>
+        <!-- Category Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {% for category in categories %}
+            <button 
+                class="category-btn {% if loop.first %}active{% endif %}" 
+                onclick="showCategory('{{ category }}')"
+            >
+                {{ category }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Content Card -->
+        <div class="bg-black border border-white/30 rounded-xl p-8 shadow-lg relative">
+            <!-- Grid pattern background -->
+            <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0 rounded-xl"></div>
+            
+            {% for category, items in categories.items() %}
+            <div class="category-content relative z-10" id="{{ category }}" {% if not loop.first %}style="display: none;"{% endif %}>
+                <h2 class="text-2xl font-bold text-white mb-6 tracking-wide text-glow">{{ category }}</h2>
+                <ul class="space-y-4">
+                    {% for item in items %}
+                    <li class="menu-item group">
+                        <span class="text-white group-hover:text-glow">{{ item }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <canvas id="temperatureChart"></canvas>
-                    </div>
-                </div>
+            {% endfor %}
+
+            <!-- Dashboard Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {% for category, items in categories.items() %}
+                <!-- ... existing dashboard items ... -->
+                {% endfor %}
+            </div>
+
+            <!-- Navigation Button -->
+            <div class="flex justify-center mt-8">
+                <a href="{{ url_for('index') }}" class="px-6 py-3 bg-black border border-white/30 rounded-lg hover:border-blue-500 transition-all duration-300 text-white text-glow">
+                    Main Menu
+                </a>
             </div>
         </div>
     </div>
 
-    <script>
-        async function fetchSystemStatus() {
-            try {
-                const response = await fetch('/dashboard', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                });
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                // Return dummy data structure in case of error
-                return {
-                    history: {
-                        cpu: [{ timestamp: new Date().toISOString(), percent: 0 }],
-                        memory: [{ timestamp: new Date().toISOString(), percent: 0 }],
-                        disk: [{ timestamp: new Date().toISOString(), percent: 0 }],
-                        temperature: [{ timestamp: new Date().toISOString(), value: 0 }]
-                    },
-                    cpu: { cpu_percent: 0, success: false },
-                    memory: { percent: 0, success: false },
-                    disk: { disks: [{ percent: 0 }], success: false },
-                    temperature: { temperatures: { system: [{ current: 0 }] }, success: false }
-                };
-            }
+    <style>
+        /* Custom CSS for the grid pattern background and text glow */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
         }
 
-        function renderChart(ctx, label, data, color) {
-            return new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [new Date().toLocaleTimeString()],
-                    datasets: [{
-                        label: label,
-                        data: [0],  // Start with zero
-                        borderColor: color,
-                        backgroundColor: color,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true } }
+        .text-glow {
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: black;
+        }
+
+        /* Category button styling */
+        .category-btn {
+            background-color: black;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        .category-btn:hover, .category-btn.active {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+            transform: translateY(-2px);
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        /* Menu item styling */
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .menu-item:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 102, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .menu-item::before {
+            content: "►";
+            color: white;
+            margin-right: 1rem;
+            font-size: 0.8em;
+            transition: all 0.3s ease;
+        }
+
+        .menu-item:hover::before {
+            color: #0066ff;
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff;
+        }
+
+        /* Add a subtle blue glow to borders */
+        .border {
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        /* Logout button */
+        .menu-button {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background-color: black;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        .menu-button:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+            transform: translateY(-2px);
+        }
+    </style>
+
+    <script>
+        function showCategory(categoryName) {
+            // Hide all categories
+            document.querySelectorAll('.category-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            
+            // Show selected category
+            document.getElementById(categoryName).style.display = 'block';
+            
+            // Update active button
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.trim() === categoryName) {
+                    btn.classList.add('active');
                 }
             });
         }
-
-        async function updateCharts(charts) {
-            try {
-                const systemStatus = await fetchSystemStatus();
-                
-                // Update CPU chart
-                if (systemStatus.cpu && systemStatus.cpu.success) {
-                    charts.cpu.data.labels.push(new Date().toLocaleTimeString());
-                    charts.cpu.data.datasets[0].data.push(systemStatus.cpu.cpu_percent || 0);
-                    
-                    // Limit data points to keep chart clean
-                    if (charts.cpu.data.labels.length > 20) {
-                        charts.cpu.data.labels.shift();
-                        charts.cpu.data.datasets[0].data.shift();
-                    }
-                }
-                
-                // Update Memory chart
-                if (systemStatus.memory && systemStatus.memory.success) {
-                    charts.memory.data.labels.push(new Date().toLocaleTimeString());
-                    charts.memory.data.datasets[0].data.push(systemStatus.memory.percent || 0);
-                    
-                    if (charts.memory.data.labels.length > 20) {
-                        charts.memory.data.labels.shift();
-                        charts.memory.data.datasets[0].data.shift();
-                    }
-                }
-                
-                // Update Disk chart
-                if (systemStatus.disk && systemStatus.disk.success && systemStatus.disk.disks && systemStatus.disk.disks.length > 0) {
-                    charts.disk.data.labels.push(new Date().toLocaleTimeString());
-                    charts.disk.data.datasets[0].data.push(systemStatus.disk.disks[0].percent || 0);
-                    
-                    if (charts.disk.data.labels.length > 20) {
-                        charts.disk.data.labels.shift();
-                        charts.disk.data.datasets[0].data.shift();
-                    }
-                }
-                
-                // Update Temperature chart - handle various potential structures
-                if (systemStatus.temperature && systemStatus.temperature.success) {
-                    let tempValue = 0;
-                    const temps = systemStatus.temperature.temperatures;
-                    if (temps) {
-                        const keys = Object.keys(temps);
-                        if (keys.length > 0 && temps[keys[0]] && temps[keys[0]].length > 0) {
-                            tempValue = temps[keys[0]][0].current || 0;
-                        }
-                    }
-                    
-                    charts.temperature.data.labels.push(new Date().toLocaleTimeString());
-                    charts.temperature.data.datasets[0].data.push(tempValue);
-                    
-                    if (charts.temperature.data.labels.length > 20) {
-                        charts.temperature.data.labels.shift();
-                        charts.temperature.data.datasets[0].data.shift();
-                    }
-                }
-
-                // Update all charts
-                Object.values(charts).forEach(chart => chart.update());
-            } catch (error) {
-                console.error('Error updating charts:', error);
-            }
-        }
-
-        async function initDashboard() {
-            // Create empty charts initially
-            const charts = {
-                cpu: renderChart(document.getElementById('cpuChart'), 'CPU Usage (%)', [], 'rgba(255, 99, 132, 1)'),
-                memory: renderChart(document.getElementById('memoryChart'), 'Memory Usage (%)', [], 'rgba(54, 162, 235, 1)'),
-                disk: renderChart(document.getElementById('diskChart'), 'Disk Usage (%)', [], 'rgba(255, 206, 86, 1)'),
-                temperature: renderChart(document.getElementById('temperatureChart'), 'Temperature (°C)', [], 'rgba(75, 192, 192, 1)')
-            };
-
-            // Update immediately then set interval
-            await updateCharts(charts);
-            setInterval(() => updateCharts(charts), 10000); // Update every 10 seconds
-        }
-
-        document.addEventListener('DOMContentLoaded', initDashboard);
     </script>
 </body>
 </html> 

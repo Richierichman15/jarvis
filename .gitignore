@@ -42,3 +42,8 @@ Thumbs.db
 
 # Jarvis specific
 jarvis/memory/
+jarvis/debug_logs/
+*.log
+
+node_modules/
+firebase-admin-sdk.json

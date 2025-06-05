@@ -1,0 +1,18 @@
+{
+  "conversations": [],
+  "tasks": [],
+  "stats": {
+    "name": "Gitonga",
+    "class": "lost",
+    "title": "Hunger",
+    "level": 1,
+    "health": 100,
+    "stamina": 100,
+    "intelligence": 0,
+    "strength": 0,
+    "wealth": 0,
+    "experience": 0,
+    "rank": "E",
+    "rank_xp": 0
+  }
+}

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Character Status</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber-blue': '#0066ff',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-black text-white min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header with Rank -->
+        <div class="text-center mb-16 relative">
+            <div class="bg-black border border-white/30 rounded p-6 relative overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <h1 class="text-4xl font-bold mb-2 text-white text-glow">{{ stats.name | default('User') }}</h1>
+                    <p class="text-xl text-white/80 mb-2">{{ stats.class }} | {{ stats.title }}</p>
+                    <div class="absolute top-4 right-4 text-right">
+                        <div class="text-2xl font-bold text-white text-glow">RANK {{ stats.rank }}</div>
+                        <div class="text-sm text-white/80">XP: {{ stats.rank_xp }}/{{ rank_requirements[stats.rank] }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
+            <!-- Strength -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-dumbbell"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">STRENGTH</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.strength }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.strength }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Perception -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">PERCEPTION</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.perception | default(5) }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.perception | default(5) }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endurance -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-heart-pulse"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">ENDURANCE</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.health }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.health }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charisma -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">CHARISMA</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.charisma | default(5) }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.charisma }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Intelligence -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">INTELLIGENCE</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.intelligence }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.intelligence }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agility -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-person-running"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">AGILITY</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.agility | default(5) }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.agility | default(5) }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Luck -->
+            <div class="bg-black border border-white/30 rounded p-4 relative group hover:border-white/50 hover:shadow-glow transition-all duration-300 overflow-hidden">
+                <div class="absolute inset-0 bg-grid-pattern opacity-10 z-0"></div>
+                <div class="relative z-10">
+                    <div class="text-2xl text-center text-cyber-blue mb-4">
+                        <i class="fas fa-clover"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white text-glow text-center mb-2">LUCK</h3>
+                    <div class="text-4xl text-center text-white text-glow mb-4">{{ stats.luck | default(5) }}</div>
+                    <div class="w-full bg-gray-900 rounded-full h-2 mb-2">
+                        <div class="bg-cyber-blue rounded-full h-2 shadow-glow" style="width: {{ stats.luck }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="flex justify-center gap-4">
+            <a href="{{ url_for('character_skills') }}" class="menu-button">
+                <span>SKILLS</span>
+                <i class="fas fa-book text-white"></i>
+            </a>
+            <a href="{{ url_for('index') }}" class="menu-button">
+                <span>MAIN MENU</span>
+                <i class="fas fa-home text-white"></i>
+            </a>
+        </div>
+    </div>
+
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: black;
+        }
+
+        /* Grid pattern background */
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Text glow effect */
+        .text-glow {
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+
+        /* Shadow glow effect */
+        .shadow-glow {
+            box-shadow: 0 0 5px #0066ff,
+                       0 0 10px #0066ff,
+                       0 0 20px #0066ff;
+        }
+
+        /* Menu button styling */
+        .menu-button {
+            display: flex;
+            align-items: center;
+            gap: 3rem;
+            background-color: black;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
+        }
+
+        .menu-button:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .menu-button i {
+            font-size: 1.5rem;
+            transition: text-shadow 0.3s ease;
+        }
+
+        .menu-button:hover i {
+            text-shadow: 
+                0 0 5px #0066ff,
+                0 0 10px #0066ff,
+                0 0 20px #0066ff;
+        }
+    </style>
+</body>
+</html> 

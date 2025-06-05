@@ -77,39 +77,3 @@ SAFE_DIRECTORIES = [
     os.path.expanduser("~/Downloads"),
     os.getcwd()
 ] 
-
-# Firebase configuration
-FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
-FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", "")
-FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "")
-FIREBASE_STORAGE_BUCKET = os.environ.get("FIREBASE_STORAGE_BUCKET", "")
-FIREBASE_MESSAGING_SENDER_ID = os.environ.get("FIREBASE_MESSAGING_SENDER_ID", "")
-FIREBASE_APP_ID = os.environ.get("FIREBASE_APP_ID", "")
-FIREBASE_MEASUREMENT_ID = os.environ.get("FIREBASE_MEASUREMENT_ID", "")
-FIREBASE_VAPID_KEY = os.environ.get("FIREBASE_VAPID_KEY", "")
-
-# Firebase Admin SDK configuration
-FIREBASE_ADMIN_SDK_PATH = os.environ.get("FIREBASE_ADMIN_SDK_PATH", "")
-
-# Notification settings
-NOTIFICATION_ENABLED = True
-DEFAULT_NOTIFICATION_ICON = "/static/images/notification-icon.png"
-DEFAULT_NOTIFICATION_BADGE = "/static/images/badge-icon.png"
-
-# Progress tracking settings
-DEFAULT_XP_PER_LEVEL = 100
-MAX_XP_GRANT = 1000
-
-if not FIREBASE_API_KEY:
-    print("Note: Firebase configuration not found. Notification functionality will be disabled.")
-
-# Firebase configuration dictionary for frontend
-FIREBASE_CONFIG = {
-    "apiKey": FIREBASE_API_KEY,
-    "authDomain": FIREBASE_AUTH_DOMAIN,
-    "projectId": FIREBASE_PROJECT_ID,
-    "storageBucket": FIREBASE_STORAGE_BUCKET,
-    "messagingSenderId": FIREBASE_MESSAGING_SENDER_ID,
-    "appId": FIREBASE_APP_ID,
-    "measurementId": FIREBASE_MEASUREMENT_ID
-} 

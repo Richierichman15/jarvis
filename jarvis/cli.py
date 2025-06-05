@@ -5,7 +5,8 @@ This module provides a command-line interface for interacting with Jarvis.
 import os
 import sys
 import time
-from typing import Optional, List
+import json
+from typing import Optional, List, Dict, Any, Union
 
 import typer
 from rich.console import Console
@@ -18,6 +19,10 @@ from pathlib import Path
 
 from .jarvis import Jarvis
 from .dual_jarvis import DualJarvis
+
+import argparse
+import logging
+from tabulate import tabulate
 
 # Create Typer app
 app = typer.Typer(help="Jarvis AI Assistant")
@@ -465,6 +470,199 @@ def dual_query(
     console.print(Markdown(response))
     
     return 0
+
+
+def register_commands(subparsers):
+    """Register all available commands with the argument parser."""
+    # ... existing commands ...
+
+    # Plugin commands
+    plugin_parser = subparsers.add_parser('plugin', help='Manage plugins')
+    plugin_subparsers = plugin_parser.add_subparsers(dest='plugin_command', required=True)
+    
+    # List plugins
+    list_parser = plugin_subparsers.add_parser('list', help='List available plugins')
+    list_parser.add_argument('--format', choices=['table', 'json'], default='table', help='Output format')
+    
+    # Load plugin
+    load_parser = plugin_subparsers.add_parser('load', help='Load a plugin')
+    load_parser.add_argument('module_name', help='Module name of the plugin')
+    load_parser.add_argument('class_name', help='Class name of the plugin')
+    
+    # Unload plugin
+    unload_parser = plugin_subparsers.add_parser('unload', help='Unload a plugin')
+    unload_parser.add_argument('plugin_name', help='Name of the plugin to unload')
+    
+    # Get plugin settings
+    get_settings_parser = plugin_subparsers.add_parser('get-settings', help='Get plugin settings')
+    get_settings_parser.add_argument('plugin_name', help='Name of the plugin')
+    get_settings_parser.add_argument('--format', choices=['table', 'json'], default='table', help='Output format')
+    
+    # Update plugin settings
+    update_settings_parser = plugin_subparsers.add_parser('update-settings', help='Update plugin settings')
+    update_settings_parser.add_argument('plugin_name', help='Name of the plugin')
+    update_settings_parser.add_argument('settings_file', help='JSON file containing settings')
+    
+    # Reset plugin settings
+    reset_settings_parser = plugin_subparsers.add_parser('reset-settings', help='Reset plugin settings to defaults')
+    reset_settings_parser.add_argument('plugin_name', help='Name of the plugin')
+    
+    # API commands
+    api_parser = subparsers.add_parser('api', help='Control the API server')
+    api_subparsers = api_parser.add_subparsers(dest='api_command', required=True)
+    
+    # Start API server
+    start_parser = api_subparsers.add_parser('start', help='Start the API server')
+    start_parser.add_argument('--host', default='127.0.0.1', help='Host to bind to')
+    start_parser.add_argument('--port', type=int, default=5000, help='Port to bind to')
+    start_parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+    
+    # Stop API server
+    stop_parser = api_subparsers.add_parser('stop', help='Stop the API server')
+    
+    # Get API key
+    get_key_parser = api_subparsers.add_parser('get-key', help='Get the API key')
+
+    # ... other existing commands ...
+
+def handle_plugin_command(args, jarvis):
+    """Handle plugin-related commands."""
+    if args.plugin_command == 'list':
+        plugins = jarvis.discover_plugins()
+        if args.format == 'json':
+            print(json.dumps(plugins, indent=2))
+        else:
+            if not plugins:
+                print("No plugins available")
+                return
+            
+            table_data = []
+            for plugin in plugins:
+                table_data.append([
+                    plugin['name'],
+                    plugin['version'],
+                    plugin['type'],
+                    "Yes" if plugin['enabled'] else "No",
+                    plugin['description']
+                ])
+            
+            headers = ["Name", "Version", "Type", "Enabled", "Description"]
+            print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    
+    elif args.plugin_command == 'load':
+        if jarvis.load_plugin(args.module_name, args.class_name):
+            print(f"Plugin loaded successfully: {args.module_name}.{args.class_name}")
+        else:
+            print(f"Failed to load plugin: {args.module_name}.{args.class_name}")
+    
+    elif args.plugin_command == 'unload':
+        if jarvis.unload_plugin(args.plugin_name):
+            print(f"Plugin unloaded successfully: {args.plugin_name}")
+        else:
+            print(f"Failed to unload plugin: {args.plugin_name}")
+    
+    elif args.plugin_command == 'get-settings':
+        settings = jarvis.get_plugin_settings(args.plugin_name)
+        if settings is None:
+            print(f"No settings found for plugin: {args.plugin_name}")
+            return
+        
+        if args.format == 'json':
+            print(json.dumps(settings, indent=2))
+        else:
+            table_data = []
+            for key, value in settings.items():
+                table_data.append([key, str(value)])
+            
+            headers = ["Setting", "Value"]
+            print(f"Settings for plugin: {args.plugin_name}")
+            print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    
+    elif args.plugin_command == 'update-settings':
+        try:
+            with open(args.settings_file, 'r') as f:
+                settings = json.load(f)
+            
+            if jarvis.update_plugin_settings(args.plugin_name, settings):
+                print(f"Settings updated successfully for plugin: {args.plugin_name}")
+            else:
+                print(f"Failed to update settings for plugin: {args.plugin_name}")
+        except Exception as e:
+            print(f"Error loading settings file: {str(e)}")
+    
+    elif args.plugin_command == 'reset-settings':
+        if jarvis.plugin_manager.reset_plugin_settings(args.plugin_name):
+            print(f"Settings reset to defaults for plugin: {args.plugin_name}")
+        else:
+            print(f"Failed to reset settings for plugin: {args.plugin_name}")
+
+def handle_api_command(args, jarvis):
+    """Handle API-related commands."""
+    if args.api_command == 'start':
+        # Create a new Jarvis instance with API enabled if it's not already
+        if jarvis.api_server is None:
+            print("Creating a new Jarvis instance with API enabled...")
+            jarvis = Jarvis(user_name=getattr(args, 'name', "Boss"), 
+                           enable_api=True, 
+                           api_host=args.host, 
+                           api_port=args.port)
+        
+        # Start the API server
+        if jarvis.start_api_server(debug=args.debug):
+            print(f"API server started at http://{args.host}:{args.port}")
+            print(f"API Key: {jarvis.get_api_key()}")
+            
+            # If not in debug mode, keep the main thread alive
+            if not args.debug:
+                try:
+                    print("Press Ctrl+C to stop the server")
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    print("\nStopping API server...")
+                    jarvis.stop_api_server()
+                    print("API server stopped")
+        else:
+            print("Failed to start API server")
+    
+    elif args.api_command == 'stop':
+        if jarvis.stop_api_server():
+            print("API server stopped")
+        else:
+            print("Failed to stop API server")
+    
+    elif args.api_command == 'get-key':
+        api_key = jarvis.get_api_key()
+        if api_key:
+            print(f"API Key: {api_key}")
+        else:
+            print("API server is not initialized")
+
+def main():
+    """Main entry point for the CLI."""
+    parser = argparse.ArgumentParser(description="Jarvis AI Assistant")
+    # ... existing code ...
+    
+    args = parser.parse_args()
+    
+    # ... existing code ...
+    
+    # Create Jarvis instance with plugin system enabled by default
+    jarvis = Jarvis(user_name=getattr(args, 'name', "Boss"), enable_plugins=True)
+    
+    # ... existing code ...
+    
+    # Handle plugin commands
+    if hasattr(args, 'plugin_command'):
+        handle_plugin_command(args, jarvis)
+        return
+    
+    # Handle API commands
+    if hasattr(args, 'api_command'):
+        handle_api_command(args, jarvis)
+        return
+    
+    # ... existing code ...
 
 
 if __name__ == "__main__":
