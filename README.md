@@ -1,121 +1,243 @@
-# JARVIS - Just A Rather Very Intelligent System
+# Jarvis System 🤖⚔️
 
-An AI assistant inspired by Iron Man's JARVIS, built with a hybrid approach using both local models and cloud AI.
+**An RPG-inspired life management system that gamifies personal development and daily tasks.**
 
-## Features
+Transform your life into an epic quest with the Jarvis System - a powerful AI assistant that helps you level up through daily challenges, skill progression, and achievement unlocking, just like your favorite RPG games!
 
-- **Hybrid Intelligence**: Uses local models (via Ollama) for basic tasks and OpenAI for complex reasoning
-- **Memory**: Remembers conversation history for context
-- **Tools**: Can search the web and use other tools to help answer questions
-- **Beautiful CLI**: Stylish command-line interface for interacting with JARVIS
-- **Dual Model Mode**: Compare responses and performance of local and OpenAI models side by side
-- **Docker Support**: Run Jarvis and Ollama in containers for easy deployment
+## 🎮 Features
 
-## Requirements
+### 🏆 RPG-Style Progression System
+- **Character Stats**: Health, Intelligence, Strength, Wealth tracking
+- **XP & Leveling**: Earn experience points and level up by completing quests
+- **Rank System**: Progress from E-rank to S-rank Hunter
+- **Skill Tree**: Unlock new abilities and specializations as you grow
+- **Inventory System**: Collect rewards, artifacts, and resources
 
-- Python 3.8+
-- [Ollama](https://ollama.ai/) for local model inference
-- OpenAI API key (optional)
+### 📋 Intelligent Quest System  
+- **Daily Quests**: Auto-generated personalized challenges
+- **Quest Categories**: Financial, Programming, Health, Personal Growth, Communication
+- **Difficulty Scaling**: E, D, C, B, A, S rank quests with increasing rewards
+- **3-Month Planning**: Long-term goal tracking with weekly milestones
+- **Smart Recommendations**: AI-driven quest suggestions based on your weakest stats
 
-## Installation
+### 🔔 Push Notification System
+- **Firebase Integration**: Real-time push notifications across devices
+- **Scheduled Reminders**: Morning quest assignments, evening progress checks, nightly reflections
+- **Achievement Alerts**: Get notified when you level up or unlock new skills
+- **Custom Notifications**: Personalized messages based on your progress
 
-### Standard Installation
+### 🌐 Modern Web Interface
+- **Responsive Design**: Works seamlessly on desktop and mobile
+- **Real-time Updates**: Live stats and progress tracking
+- **Interactive Dashboard**: Comprehensive overview of your journey
+- **Progress Visualization**: Beautiful charts and progress bars
 
-1. Clone this repository
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-3. Make sure Ollama is installed and running
-4. Pull the needed models:
-   ```
-   ollama pull llama3:8b-instruct-q4_0
-   ```
+## 🚀 Quick Start
 
-### Docker Installation
+### Local Development
 
-For containerized deployment (includes Ollama):
-
-1. Make sure you have Docker and Docker Compose installed
-2. Clone this repository
-3. Start the containers:
-   ```
-   docker-compose up -d
-   ```
-4. Access the web interface at http://localhost:5000
-
-See [DOCKER_README.md](DOCKER_README.md) for detailed Docker instructions.
-
-## Usage
-
-### Interactive Chat
-
-Start an interactive chat session with JARVIS:
-
+1. **Clone the repository**:
 ```bash
-python main.py chat --name "Your Name"
+git clone <repository-url>
+cd jarvis
 ```
 
-### Single Query
-
-Ask JARVIS a single question:
-
+2. **Install dependencies**:
 ```bash
-python main.py query "What is the capital of France?" --name "Your Name"
+pip install -r requirements.txt
 ```
 
-### Dual Model Mode
-
-Compare local and OpenAI models in real-time to see which is faster and how responses differ:
-
+3. **Set up environment**:
 ```bash
-# Interactive dual model chat
-python main.py dual_chat --openai-key your_api_key_here
-
-# Single dual model query
-python main.py dual_query "What is quantum computing?" --openai-key your_api_key_here
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-Both commands will show responses from the local model and OpenAI side by side, along with performance metrics.
-
-### Weather Information
-
-Get weather information for any location:
-
+4. **Run the application**:
 ```bash
-python main.py weather "New York" 
+python app.py
 ```
 
-For the best weather data, set up an OpenWeatherMap API key:
+5. **Open your browser**: Navigate to `http://localhost:8080`
 
+### 🔥 Firebase Deployment
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Quick deployment:
 ```bash
-export OPENWEATHER_API_KEY=your_api_key_here
+# Install Firebase CLI
+npm install -g firebase-tools
+
+# Login and initialize
+firebase login
+firebase init
+
+# Deploy
+firebase deploy
 ```
 
-See [WEATHER_README.md](WEATHER_README.md) for detailed setup instructions.
+## 🏗️ Architecture
 
-### Web Interface
-
-Start the web interface:
-
-```bash
-python main.py --web
+### 📁 Project Structure
+```
+jarvis/
+├── jarvis/                 # Core system modules
+│   ├── api/               # API server and endpoints
+│   ├── models/            # AI models (OpenAI, Claude, Ollama)
+│   ├── tools/             # System tools and utilities
+│   ├── memory/            # Conversation and session memory
+│   ├── plugins/           # Extensible plugin system
+│   ├── templates/         # HTML templates
+│   ├── static/           # CSS, JS, and assets
+│   ├── utils/            # Utility functions and Firebase
+│   ├── config.py         # Centralized configuration
+│   ├── jarvis.py         # Main system class
+│   └── daily_quest_system.py  # RPG quest management
+├── app.py                # Main Flask application
+├── main.py              # Firebase Functions entry point
+├── firebase.json        # Firebase configuration
+└── requirements.txt     # Python dependencies
 ```
 
-## Project Structure
+### 🔧 Core Components
 
-- `jarvis/` - Main package
-  - `models/` - AI model handlers
-  - `memory/` - Conversation memory
-  - `tools/` - Tools JARVIS can use
-  - `utils/` - Utility functions
-  - `jarvis.py` - Core JARVIS class
-  - `cli.py` - Command-line interface
+1. **Jarvis Core**: Main AI system with conversation memory and tool integration
+2. **Quest System**: RPG-style task management with XP rewards
+3. **Firebase Manager**: Push notifications and cloud integration  
+4. **Configuration System**: Centralized environment management
+5. **API Server**: RESTful endpoints for all system operations
 
-## Extending JARVIS
+## 🎯 RPG System Details
 
-JARVIS is designed to be extended with new tools and capabilities. Add your own tools in the `jarvis/tools/` directory!
+### 📊 Character Progression
+- **Starting Level**: 1 (E-rank Hunter)
+- **Level Cap**: 50 (configurable)
+- **XP Sources**: Quest completion, daily habits, skill practice
+- **Stat Growth**: Balanced progression across Health, Intelligence, Strength, Wealth
 
-## License
+### ⚔️ Quest Types
 
-MIT 
+| Type | Focus | Example Quests |
+|------|-------|----------------|
+| 🏃 Health | Physical wellness | 20-min workout, meditation session |
+| 🧠 Programming | Technical skills | Code practice, learn new language |
+| 💰 Financial | Wealth building | Expense tracking, investment research |
+| 📚 Personal Growth | Self-improvement | Journaling, skill practice |
+| 🗣️ Communication | Social skills | Networking, public speaking |
+
+### 🏅 Rank Progression
+- **E-Rank**: 0 - 1,000 XP (Beginner)
+- **D-Rank**: 1,000 - 2,500 XP (Novice)  
+- **C-Rank**: 2,500 - 5,000 XP (Intermediate)
+- **B-Rank**: 5,000 - 10,000 XP (Advanced)
+- **A-Rank**: 10,000 - 20,000 XP (Expert)
+- **S-Rank**: 20,000+ XP (Master)
+
+## 🛠️ Configuration
+
+### Environment Variables
+```env
+# Core Settings
+ENVIRONMENT=development
+DEBUG=False
+SECRET_KEY=your-secret-key
+
+# Firebase Configuration
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_PRIVATE_KEY=your-private-key
+VAPID_KEY=your-vapid-key
+
+# Quest System
+DAILY_QUEST_COUNT=4
+XP_MULTIPLIER=1.0
+MAX_LEVEL=50
+
+# Notification Schedule  
+MORNING_NOTIFICATION=07:00
+EVENING_NOTIFICATION=18:00
+NIGHT_NOTIFICATION=21:00
+```
+
+### Customization Options
+- **Quest Generation**: Modify templates in `daily_quest_system.py`
+- **Skill Trees**: Edit `jarvis/skills_config.json`
+- **UI Themes**: Customize CSS in `jarvis/static/css/`
+- **Notification Messages**: Update templates in notification system
+
+## 📱 API Reference
+
+### Core Endpoints
+```
+GET  /api/stats              # Get character statistics
+GET  /api/tasks              # Get all quests (with filters)
+POST /api/daily-quests/generate  # Generate new daily quests
+POST /api/complete_quest_advanced  # Complete quest with XP
+GET  /api/health            # System health check
+```
+
+### Quest Management
+```
+POST /api/toggle_quest_active    # Activate/deactivate quest
+GET  /api/daily-quests/stats    # Get daily progress stats
+POST /api/three-month-plan/generate  # Create long-term plan
+```
+
+### Notifications
+```
+POST /api/save-notification-token  # Register for push notifications
+POST /api/notification/manual     # Send test notification
+GET  /api/notifications          # Get recent notifications
+```
+
+## 🤝 Contributing
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Commit changes**: `git commit -m 'Add amazing feature'`
+4. **Push to branch**: `git push origin feature/amazing-feature`
+5. **Open a Pull Request**
+
+### Development Guidelines
+- Follow Python PEP 8 style guide
+- Add type hints for new functions
+- Include docstrings for public methods
+- Test Firebase integration locally
+- Update documentation for new features
+
+## 🐛 Troubleshooting
+
+### Common Issues
+- **Firebase not connecting**: Check environment variables and service account permissions
+- **Notifications not working**: Verify VAPID key and browser permissions
+- **Quest generation failing**: Ensure skills configuration file is valid JSON
+
+### Debug Mode
+```bash
+# Enable debug logging
+export DEBUG=True
+python app.py
+```
+
+### Health Check
+Visit `/api/health` to verify all system components are working correctly.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Solo Leveling** - Inspiration for the rank and progression system
+- **RPG Games** - Quest and leveling mechanics
+- **Firebase** - Real-time notifications and hosting
+- **Flask** - Lightweight web framework
+- **OpenAI/Anthropic** - AI model integration
+
+---
+
+**Ready to start your journey from E-rank to S-rank?** 🗡️✨
+
+Transform your daily routine into an epic adventure. Every task completed brings you closer to becoming the ultimate version of yourself!
+
+[Get Started →](DEPLOYMENT.md) | [View API Docs →](/api) | [Join Community →](#) 

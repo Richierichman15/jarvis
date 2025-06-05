@@ -62,6 +62,7 @@ gunicorn>=21.0.0  # For production API serving
 
 # Firebase and notifications
 firebase-admin==6.2.0
+functions-framework>=3.4.0  # For Firebase Functions deployment
 
 # Daily quest system dependencies
 schedule==1.2.0  # For scheduling notifications
