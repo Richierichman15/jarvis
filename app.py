@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Import the daily quest system
+from jarvis.daily_quest_system import DailyQuestGenerator
+
 # Required Firebase environment variables
 REQUIRED_FIREBASE_VARS = [
     "FIREBASE_TYPE",
@@ -68,6 +71,33 @@ except Exception as e:
 
 system = Jarvis()  # Initialize our System
 
+# Initialize the daily quest system
+daily_quest_system = DailyQuestGenerator(system)
+
+# Register notification callback for Firebase notifications
+def send_firebase_notification(notification_data):
+    """Send Firebase notification"""
+    if firebase_enabled and 'fcm_token' in session:
+        try:
+            result = send_notification(
+                token=session['fcm_token'],
+                title=notification_data.get('title', 'System Notification'),
+                body=notification_data.get('message', ''),
+                data={
+                    'type': notification_data.get('type', ''),
+                    'notification_time': notification_data.get('notification_time', ''),
+                    'redirect_url': url_for('show_notification', notification_type=notification_data.get('type', 'quest').lower().replace(' ', '_'))
+                }
+            )
+            print(f"Notification sent: {result}")
+        except Exception as e:
+            print(f"Error sending Firebase notification: {e}")
+
+daily_quest_system.register_notification_callback(send_firebase_notification)
+
+# Start the notification scheduler
+daily_quest_system.schedule_daily_notifications()
+
 # Dashboard categories
 DASHBOARD_CATEGORIES = {
     "Start Quests": [
@@ -119,19 +149,27 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     """Render the dashboard page"""
+    # Get daily stats
+    daily_stats = daily_quest_system.get_daily_stats()
+    
     return render_template('dashboard.html',
                          categories=DASHBOARD_CATEGORIES,
                          stats=system.stats,
                          tasks=system.tasks,
+                         daily_stats=daily_stats,
                          session=session)
 
 @app.route('/quests')
 def show_quests():
     """Render the quests page"""
+    # Get daily stats for quest information
+    daily_stats = daily_quest_system.get_daily_stats()
+    
     return render_template('quest.html',
                          categories=DASHBOARD_CATEGORIES,
                          stats=system.stats,
                          tasks=system.tasks,
+                         daily_stats=daily_stats,
                          session=session)
 
 @app.route('/character-status')
@@ -156,6 +194,9 @@ def character_skills():
     # Calculate skill points based on level
     skill_points = skills_config['skill_points']['starting_points'] + (system.stats.get('level', 1) - 1) * skills_config['skill_points']['per_level']
     
+    # Get skill progress from stats
+    skill_progress = system.stats.get('skill_progress', {})
+    
     # Determine which skills are unlocked based on level and prerequisites
     for category in skills_config['categories'].values():
         for skill in category['skills']:
@@ -163,6 +204,9 @@ def character_skills():
                 system.stats.get('level', 1) >= skill['requirements']['level'] and
                 all(parent in system.stats.get('unlocked_skills', []) for parent in skill['requirements']['parent_skills'])
             )
+            # Add progress information
+            skill['progress'] = skill_progress.get(skill['id'], 0)
+            skill['max_progress'] = 100  # Default max progress
     
     return render_template('skills.html',
                          stats=system.stats,
@@ -186,6 +230,18 @@ def show_notification(notification_type):
         'quest': {
             'type': 'The Secret Quest',
             'message': 'Courage of the Weak'
+        },
+        'daily_quest_assignment': {
+            'type': 'Daily Quest Assignment',
+            'message': 'New daily quests have been assigned!'
+        },
+        'progress_update': {
+            'type': 'Progress Update',
+            'message': 'Your daily progress has been updated!'
+        },
+        'daily_reflection': {
+            'type': 'Daily Reflection',
+            'message': 'Time to reflect on your progress!'
         },
         'achievement': {
             'type': 'Achievement Unlocked',
@@ -240,6 +296,171 @@ def get_stats():
 def get_tasks():
     """Get all tasks"""
     return jsonify([task.to_dict() for task in system.tasks])
+
+# NEW DAILY QUEST SYSTEM API ENDPOINTS
+
+@app.route('/api/daily-quests/generate', methods=['POST'])
+def generate_daily_quests():
+    """Generate new daily quests"""
+    try:
+        quests = daily_quest_system.generate_daily_quests()
+        return jsonify({
+            'success': True,
+            'quests': quests,
+            'count': len(quests),
+            'message': f'Generated {len(quests)} daily quests successfully!'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/daily-quests/stats')
+def get_daily_stats():
+    """Get daily quest statistics"""
+    try:
+        daily_stats = daily_quest_system.get_daily_stats()
+        return jsonify({
+            'success': True,
+            'stats': daily_stats
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/three-month-plan/generate', methods=['POST'])
+def generate_three_month_plan():
+    """Generate a new 3-month plan"""
+    try:
+        plan = daily_quest_system.generate_three_month_plan()
+        return jsonify({
+            'success': True,
+            'plan': plan,
+            'message': '3-month plan generated successfully!'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/three-month-plan')
+def get_three_month_plan():
+    """Get the current 3-month plan"""
+    try:
+        if daily_quest_system.three_month_plan:
+            return jsonify({
+                'success': True,
+                'plan': daily_quest_system.three_month_plan
+            })
+        else:
+            # Try to load from file
+            try:
+                with open('three_month_plan.json', 'r') as f:
+                    plan = json.load(f)
+                daily_quest_system.three_month_plan = plan
+                return jsonify({
+                    'success': True,
+                    'plan': plan
+                })
+            except FileNotFoundError:
+                return jsonify({
+                    'success': False,
+                    'error': 'No 3-month plan found. Generate one first.'
+                }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/complete_quest_advanced', methods=['POST'])
+def complete_quest_advanced():
+    """Complete a quest with advanced XP system"""
+    task_index = request.json.get('task_index')
+    
+    if task_index is not None:
+        try:
+            result = daily_quest_system.complete_quest_with_xp(task_index)
+            
+            if result['success']:
+                # Create notification data
+                notification = {
+                    'type': 'Quest Completed',
+                    'title': f'Quest Completed: {result["quest_name"]}',
+                    'message': f'You gained {result["xp_gained"]} XP!',
+                    'xp_gained': result['xp_gained'],
+                    'skill_xp_gained': result['skill_xp_gained'],
+                    'skills_affected': result['skills_affected'],
+                    'stat_rewards': result['stat_rewards'],
+                    'level_up': result['level_up'],
+                    'rank_up': result['rank_up']
+                }
+                
+                # Send push notification if Firebase is enabled and token exists
+                if firebase_enabled and 'fcm_token' in session:
+                    notification_result = send_notification(
+                        token=session['fcm_token'],
+                        title=notification['title'],
+                        body=notification['message'],
+                        data={'quest_name': result["quest_name"]}
+                    )
+                    if not notification_result['success']:
+                        print(f"Failed to send notification: {notification_result.get('error')}")
+                
+                return jsonify({
+                    'success': True,
+                    'notification': notification,
+                    'result': result
+                })
+            else:
+                return jsonify(result), 400
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    return jsonify({'success': False, 'error': 'No task index provided'}), 400
+
+@app.route('/api/notification/manual', methods=['POST'])
+def send_manual_notification():
+    """Send a manual notification (for testing)"""
+    data = request.json
+    notification_type = data.get('type', 'morning')
+    
+    if notification_type == 'morning':
+        daily_quest_system._send_morning_notification()
+    elif notification_type == 'evening':
+        daily_quest_system._send_evening_notification()
+    elif notification_type == 'night':
+        daily_quest_system._send_night_notification()
+    else:
+        return jsonify({'success': False, 'error': 'Invalid notification type'}), 400
+    
+    return jsonify({'success': True, 'message': f'{notification_type.title()} notification sent!'})
+
+@app.route('/planning')
+def planning_dashboard():
+    """Render the 3-month planning dashboard"""
+    if "username" not in session:
+        session["username"] = "User"
+    
+    # Load the current 3-month plan
+    try:
+        if daily_quest_system.three_month_plan:
+            plan = daily_quest_system.three_month_plan
+        else:
+            with open('three_month_plan.json', 'r') as f:
+                plan = json.load(f)
+                daily_quest_system.three_month_plan = plan
+    except FileNotFoundError:
+        plan = None
+    
+    return render_template('planning.html',
+                         stats=system.stats,
+                         plan=plan,
+                         current_date=datetime.now().isoformat())
 
 @app.route('/api/toggle_quest_active', methods=['POST'])
 def toggle_quest_active():
