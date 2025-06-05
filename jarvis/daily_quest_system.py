@@ -1,7 +1,7 @@
 """
 Daily Quest System for Jarvis
-Generates personalized daily quests based on user goals and long-term planning.
-Includes notification scheduling and XP integration with skill tree.
+Uses Jarvis's AI brain to intelligently generate daily quests based on user goals and progress.
+Much simpler approach that leverages existing AI capabilities.
 """
 
 import json
@@ -14,6 +14,7 @@ import threading
 from enum import Enum
 
 class QuestDifficulty(Enum):
+    """XP rewards for different quest difficulties"""
     E = {"xp": 10, "skill_xp": 5, "multiplier": 1}
     D = {"xp": 25, "skill_xp": 10, "multiplier": 1.5}
     C = {"xp": 50, "skill_xp": 15, "multiplier": 2}
@@ -22,6 +23,7 @@ class QuestDifficulty(Enum):
     S = {"xp": 500, "skill_xp": 75, "multiplier": 6}
 
 class NotificationTime(Enum):
+    """Scheduled notification times"""
     MORNING = "07:00"
     EVENING = "18:00"
     NIGHT = "21:00"
@@ -29,459 +31,249 @@ class NotificationTime(Enum):
 class DailyQuestGenerator:
     def __init__(self, jarvis_instance):
         self.jarvis = jarvis_instance
-        self.load_quest_templates()
-        self.load_user_goals()
-        self.load_skill_config()
         self.three_month_plan = {}
-        self.current_week = 1
         self.notification_callbacks = []
         
-    def load_quest_templates(self):
-        """Load quest templates organized by goal categories"""
-        self.quest_templates = {
-            "financial": [
-                {
-                    "name": "Daily Expense Tracking",
-                    "description": "Log all expenses for today and review spending patterns",
-                    "difficulty": "D",
-                    "base_xp": 25,
-                    "skills": ["budget_master", "financial_awareness"],
-                    "stat_rewards": {"wealth": 2, "discipline": 1},
-                    "time_estimate": 15
-                },
-                {
-                    "name": "Investment Research",
-                    "description": "Research one stock or investment opportunity for 30 minutes",
-                    "difficulty": "C",
-                    "base_xp": 50,
-                    "skills": ["financial_literacy", "critical_thinking"],
-                    "stat_rewards": {"wealth": 3, "intelligence": 2},
-                    "time_estimate": 30
-                },
-                {
-                    "name": "Side Hustle Development",
-                    "description": "Work on your side project or business for 1 hour",
-                    "difficulty": "B",
-                    "base_xp": 100,
-                    "skills": ["entrepreneurship", "side_hustle"],
-                    "stat_rewards": {"wealth": 5, "confidence": 3},
-                    "time_estimate": 60
-                }
-            ],
-            "programming": [
-                {
-                    "name": "Code Practice Session",
-                    "description": "Complete coding challenges or work on a project for 30 minutes",
-                    "difficulty": "C",
-                    "base_xp": 50,
-                    "skills": ["basic_coding", "problem_solving"],
-                    "stat_rewards": {"intelligence": 3, "problem_solving": 2},
-                    "time_estimate": 30
-                },
-                {
-                    "name": "Learn New Programming Concept",
-                    "description": "Study and practice a new programming concept or library",
-                    "difficulty": "D",
-                    "base_xp": 25,
-                    "skills": ["tech_innovator", "continuous_learning"],
-                    "stat_rewards": {"intelligence": 2, "tech_mastery": 1},
-                    "time_estimate": 20
-                },
-                {
-                    "name": "Build Feature",
-                    "description": "Add a new feature to an existing project",
-                    "difficulty": "B",
-                    "base_xp": 100,
-                    "skills": ["tech_innovator", "project_management"],
-                    "stat_rewards": {"intelligence": 4, "creativity": 3},
-                    "time_estimate": 90
-                }
-            ],
-            "health": [
-                {
-                    "name": "Morning Exercise",
-                    "description": "Complete a 20-minute workout or exercise session",
-                    "difficulty": "D",
-                    "base_xp": 25,
-                    "skills": ["early_riser", "fitness_discipline"],
-                    "stat_rewards": {"strength": 2, "health": 3},
-                    "time_estimate": 20
-                },
-                {
-                    "name": "Meditation Session",
-                    "description": "Practice mindfulness meditation for 15 minutes",
-                    "difficulty": "D",
-                    "base_xp": 20,
-                    "skills": ["daily_meditation", "mindfulness"],
-                    "stat_rewards": {"spirit": 2, "focus": 2},
-                    "time_estimate": 15
-                },
-                {
-                    "name": "Healthy Meal Prep",
-                    "description": "Prepare a nutritious meal and plan healthy eating for the day",
-                    "difficulty": "C",
-                    "base_xp": 40,
-                    "skills": ["nutrition_master", "self_care"],
-                    "stat_rewards": {"health": 3, "discipline": 2},
-                    "time_estimate": 30
-                }
-            ],
-            "personal_growth": [
-                {
-                    "name": "Daily Journaling",
-                    "description": "Write in your journal for 10 minutes, reflecting on goals and progress",
-                    "difficulty": "E",
-                    "base_xp": 15,
-                    "skills": ["journaling", "self_awareness"],
-                    "stat_rewards": {"wisdom": 2, "self_awareness": 1},
-                    "time_estimate": 10
-                },
-                {
-                    "name": "Learning Session",
-                    "description": "Read or study educational content for 30 minutes",
-                    "difficulty": "D",
-                    "base_xp": 30,
-                    "skills": ["daily_reader", "knowledge_seeker"],
-                    "stat_rewards": {"intelligence": 2, "wisdom": 1},
-                    "time_estimate": 30
-                },
-                {
-                    "name": "Skill Practice",
-                    "description": "Practice a specific skill you're developing for 45 minutes",
-                    "difficulty": "C",
-                    "base_xp": 60,
-                    "skills": ["skill_mastery", "deliberate_practice"],
-                    "stat_rewards": {"focus": 3, "mastery": 2},
-                    "time_estimate": 45
-                }
-            ],
-            "communication": [
-                {
-                    "name": "Network Building",
-                    "description": "Reach out to one professional contact or make a new connection",
-                    "difficulty": "C",
-                    "base_xp": 45,
-                    "skills": ["networking", "communication"],
-                    "stat_rewards": {"charisma": 3, "social_capital": 2},
-                    "time_estimate": 15
-                },
-                {
-                    "name": "Public Speaking Practice",
-                    "description": "Practice presenting or speaking for 20 minutes",
-                    "difficulty": "B",
-                    "base_xp": 80,
-                    "skills": ["public_speaking", "confidence"],
-                    "stat_rewards": {"charisma": 4, "confidence": 3},
-                    "time_estimate": 20
-                }
-            ]
-        }
-    
-    def load_user_goals(self):
-        """Load user goals from memory"""
-        try:
-            with open('jarvis_memory.json', 'r') as f:
-                data = json.load(f)
-                # Extract goals from the nested structure
-                for task in data.get('tasks', []):
-                    if isinstance(task, dict) and 'goals' in task:
-                        self.user_goals = task['goals']
-                        break
-                else:
-                    self.user_goals = []
-        except Exception as e:
-            print(f"Error loading user goals: {e}")
-            self.user_goals = []
-    
-    def load_skill_config(self):
-        """Load skill configuration"""
-        try:
-            with open('jarvis/skills_config.json', 'r') as f:
-                self.skills_config = json.load(f)
-        except Exception as e:
-            print(f"Error loading skills config: {e}")
-            self.skills_config = {}
-    
     def generate_three_month_plan(self) -> Dict:
-        """Generate a comprehensive 3-month plan based on user goals"""
-        plan = {
-            "created_at": datetime.now().isoformat(),
-            "total_weeks": 12,
-            "months": {}
-        }
+        """Use Jarvis's AI to generate a comprehensive 3-month plan"""
+        # Create AI prompt for 3-month planning
+        planning_prompt = f"""
+        You are a strategic life planner. Based on the user's current stats and goals, create a comprehensive 3-month plan.
         
-        # Analyze user goals and create monthly themes
-        monthly_themes = self._create_monthly_themes()
+        Current User Stats:
+        - Level: {self.jarvis.stats.get('level', 1)}
+        - Rank: {self.jarvis.stats.get('rank', 'E')}
+        - Health: {self.jarvis.stats.get('health', 0)}
+        - Intelligence: {self.jarvis.stats.get('intelligence', 0)}
+        - Strength: {self.jarvis.stats.get('strength', 0)}
+        - Wealth: {self.jarvis.stats.get('wealth', 0)}
         
-        for month in range(1, 4):
-            month_name = ["Month 1", "Month 2", "Month 3"][month-1]
-            theme = monthly_themes[month-1]
+        User Goals: {self._get_user_goals_summary()}
+        
+        Create a strategic 3-month plan with:
+        1. Month 1 theme and focus areas
+        2. Month 2 theme and focus areas  
+        3. Month 3 theme and focus areas
+        4. Weekly milestones for each month
+        
+        Format your response as a clear, actionable plan.
+        """
+        
+        try:
+            # Use Jarvis's AI to generate the plan
+            plan_response = self.jarvis.llm.invoke(planning_prompt)
             
-            plan["months"][month_name] = {
-                "theme": theme["name"],
-                "focus_areas": theme["focus_areas"],
-                "weeks": {}
+            # Create structured plan data
+            plan = {
+                "created_at": datetime.now().isoformat(),
+                "ai_generated_plan": plan_response,
+                "total_weeks": 12,
+                "current_week": 1
             }
             
-            # Generate weekly goals for each month
-            for week in range(1, 5):
-                week_number = (month-1) * 4 + week
-                weekly_goals = self._generate_weekly_goals(theme, week, week_number)
-                
-                plan["months"][month_name]["weeks"][f"Week {week}"] = {
-                    "week_number": week_number,
-                    "goals": weekly_goals,
-                    "daily_quest_focus": self._get_daily_quest_focus(theme, week)
-                }
-        
-        self.three_month_plan = plan
-        self._save_three_month_plan()
-        return plan
-    
-    def _create_monthly_themes(self) -> List[Dict]:
-        """Create monthly themes based on user goals"""
-        themes = [
-            {
-                "name": "Foundation Building",
-                "focus_areas": ["habits", "routines", "basic_skills", "health"],
-                "primary_goals": ["Physical Peak Performance", "Basic Skills Development"]
-            },
-            {
-                "name": "Skill Advancement",
-                "focus_areas": ["technical_skills", "learning", "projects", "networking"],
-                "primary_goals": ["Programming Language Proficiency", "Master Public Speaking"]
-            },
-            {
-                "name": "Growth & Optimization",
-                "focus_areas": ["wealth_building", "advanced_skills", "leadership", "systems"],
-                "primary_goals": ["Financial Independence", "Advanced Skill Mastery"]
-            }
-        ]
-        return themes
-    
-    def _generate_weekly_goals(self, theme: Dict, week: int, week_number: int) -> List[Dict]:
-        """Generate specific weekly goals based on the monthly theme"""
-        goals = []
-        
-        if theme["name"] == "Foundation Building":
-            if week == 1:
-                goals = [
-                    {"name": "Establish morning routine", "category": "habits", "difficulty": "D"},
-                    {"name": "Complete daily exercise for 7 days", "category": "health", "difficulty": "C"},
-                    {"name": "Set up workspace and tools", "category": "productivity", "difficulty": "E"}
-                ]
-            elif week == 2:
-                goals = [
-                    {"name": "Track expenses daily", "category": "financial", "difficulty": "D"},
-                    {"name": "Read 2 chapters of educational book", "category": "learning", "difficulty": "D"},
-                    {"name": "Complete 3 coding practice sessions", "category": "programming", "difficulty": "C"}
-                ]
-            # Add more weeks...
+            self.three_month_plan = plan
+            self._save_three_month_plan()
+            return plan
             
-        elif theme["name"] == "Skill Advancement":
-            goals = [
-                {"name": "Complete advanced tutorial", "category": "programming", "difficulty": "B"},
-                {"name": "Give presentation to 5+ people", "category": "communication", "difficulty": "B"},
-                {"name": "Network with 3 new professionals", "category": "networking", "difficulty": "C"}
-            ]
-            
-        elif theme["name"] == "Growth & Optimization":
-            goals = [
-                {"name": "Launch side project MVP", "category": "entrepreneurship", "difficulty": "A"},
-                {"name": "Optimize investment portfolio", "category": "financial", "difficulty": "B"},
-                {"name": "Mentor someone in your skill area", "category": "leadership", "difficulty": "B"}
-            ]
-        
-        return goals
-    
-    def _get_daily_quest_focus(self, theme: Dict, week: int) -> List[str]:
-        """Get the daily quest focus areas for a specific week"""
-        focus_rotation = {
-            "Foundation Building": ["health", "personal_growth", "programming"],
-            "Skill Advancement": ["programming", "communication", "financial"],
-            "Growth & Optimization": ["financial", "programming", "personal_growth", "communication"]
-        }
-        return focus_rotation.get(theme["name"], ["personal_growth", "health"])
+        except Exception as e:
+            print(f"Error generating 3-month plan: {e}")
+            return {}
     
     def generate_daily_quests(self, date: datetime = None) -> List[Dict]:
-        """Generate personalized daily quests for a specific date"""
+        """Use Jarvis's AI brain to generate intelligent daily quests"""
         if date is None:
             date = datetime.now()
             
-        # Get current week from 3-month plan
-        current_week_info = self._get_current_week_info(date)
+        # Create AI prompt for daily quest generation
+        quest_prompt = self._create_quest_generation_prompt(date)
         
-        # Generate 3-4 quests based on current focus and user stats
-        daily_quests = []
+        try:
+            # Use Jarvis's AI to generate quests
+            response = self.jarvis.llm.invoke(quest_prompt)
+            
+            # Parse the AI response and create quests
+            daily_quests = self._parse_quest_response(response)
+            
+            # Add quests to Jarvis system
+            for quest in daily_quests:
+                self._add_quest_to_jarvis(quest)
+            
+            print(f"✅ Generated {len(daily_quests)} daily quests using Jarvis AI")
+            return daily_quests
+            
+        except Exception as e:
+            print(f"Error generating daily quests: {e}")
+            return []
+    
+    def _create_quest_generation_prompt(self, date: datetime) -> str:
+        """Create an intelligent prompt for Jarvis to generate daily quests"""
         
-        # Always include one foundation quest (health/personal growth)
-        foundation_quest = self._select_quest_by_category(["health", "personal_growth"])
-        if foundation_quest:
-            daily_quests.append(self._personalize_quest(foundation_quest, "foundation"))
+        # Get user context
+        current_stats = self.jarvis.stats
+        weak_stats = self._find_weakest_stats()
+        recent_completions = self._get_recent_completions()
         
-        # Add focus-area quests based on current week
-        if current_week_info:
-            focus_areas = current_week_info.get("daily_quest_focus", ["programming"])
-            for area in focus_areas[:2]:  # Take up to 2 focus areas
-                quest = self._select_quest_by_category([area])
+        prompt = f"""
+        You are Jarvis, the System from Solo Leveling. Generate 3-4 daily quests for today ({date.strftime('%A, %B %d')}).
+        
+        USER STATUS:
+        - Level: {current_stats.get('level', 1)}
+        - Rank: {current_stats.get('rank', 'E')}
+        - Health: {current_stats.get('health', 0)}
+        - Intelligence: {current_stats.get('intelligence', 0)}
+        - Strength: {current_stats.get('strength', 0)}
+        - Wealth: {current_stats.get('wealth', 0)}
+        
+        FOCUS AREAS (user's weakest stats): {', '.join(weak_stats)}
+        
+        USER GOALS: {self._get_user_goals_summary()}
+        
+        RECENT ACTIVITY: {recent_completions}
+        
+        QUEST GENERATION RULES:
+        1. Create 3-4 specific, actionable quests
+        2. Include one quest targeting the weakest stat area
+        3. Mix difficulty levels (E, D, C, B, A, S)
+        4. Make quests relevant to user's goals
+        5. Consider time constraints (realistic for one day)
+        
+        FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+        [QUEST 1]
+        Name: [Quest Name]
+        Description: [Detailed description]
+        Difficulty: [E/D/C/B/A/S]
+        Category: [health/intelligence/strength/wealth/personal_growth]
+        Time: [Estimated minutes]
+        
+        [QUEST 2]
+        Name: [Quest Name]
+        Description: [Detailed description]
+        Difficulty: [E/D/C/B/A/S]
+        Category: [health/intelligence/strength/wealth/personal_growth]
+        Time: [Estimated minutes]
+        
+        Continue for all quests. Be creative and motivating!
+        """
+        
+        return prompt
+    
+    def _parse_quest_response(self, response: str) -> List[Dict]:
+        """Parse Jarvis's AI response into structured quest data"""
+        quests = []
+        
+        # Split response into quest blocks
+        quest_blocks = response.split('[QUEST')
+        
+        for block in quest_blocks[1:]:  # Skip first empty block
+            try:
+                quest = self._extract_quest_from_block(block)
                 if quest:
-                    daily_quests.append(self._personalize_quest(quest, "focus"))
+                    quests.append(quest)
+            except Exception as e:
+                print(f"Error parsing quest block: {e}")
+                continue
         
-        # Add a challenge quest based on user's current stats
-        challenge_quest = self._generate_challenge_quest()
-        if challenge_quest:
-            daily_quests.append(challenge_quest)
-        
-        # Add quests to Jarvis system
-        for quest in daily_quests:
-            self._add_quest_to_jarvis(quest)
-        
-        return daily_quests
+        return quests
     
-    def _get_current_week_info(self, date: datetime) -> Dict:
-        """Get current week information from 3-month plan"""
-        if not self.three_month_plan:
-            return {}
-            
-        # Calculate which week we're in (simplified)
-        plan_start = datetime.fromisoformat(self.three_month_plan["created_at"].replace('Z', '+00:00'))
-        weeks_passed = (date - plan_start).days // 7 + 1
+    def _extract_quest_from_block(self, block: str) -> Optional[Dict]:
+        """Extract quest data from a text block"""
+        lines = block.strip().split('\n')
+        quest = {}
         
-        # Find the appropriate month and week
-        for month_name, month_data in self.three_month_plan["months"].items():
-            for week_name, week_data in month_data["weeks"].items():
-                if week_data["week_number"] == weeks_passed:
-                    return week_data
+        for line in lines:
+            line = line.strip()
+            if line.startswith('Name:'):
+                quest['name'] = line.replace('Name:', '').strip()
+            elif line.startswith('Description:'):
+                quest['description'] = line.replace('Description:', '').strip()
+            elif line.startswith('Difficulty:'):
+                quest['difficulty'] = line.replace('Difficulty:', '').strip()
+            elif line.startswith('Category:'):
+                quest['category'] = line.replace('Category:', '').strip()
+            elif line.startswith('Time:'):
+                time_str = line.replace('Time:', '').strip()
+                quest['time_estimate'] = int(''.join(filter(str.isdigit, time_str))) or 30
         
-        return {}
-    
-    def _select_quest_by_category(self, categories: List[str]) -> Dict:
-        """Select a quest template from specified categories"""
-        available_quests = []
+        # Validate required fields
+        if all(key in quest for key in ['name', 'description', 'difficulty']):
+            quest['generated_at'] = datetime.now().isoformat()
+            quest['quest_type'] = 'daily_ai_generated'
+            return quest
         
-        for category in categories:
-            if category in self.quest_templates:
-                available_quests.extend(self.quest_templates[category])
-        
-        if not available_quests:
-            return None
-            
-        # Weight selection based on user's current stats and recent completions
-        return random.choice(available_quests)
-    
-    def _personalize_quest(self, quest_template: Dict, quest_type: str) -> Dict:
-        """Personalize a quest template based on user's current state"""
-        personalized = quest_template.copy()
-        
-        # Adjust difficulty based on user level
-        user_level = self.jarvis.stats.get("level", 1)
-        if user_level > 3 and quest_type == "focus":
-            # Increase difficulty for higher level users
-            difficulty_order = ["E", "D", "C", "B", "A", "S"]
-            current_idx = difficulty_order.index(personalized["difficulty"])
-            if current_idx < len(difficulty_order) - 1:
-                personalized["difficulty"] = difficulty_order[current_idx + 1]
-                personalized["base_xp"] = int(personalized["base_xp"] * 1.5)
-        
-        # Add personalized elements
-        personalized["generated_at"] = datetime.now().isoformat()
-        personalized["quest_type"] = quest_type
-        personalized["deadline"] = (datetime.now() + timedelta(days=1)).isoformat()
-        
-        return personalized
-    
-    def _generate_challenge_quest(self) -> Dict:
-        """Generate a challenge quest based on user's weakest stats"""
-        stats = self.jarvis.stats
-        
-        # Find lowest stats (excluding non-numeric stats)
-        numeric_stats = {
-            key: value for key, value in stats.items() 
-            if isinstance(value, (int, float)) and key not in ['level', 'experience', 'rank_xp']
-        }
-        
-        if not numeric_stats:
-            return None
-            
-        lowest_stat = min(numeric_stats, key=numeric_stats.get)
-        
-        # Generate challenge based on lowest stat
-        challenge_templates = {
-            "strength": {
-                "name": "Strength Challenge",
-                "description": "Complete 50 push-ups or equivalent strength exercise",
-                "difficulty": "C",
-                "base_xp": 75,
-                "skills": ["pushup_master", "strength_training"],
-                "stat_rewards": {"strength": 5, "endurance": 2}
-            },
-            "intelligence": {
-                "name": "Brain Boost Challenge",
-                "description": "Solve complex problems or complete advanced learning for 1 hour",
-                "difficulty": "B",
-                "base_xp": 120,
-                "skills": ["critical_thinker", "problem_solving"],
-                "stat_rewards": {"intelligence": 5, "wisdom": 2}
-            },
-            "wealth": {
-                "name": "Wealth Building Challenge",
-                "description": "Research and plan a new income opportunity",
-                "difficulty": "B",
-                "base_xp": 100,
-                "skills": ["side_hustle", "entrepreneurship"],
-                "stat_rewards": {"wealth": 5, "confidence": 2}
-            },
-            "health": {
-                "name": "Health Optimization Challenge",
-                "description": "Complete full health routine: exercise, nutrition, and rest planning",
-                "difficulty": "C",
-                "base_xp": 80,
-                "skills": ["wellness_master", "self_care"],
-                "stat_rewards": {"health": 5, "discipline": 3}
-            }
-        }
-        
-        template = challenge_templates.get(lowest_stat)
-        if template:
-            challenge = template.copy()
-            challenge["quest_type"] = "challenge"
-            challenge["generated_at"] = datetime.now().isoformat()
-            challenge["time_estimate"] = 60
-            return challenge
-            
         return None
     
+    def _find_weakest_stats(self) -> List[str]:
+        """Find user's weakest stats to target for improvement"""
+        numeric_stats = {
+            'health': self.jarvis.stats.get('health', 0),
+            'intelligence': self.jarvis.stats.get('intelligence', 0),
+            'strength': self.jarvis.stats.get('strength', 0),
+            'wealth': self.jarvis.stats.get('wealth', 0)
+        }
+        
+        # Sort by value and return 2 weakest
+        sorted_stats = sorted(numeric_stats.items(), key=lambda x: x[1])
+        return [stat[0] for stat in sorted_stats[:2]]
+    
+    def _get_recent_completions(self) -> str:
+        """Get summary of recently completed quests"""
+        recent_tasks = []
+        today = datetime.now().date()
+        
+        for task in self.jarvis.tasks[-5:]:  # Last 5 tasks
+            if (task.status == 'completed' and task.completed_at and 
+                datetime.fromisoformat(task.completed_at).date() >= today - timedelta(days=3)):
+                recent_tasks.append(task.name)
+        
+        if recent_tasks:
+            return f"Recently completed: {', '.join(recent_tasks)}"
+        return "No recent completions"
+    
+    def _get_user_goals_summary(self) -> str:
+        """Get a summary of user's goals from memory"""
+        try:
+            with open('jarvis_memory.json', 'r') as f:
+                data = json.load(f)
+                for task in data.get('tasks', []):
+                    if isinstance(task, dict) and 'goals' in task:
+                        goals = task['goals'][:3]  # First 3 goals
+                        return '; '.join([goal.get('name', 'Unknown goal') for goal in goals])
+        except:
+            pass
+        return "Financial independence, programming mastery, physical fitness"
+    
     def _add_quest_to_jarvis(self, quest: Dict):
-        """Add a generated quest to the Jarvis task system"""
+        """Add AI-generated quest to Jarvis system"""
         from jarvis.jarvis import Task
         
-        # Calculate final XP based on difficulty
+        # Calculate XP based on difficulty
         difficulty_info = QuestDifficulty[quest["difficulty"]].value
-        final_xp = quest["base_xp"] * difficulty_info["multiplier"]
+        base_xp = difficulty_info["xp"]
+        final_xp = int(base_xp * difficulty_info["multiplier"])
         
         # Create reward string
-        stat_rewards = quest.get("stat_rewards", {})
-        reward_parts = [f"XP +{final_xp}"]
-        for stat, amount in stat_rewards.items():
-            reward_parts.append(f"{stat.title()} +{amount}")
+        reward = f"XP +{final_xp}"
+        category = quest.get('category', 'general')
+        if category in ['health', 'intelligence', 'strength', 'wealth']:
+            stat_bonus = random.randint(1, 3)
+            reward += f", {category.title()} +{stat_bonus}"
         
         # Create task
         task = Task(
             name=quest["name"],
             description=quest["description"],
             difficulty=quest["difficulty"],
-            reward=", ".join(reward_parts),
-            deadline=quest.get("deadline")
+            reward=reward,
+            deadline=(datetime.now() + timedelta(days=1)).isoformat()
         )
         
-        # Add metadata for XP and skill tracking
-        task.base_xp = quest["base_xp"]
+        # Add metadata for XP tracking
+        task.base_xp = base_xp
         task.final_xp = final_xp
         task.skill_xp = difficulty_info["skill_xp"]
-        task.skills = quest.get("skills", [])
-        task.stat_rewards = stat_rewards
-        task.quest_type = quest.get("quest_type", "daily")
+        task.quest_type = quest.get("quest_type", "ai_generated")
         task.time_estimate = quest.get("time_estimate", 30)
+        task.category = quest.get("category", "general")
         
         self.jarvis.tasks.append(task)
         self.jarvis.save_memory()
@@ -494,99 +286,63 @@ class DailyQuestGenerator:
         except Exception as e:
             print(f"Error saving 3-month plan: {e}")
     
+    # === NOTIFICATION SYSTEM (simplified) ===
+    
     def schedule_daily_notifications(self):
-        """Schedule notifications for morning, evening, and night"""
-        schedule.clear()  # Clear existing schedules
+        """Schedule daily notifications"""
+        schedule.clear()
         
-        # Morning notification - Quest Assignment
-        schedule.every().day.at(NotificationTime.MORNING.value).do(
-            self._send_morning_notification
-        )
+        schedule.every().day.at(NotificationTime.MORNING.value).do(self._send_morning_notification)
+        schedule.every().day.at(NotificationTime.EVENING.value).do(self._send_evening_notification)
+        schedule.every().day.at(NotificationTime.NIGHT.value).do(self._send_night_notification)
         
-        # Evening notification - Progress Check
-        schedule.every().day.at(NotificationTime.EVENING.value).do(
-            self._send_evening_notification
-        )
-        
-        # Night notification - Reflection & Tomorrow Preview
-        schedule.every().day.at(NotificationTime.NIGHT.value).do(
-            self._send_night_notification
-        )
-        
-        # Start the scheduler in a separate thread
+        # Start scheduler in background thread
         def run_scheduler():
             while True:
                 schedule.run_pending()
-                time.sleep(60)  # Check every minute
+                time.sleep(60)
         
-        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-        scheduler_thread.start()
+        threading.Thread(target=run_scheduler, daemon=True).start()
+        print("✅ Daily notification scheduler started")
     
     def _send_morning_notification(self):
-        """Send morning notification with daily quests"""
+        """Morning: Generate and announce daily quests"""
         daily_quests = self.generate_daily_quests()
+        total_xp = sum(quest.get("final_xp", 0) for quest in daily_quests)
         
-        if daily_quests:
-            quest_count = len(daily_quests)
-            total_xp = sum(quest.get("final_xp", quest.get("base_xp", 0)) for quest in daily_quests)
-            
-            notification_data = {
-                "type": "Daily Quest Assignment",
-                "title": "🌅 Good Morning, Hunter!",
-                "message": f"{quest_count} new quests await! Potential XP: {total_xp}",
-                "quests": [{"name": q["name"], "difficulty": q["difficulty"]} for q in daily_quests],
-                "notification_time": "morning"
-            }
-            
-            self._trigger_notification(notification_data)
+        notification_data = {
+            "type": "Daily Quest Assignment",
+            "title": "🌅 Good Morning, Hunter!",
+            "message": f"{len(daily_quests)} new AI-generated quests await! Potential XP: {total_xp}",
+            "notification_time": "morning"
+        }
+        self._trigger_notification(notification_data)
     
     def _send_evening_notification(self):
-        """Send evening notification with progress update"""
-        completed_today = [task for task in self.jarvis.tasks 
-                          if task.status == "completed" 
-                          and task.completed_at 
-                          and datetime.fromisoformat(task.completed_at).date() == datetime.now().date()]
-        
-        pending_today = [task for task in self.jarvis.tasks 
-                        if task.status == "pending" 
-                        and hasattr(task, 'quest_type')]
-        
-        completed_xp = sum(getattr(task, 'final_xp', 0) for task in completed_today)
+        """Evening: Progress check"""
+        today_completed = self._get_today_completed_count()
+        today_xp = self._get_today_xp_earned()
         
         notification_data = {
             "type": "Progress Update",
             "title": "🌆 Evening Check-in",
-            "message": f"Completed: {len(completed_today)} quests, {completed_xp} XP earned!",
-            "progress": {
-                "completed": len(completed_today),
-                "pending": len(pending_today),
-                "xp_earned": completed_xp
-            },
+            "message": f"Completed: {today_completed} quests, {today_xp} XP earned!",
             "notification_time": "evening"
         }
-        
         self._trigger_notification(notification_data)
     
     def _send_night_notification(self):
-        """Send night notification with reflection prompt and tomorrow preview"""
-        # Get tomorrow's planned focus
-        tomorrow = datetime.now() + timedelta(days=1)
-        tomorrow_week_info = self._get_current_week_info(tomorrow)
-        
+        """Night: Reflection prompt"""
         notification_data = {
             "type": "Daily Reflection",
             "title": "🌙 Time to Reflect",
-            "message": "How did today go? Tomorrow's focus: " + 
-                      ", ".join(tomorrow_week_info.get("daily_quest_focus", ["Growth"])),
-            "reflection_prompt": "What did you learn today? What will you improve tomorrow?",
-            "tomorrow_focus": tomorrow_week_info.get("daily_quest_focus", []),
+            "message": "How did today's quests go? Tomorrow brings new challenges!",
             "notification_time": "night"
         }
-        
         self._trigger_notification(notification_data)
     
     def _trigger_notification(self, notification_data: Dict):
-        """Trigger notification through registered callbacks"""
+        """Send notification through registered callbacks"""
         for callback in self.notification_callbacks:
             try:
                 callback(notification_data)
@@ -597,8 +353,10 @@ class DailyQuestGenerator:
         """Register a callback function for notifications"""
         self.notification_callbacks.append(callback)
     
+    # === QUEST COMPLETION WITH XP ===
+    
     def complete_quest_with_xp(self, task_index: int) -> Dict:
-        """Complete a quest and apply XP to both general and skill systems"""
+        """Complete a quest and apply XP rewards"""
         try:
             task = self.jarvis.tasks[task_index - 1]
             if task.status == "completed":
@@ -608,62 +366,52 @@ class DailyQuestGenerator:
             task.status = "completed"
             task.completed_at = datetime.now().isoformat()
             
-            # Calculate XP rewards
-            base_xp = getattr(task, 'final_xp', getattr(task, 'base_xp', 0))
-            skill_xp = getattr(task, 'skill_xp', 0)
+            # Apply XP rewards
+            base_xp = getattr(task, 'final_xp', getattr(task, 'base_xp', 10))
+            skill_xp = getattr(task, 'skill_xp', 5)
             
-            # Apply general XP
             self.jarvis.stats["experience"] += base_xp
             self.jarvis.stats["rank_xp"] += base_xp
             
-            # Apply skill XP to relevant skills
-            skills_affected = getattr(task, 'skills', [])
-            skill_updates = {}
+            # Apply stat bonuses (parse from reward string)
+            self._apply_stat_rewards(task.reward)
             
-            for skill_id in skills_affected:
-                if skill_id in self.jarvis.stats.get('skill_progress', {}):
-                    self.jarvis.stats['skill_progress'][skill_id] += skill_xp
-                    skill_updates[skill_id] = skill_xp
-                else:
-                    # Initialize skill progress if not exists
-                    if 'skill_progress' not in self.jarvis.stats:
-                        self.jarvis.stats['skill_progress'] = {}
-                    self.jarvis.stats['skill_progress'][skill_id] = skill_xp
-                    skill_updates[skill_id] = skill_xp
-            
-            # Apply stat rewards
-            stat_rewards = getattr(task, 'stat_rewards', {})
-            for stat, amount in stat_rewards.items():
-                if stat in self.jarvis.stats:
-                    self.jarvis.stats[stat] += amount
-            
-            # Check for level ups and rank ups
+            # Check for level/rank ups
             level_up = self._check_level_up()
             rank_up = self._check_rank_up()
             
-            # Save progress
             self.jarvis.save_memory()
             
             return {
                 "success": True,
                 "xp_gained": base_xp,
                 "skill_xp_gained": skill_xp,
-                "skills_affected": skill_updates,
-                "stat_rewards": stat_rewards,
                 "level_up": level_up,
                 "rank_up": rank_up,
                 "quest_name": task.name
             }
             
-        except IndexError:
-            return {"success": False, "error": "Invalid quest number"}
-        except Exception as e:
+        except (IndexError, Exception) as e:
             return {"success": False, "error": str(e)}
+    
+    def _apply_stat_rewards(self, reward_string: str):
+        """Parse and apply stat rewards from reward string"""
+        # Simple parsing: "Health +3", "Intelligence +2", etc.
+        parts = reward_string.split(', ')
+        for part in parts:
+            if '+' in part and any(stat in part.lower() for stat in ['health', 'intelligence', 'strength', 'wealth']):
+                for stat in ['health', 'intelligence', 'strength', 'wealth']:
+                    if stat in part.lower():
+                        try:
+                            bonus = int(part.split('+')[1])
+                            self.jarvis.stats[stat] += bonus
+                        except:
+                            pass
     
     def _check_level_up(self) -> bool:
         """Check and handle level up"""
         xp_needed = self.jarvis.stats["level"] * 150
-        if self.jarvis.stats["experience"] >= xp_needed and self.jarvis.stats["level"] < 15:
+        if self.jarvis.stats["experience"] >= xp_needed:
             self.jarvis.stats["level"] += 1
             self.jarvis.stats["experience"] -= xp_needed
             return True
@@ -673,20 +421,40 @@ class DailyQuestGenerator:
         """Check and handle rank up"""
         current_rank = self.jarvis.stats["rank"]
         rank_order = ["E", "D", "C", "B", "A", "S", "SS"]
-        current_rank_index = rank_order.index(current_rank)
+        current_idx = rank_order.index(current_rank)
         
         if (self.jarvis.stats["rank_xp"] >= self.jarvis.rank_requirements[current_rank] 
-            and current_rank_index < len(rank_order) - 1):
-            self.jarvis.stats["rank"] = rank_order[current_rank_index + 1]
+            and current_idx < len(rank_order) - 1):
+            self.jarvis.stats["rank"] = rank_order[current_idx + 1]
             self.jarvis.stats["rank_xp"] = 0
             return True
         return False
     
-    def get_daily_stats(self) -> Dict:
-        """Get daily statistics and progress"""
+    # === HELPER METHODS ===
+    
+    def _get_today_completed_count(self) -> int:
+        """Count quests completed today"""
         today = datetime.now().date()
-        
-        # Get today's tasks
+        count = 0
+        for task in self.jarvis.tasks:
+            if (task.status == "completed" and task.completed_at and 
+                datetime.fromisoformat(task.completed_at).date() == today):
+                count += 1
+        return count
+    
+    def _get_today_xp_earned(self) -> int:
+        """Calculate total XP earned today"""
+        today = datetime.now().date()
+        total_xp = 0
+        for task in self.jarvis.tasks:
+            if (task.status == "completed" and task.completed_at and 
+                datetime.fromisoformat(task.completed_at).date() == today):
+                total_xp += getattr(task, 'final_xp', 0)
+        return total_xp
+    
+    def get_daily_stats(self) -> Dict:
+        """Get daily statistics"""
+        today = datetime.now().date()
         today_tasks = [task for task in self.jarvis.tasks 
                       if hasattr(task, 'quest_type') 
                       and (not hasattr(task, 'created_at') 
@@ -694,17 +462,12 @@ class DailyQuestGenerator:
         
         completed_tasks = [task for task in today_tasks if task.status == "completed"]
         
-        # Calculate stats
-        total_xp_today = sum(getattr(task, 'final_xp', 0) for task in completed_tasks)
-        total_skill_xp_today = sum(getattr(task, 'skill_xp', 0) for task in completed_tasks)
-        
         return {
             "date": today.isoformat(),
             "total_quests": len(today_tasks),
             "completed_quests": len(completed_tasks),
             "pending_quests": len(today_tasks) - len(completed_tasks),
-            "xp_earned_today": total_xp_today,
-            "skill_xp_earned_today": total_skill_xp_today,
+            "xp_earned_today": self._get_today_xp_earned(),
             "completion_rate": len(completed_tasks) / len(today_tasks) if today_tasks else 0,
             "current_level": self.jarvis.stats.get("level", 1),
             "current_rank": self.jarvis.stats.get("rank", "E")
