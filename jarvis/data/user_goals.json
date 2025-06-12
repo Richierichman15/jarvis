@@ -1,0 +1,196 @@
+{
+  "buck": {
+    "desires": "i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to have three wins a day which is physical, mentally, spiritual. right now i am a software developer that is learning finance with it. i've been investing a lot. i want to know how money works. i'm 160 pounds and i want to gain 20 pounds in 6-8months. i want to make $5k a month. i want to learn. i love exploring.",
+    "goals": [
+      {
+        "id": "buck_goal_1",
+        "title": "Achieve significant progress towards: i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "This is a 3-month goal focused on i want to be a jack of all traits. i want to be su...",
+        "type": "long-term",
+        "timeline_days": 90,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072561",
+        "due_date": "2025-09-10T10:20:20.072565"
+      },
+      {
+        "id": "buck_goal_2",
+        "title": "Master foundational skills needed for: i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "This is a 3-month goal focused on i want to be a jack of all traits. i want to be su...",
+        "type": "long-term",
+        "timeline_days": 90,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072582",
+        "due_date": "2025-09-10T10:20:20.072584"
+      },
+      {
+        "id": "buck_goal_3",
+        "title": "Create a sustainable plan for: i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "This is a 3-month goal focused on i want to be a jack of all traits. i want to be su...",
+        "type": "long-term",
+        "timeline_days": 90,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072587",
+        "due_date": "2025-09-10T10:20:20.072588"
+      },
+      {
+        "id": "buck_goal_4",
+        "title": "Research and plan for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Monthly milestone towards i want to be a jack of all traits. i want to be su...",
+        "type": "medium-term",
+        "timeline_days": 30,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072591",
+        "due_date": "2025-07-12T10:20:20.072613"
+      },
+      {
+        "id": "buck_goal_5",
+        "title": "Build initial foundation for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Monthly milestone towards i want to be a jack of all traits. i want to be su...",
+        "type": "medium-term",
+        "timeline_days": 30,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072617",
+        "due_date": "2025-07-12T10:20:20.072619"
+      },
+      {
+        "id": "buck_goal_6",
+        "title": "Connect with others interested in i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Monthly milestone towards i want to be a jack of all traits. i want to be su...",
+        "type": "medium-term",
+        "timeline_days": 30,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072621",
+        "due_date": "2025-07-12T10:20:20.072622"
+      },
+      {
+        "id": "buck_goal_7",
+        "title": "Gather resources needed for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Monthly milestone towards i want to be a jack of all traits. i want to be su...",
+        "type": "medium-term",
+        "timeline_days": 30,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072625",
+        "due_date": "2025-07-12T10:20:20.072626"
+      },
+      {
+        "id": "buck_goal_8",
+        "title": "Practice basic skills for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Monthly milestone towards i want to be a jack of all traits. i want to be su...",
+        "type": "medium-term",
+        "timeline_days": 30,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072634",
+        "due_date": "2025-07-12T10:20:20.072636"
+      },
+      {
+        "id": "buck_goal_9",
+        "title": "Set up environment for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Monthly milestone towards i want to be a jack of all traits. i want to be su...",
+        "type": "medium-term",
+        "timeline_days": 30,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072639",
+        "due_date": "2025-07-12T10:20:20.072640"
+      },
+      {
+        "id": "buck_goal_10",
+        "title": "Spend 30 minutes daily learning about i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072644",
+        "due_date": "2025-06-19T10:20:20.072645"
+      },
+      {
+        "id": "buck_goal_11",
+        "title": "Write down specific steps for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072648",
+        "due_date": "2025-06-19T10:20:20.072649"
+      },
+      {
+        "id": "buck_goal_12",
+        "title": "Find one resource related to i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072651",
+        "due_date": "2025-06-19T10:20:20.072652"
+      },
+      {
+        "id": "buck_goal_13",
+        "title": "Take one small action towards i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072655",
+        "due_date": "2025-06-19T10:20:20.072656"
+      },
+      {
+        "id": "buck_goal_14",
+        "title": "Reflect on progress towards i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072658",
+        "due_date": "2025-06-19T10:20:20.072659"
+      },
+      {
+        "id": "buck_goal_15",
+        "title": "Share your goal of i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ... with someone",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072661",
+        "due_date": "2025-06-19T10:20:20.072663"
+      },
+      {
+        "id": "buck_goal_16",
+        "title": "Create a timeline for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072665",
+        "due_date": "2025-06-19T10:20:20.072666"
+      },
+      {
+        "id": "buck_goal_17",
+        "title": "Identify potential obstacles for i want to be a jack of all traits. i want to be successful in everything. i am ambitious, i want to ...",
+        "description": "Weekly action step towards i want to be a jack of all traits. i want to be su...",
+        "type": "short-term",
+        "timeline_days": 7,
+        "status": "pending",
+        "progress": 0,
+        "created_at": "2025-06-12T10:20:20.072668",
+        "due_date": "2025-06-19T10:20:20.072669"
+      }
+    ],
+    "created_at": "2025-06-12T10:20:20.072929",
+    "status": "active"
+  }
+}

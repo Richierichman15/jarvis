@@ -66,9 +66,136 @@ class DailyQuestGenerator:
             # Create structured plan data
             plan = {
                 "created_at": datetime.now().isoformat(),
-                "ai_generated_plan": plan_response,
                 "total_weeks": 12,
-                "current_week": 1
+                "current_week": 1,
+                "months": {
+                    "Month 1": {
+                        "theme": "Foundation Building",
+                        "focus_areas": ["health", "programming", "financial_literacy"],
+                        "weeks": {
+                            "Week 1": {
+                                "week_number": 1,
+                                "goals": [
+                                    {"name": "Read one personal finance book", "difficulty": "C"},
+                                    {"name": "Complete first programming module", "difficulty": "D"},
+                                    {"name": "Exercise 30 minutes daily", "difficulty": "E"}
+                                ],
+                                "daily_quest_focus": ["health", "learning"]
+                            },
+                            "Week 2": {
+                                "week_number": 2,
+                                "goals": [
+                                    {"name": "Watch investing video series", "difficulty": "D"},
+                                    {"name": "Practice coding exercises daily", "difficulty": "C"},
+                                    {"name": "Maintain exercise routine", "difficulty": "D"}
+                                ],
+                                "daily_quest_focus": ["finance", "coding"]
+                            },
+                            "Week 3": {
+                                "week_number": 3,
+                                "goals": [
+                                    {"name": "Take budgeting course", "difficulty": "C"},
+                                    {"name": "Build small coding project", "difficulty": "B"},
+                                    {"name": "Increase workout intensity", "difficulty": "C"}
+                                ],
+                                "daily_quest_focus": ["projects", "fitness"]
+                            },
+                            "Week 4": {
+                                "week_number": 4,
+                                "goals": [
+                                    {"name": "Review month's financial learning", "difficulty": "B"},
+                                    {"name": "Complete programming project", "difficulty": "A"},
+                                    {"name": "Track fitness progress", "difficulty": "D"}
+                                ],
+                                "daily_quest_focus": ["review", "completion"]
+                            }
+                        }
+                    },
+                    "Month 2": {
+                        "theme": "Skill Advancement",
+                        "focus_areas": ["programming", "investing", "physical_performance"],
+                        "weeks": {
+                            "Week 5": {
+                                "week_number": 5,
+                                "goals": [
+                                    {"name": "Research investment opportunities", "difficulty": "B"},
+                                    {"name": "Learn advanced programming concepts", "difficulty": "A"},
+                                    {"name": "Design workout program", "difficulty": "C"}
+                                ],
+                                "daily_quest_focus": ["research", "planning"]
+                            },
+                            "Week 6": {
+                                "week_number": 6,
+                                "goals": [
+                                    {"name": "Start investment portfolio", "difficulty": "A"},
+                                    {"name": "Build complex application", "difficulty": "S"},
+                                    {"name": "Follow workout program", "difficulty": "B"}
+                                ],
+                                "daily_quest_focus": ["execution", "discipline"]
+                            },
+                            "Week 7": {
+                                "week_number": 7,
+                                "goals": [
+                                    {"name": "Monitor investments", "difficulty": "C"},
+                                    {"name": "Debug and optimize code", "difficulty": "A"},
+                                    {"name": "Track fitness metrics", "difficulty": "D"}
+                                ],
+                                "daily_quest_focus": ["optimization", "tracking"]
+                            },
+                            "Week 8": {
+                                "week_number": 8,
+                                "goals": [
+                                    {"name": "Evaluate investment performance", "difficulty": "B"},
+                                    {"name": "Deploy application", "difficulty": "A"},
+                                    {"name": "Adjust workout routine", "difficulty": "C"}
+                                ],
+                                "daily_quest_focus": ["evaluation", "adjustment"]
+                            }
+                        }
+                    },
+                    "Month 3": {
+                        "theme": "Mastery & Integration",
+                        "focus_areas": ["wealth_building", "software_mastery", "peak_performance"],
+                        "weeks": {
+                            "Week 9": {
+                                "week_number": 9,
+                                "goals": [
+                                    {"name": "Create passive income stream", "difficulty": "S"},
+                                    {"name": "Contribute to open source", "difficulty": "A"},
+                                    {"name": "Set new fitness goals", "difficulty": "B"}
+                                ],
+                                "daily_quest_focus": ["innovation", "contribution"]
+                            },
+                            "Week 10": {
+                                "week_number": 10,
+                                "goals": [
+                                    {"name": "Diversify investments", "difficulty": "A"},
+                                    {"name": "Master advanced algorithms", "difficulty": "S"},
+                                    {"name": "Achieve fitness milestone", "difficulty": "A"}
+                                ],
+                                "daily_quest_focus": ["mastery", "achievement"]
+                            },
+                            "Week 11": {
+                                "week_number": 11,
+                                "goals": [
+                                    {"name": "Automate investment strategy", "difficulty": "S"},
+                                    {"name": "Build portfolio project", "difficulty": "A"},
+                                    {"name": "Document fitness journey", "difficulty": "C"}
+                                ],
+                                "daily_quest_focus": ["automation", "documentation"]
+                            },
+                            "Week 12": {
+                                "week_number": 12,
+                                "goals": [
+                                    {"name": "Review financial growth", "difficulty": "B"},
+                                    {"name": "Plan next coding projects", "difficulty": "C"},
+                                    {"name": "Set long-term fitness plan", "difficulty": "B"}
+                                ],
+                                "daily_quest_focus": ["review", "planning"]
+                            }
+                        }
+                    }
+                }
             }
             
             self.three_month_plan = plan
@@ -442,15 +569,23 @@ class DailyQuestGenerator:
                 count += 1
         return count
     
-    def _get_today_xp_earned(self) -> int:
-        """Calculate total XP earned today"""
+    def _get_today_xp_earned(self):
+        """Get total XP earned today."""
+        today_xp = 0
         today = datetime.now().date()
-        total_xp = 0
+        
         for task in self.jarvis.tasks:
-            if (task.status == "completed" and task.completed_at and 
+            # Convert dict to Task object if needed
+            if isinstance(task, dict):
+                task = Task.from_dict(task)
+            
+            if (task.status == "completed" and task.completed_at and
                 datetime.fromisoformat(task.completed_at).date() == today):
-                total_xp += getattr(task, 'final_xp', 0)
-        return total_xp
+                # Convert reward to int if it's a string
+                reward = int(task.reward) if isinstance(task.reward, str) else task.reward
+                today_xp += reward
+            
+        return today_xp
     
     def get_daily_stats(self) -> Dict:
         """Get daily statistics"""

@@ -42,7 +42,7 @@ LOCAL_MODELS = {
 }
 
 # Model settings
-LOCAL_MODEL_NAME = LOCAL_MODELS["llama3"]  # Default model
+LOCAL_MODEL_NAME = LOCAL_MODELS["mistral"]  # Changed to use Mistral as default
 LOCAL_MODEL_BASE_URL = "http://localhost:11434/api"  # Ollama API endpoint
 
 OPENAI_MODEL = "gpt-4-turbo-preview"  # Latest GPT-4 model

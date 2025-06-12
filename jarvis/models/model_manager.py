@@ -74,4 +74,20 @@ class ModelManager:
                 logger.error(f"Claude model failed: {str(e)}")
                 return "Error: Both OpenAI and Claude models failed to generate a response."
                 
-        return "Error: No models available to generate a response." 
+        return "Error: No models available to generate a response."
+
+def get_model():
+    """Get a model instance for text generation.
+    
+    Returns:
+        A model instance that can generate text responses
+    """
+    manager = ModelManager()
+    
+    # Return the first available model
+    if manager.openai_available:
+        return manager.openai_model
+    elif manager.claude_available:
+        return manager.claude_model
+    else:
+        raise RuntimeError("No models available. Please check your API keys and model configurations.") 

@@ -17,7 +17,28 @@ class Task:
         self.name = name
         self.description = description
         self.difficulty = difficulty  # E, D, C, B, A, S
-        self.reward = reward
+        # Handle both numeric and stat modifier rewards
+        if isinstance(reward, (int, float)):
+            self.reward = int(reward)
+            self.stat_modifiers = {}
+        else:
+            # Parse stat modifiers from string like "Health +5, Intelligence +3"
+            self.reward = 0  # Base XP reward
+            self.stat_modifiers = {}
+            if isinstance(reward, str):
+                modifiers = reward.split(',')
+                for mod in modifiers:
+                    mod = mod.strip()
+                    if '+' in mod:
+                        stat, value = mod.split('+')
+                        stat = stat.strip()
+                        try:
+                            value = int(value.strip())
+                            self.stat_modifiers[stat] = value
+                            self.reward += value  # Use stat value as XP reward
+                        except ValueError:
+                            pass
+        
         self.deadline = deadline
         self.status = status
         self.created_at = datetime.now().isoformat()
@@ -29,6 +50,7 @@ class Task:
             "description": self.description,
             "difficulty": self.difficulty,
             "reward": self.reward,
+            "stat_modifiers": self.stat_modifiers,
             "deadline": self.deadline,
             "status": self.status,
             "created_at": self.created_at,
@@ -37,109 +59,172 @@ class Task:
 
     @classmethod
     def from_dict(cls, data):
+        """Create a Task instance from a dictionary."""
+        if not isinstance(data, dict):
+            raise ValueError("Data must be a dictionary")
+            
+        required_fields = ["name", "description", "difficulty"]
+        for field in required_fields:
+            if field not in data:
+                raise ValueError(f"Missing required field: {field}")
+        
+        # Handle both numeric and stat modifier rewards
+        reward = data.get("reward", 0)
+        if isinstance(reward, (int, float)):
+            reward = int(reward)
+        elif isinstance(reward, str):
+            # Keep the string reward as is, it will be parsed in __init__
+            pass
+        else:
+            reward = 0
+        
         task = cls(
             name=data["name"],
             description=data["description"],
             difficulty=data["difficulty"],
-            reward=data["reward"],
-            deadline=data["deadline"],
-            status=data["status"]
+            reward=reward,
+            deadline=data.get("deadline"),
+            status=data.get("status", "pending")
         )
-        task.created_at = data["created_at"]
-        task.completed_at = data["completed_at"]
+        
+        # Restore additional fields
+        if "created_at" in data:
+            task.created_at = data["created_at"]
+        if "completed_at" in data:
+            task.completed_at = data["completed_at"]
+        if "stat_modifiers" in data and isinstance(data["stat_modifiers"], dict):
+            task.stat_modifiers = data["stat_modifiers"]
+            
         return task
 
 class Jarvis:
-    def __init__(self):
+    def __init__(self, user_name="User"):
+        self.user_name = user_name
         self.name = "System"
         self.version = "1.0.0"
-        self.memory_file = "jarvis_memory.json"
+        # Set memory file path relative to the jarvis directory
+        self.memory_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'jarvis_memory.json')
         self.conversation_history = []
         self.tasks = []
         self.stats = {
-            "name": "Gitonga",
-            "class": "lost",
-            "title": "Hunger",
             "level": 1,
-            "health": 100,
-            "stamina": 100,
-            "intelligence": 0,
-            "strength": 0,
-            "wealth": 0,
-            "experience": 0,
             "rank": "E",
-            "rank_xp": 0
+            "experience": 0,
+            "health": 100,
+            "energy": 100,
+            "focus": 100,
+            "skills": {}
         }
         self.rank_requirements = {
-            "E": 1000,    # 1000 XP to reach D
-            "D": 2500,    # 2500 XP to reach C
-            "C": 5000,    # 5000 XP to reach B
-            "B": 10000,   # 10000 XP to reach A
-            "A": 20000,   # 20000 XP to reach S
-            "S": 50000    # 50000 XP to reach SS
+            "E": 0,
+            "D": 1000,
+            "C": 5000,
+            "B": 15000,
+            "A": 50000,
+            "S": 100000
         }
         self.load_memory()
         
         # Initialize Ollama with Mistral model
         self.llm = OllamaLLM(
-            model="mistral",
+            model="mistral:7b-instruct-v0.2-q4_0",
             callbacks=[StreamingStdOutCallbackHandler()],
             temperature=0.7
         )
     
     def load_memory(self):
-        """Load all memory data from JSON file"""
+        """Load memory from JSON file."""
         try:
+            # Create memory directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.memory_file), exist_ok=True)
+            
             if os.path.exists(self.memory_file):
                 with open(self.memory_file, 'r') as f:
                     data = json.load(f)
-                    self.conversation_history = data.get("conversations", [])
                     
-                    # Load top-level tasks
-                    tasks_data = data.get("tasks", [])
-                    self.tasks = []
+                    # Initialize default structure if needed
+                    if not isinstance(data, dict):
+                        data = {}
+                    if 'users' not in data:
+                        data['users'] = {}
+                    if 'tasks' not in data:
+                        data['tasks'] = []
                     
-                    for task_data in tasks_data:
-                        if isinstance(task_data, dict):
-                            if "quests" in task_data:
-                                # Handle nested quests
-                                for quest in task_data["quests"]:
-                                    task = Task(
-                                        name=quest["name"],
-                                        description=quest["description"],
-                                        difficulty=quest["difficulty"],
-                                        reward=quest["reward"],
-                                        deadline=quest.get("deadline"),
-                                        status=quest.get("status", "pending")
-                                    )
-                                    task.created_at = quest.get("created_at", datetime.now().isoformat())
-                                    task.completed_at = quest.get("completed_at")
-                                    self.tasks.append(task)
-                            elif "name" in task_data:
-                                # Handle regular tasks
-                                self.tasks.append(Task.from_dict(task_data))
+                    # Load user-specific data if available
+                    if self.user_name in data['users']:
+                        user_data = data['users'][self.user_name]
+                        if isinstance(user_data, dict):
+                            if 'stats' in user_data:
+                                self.stats.update(user_data['stats'])
+                            if 'tasks' in user_data and isinstance(user_data['tasks'], list):
+                                self.tasks = []
+                                for t in user_data['tasks']:
+                                    try:
+                                        if isinstance(t, dict) and 'name' in t:
+                                            self.tasks.append(Task.from_dict(t))
+                                    except Exception as e:
+                                        print(f"Error loading task: {e}")
                     
-                    # Update stats while preserving defaults
-                    for item in tasks_data:
-                        if isinstance(item, dict) and "stats" in item:
-                            loaded_stats = item["stats"]
-                            for key, value in loaded_stats.items():
-                                if key in self.stats:
-                                    self.stats[key] = value
-                            break
-        except Exception as e:
+                    # Load global tasks
+                    if isinstance(data.get('tasks', []), list):
+                        for t in data['tasks']:
+                            try:
+                                if isinstance(t, dict) and 'name' in t:
+                                    self.tasks.append(Task.from_dict(t))
+                            except Exception as e:
+                                print(f"Error loading global task: {e}")
+            else:
+                # Create default memory file if it doesn't exist
+                self.save_memory()
+                    
+        except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"Error loading memory: {e}")
+            # Create default memory file
+            self.save_memory()
     
     def save_memory(self):
-        """Save all memory data to JSON file"""
+        """Save memory to JSON file."""
         try:
-            data = {
-                "conversations": self.conversation_history,
-                "tasks": [task.to_dict() for task in self.tasks],
-                "stats": self.stats
-            }
+            # Create memory directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.memory_file), exist_ok=True)
+            
+            # Load existing data or create new
+            try:
+                with open(self.memory_file, 'r') as f:
+                    data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                data = {'users': {}, 'tasks': []}
+            
+            # Ensure users dict exists
+            if not isinstance(data, dict):
+                data = {}
+            if 'users' not in data:
+                data['users'] = {}
+            if 'tasks' not in data:
+                data['tasks'] = []
+            
+            # Update user data
+            if self.user_name not in data['users']:
+                data['users'][self.user_name] = {}
+            
+            # Convert tasks to dict format
+            task_dicts = []
+            for task in self.tasks:
+                if isinstance(task, Task):
+                    task_dicts.append(task.to_dict())
+                elif isinstance(task, dict) and 'name' in task:
+                    task_dicts.append(task)
+            
+            # Save user-specific data
+            data['users'][self.user_name].update({
+                'stats': self.stats,
+                'tasks': task_dicts
+            })
+            
+            # Save to file
             with open(self.memory_file, 'w') as f:
-                json.dump(data, f, indent=2)
+                json.dump(data, f, indent=4)
+                
         except Exception as e:
             print(f"Error saving memory: {e}")
         
@@ -182,12 +267,12 @@ class Jarvis:
         print("\n[USER STATISTICS]")
         print("=" * 50)
         print(f"  RANK: {self.stats['rank']}")
-        print(f"  RANK XP: {self.stats['rank_xp']}/{self.rank_requirements[self.stats['rank']]}")
+        print(f"  RANK XP: {self.stats['experience']}/{self.rank_requirements[self.stats['rank']]}")
         print(f"  LEVEL: {self.stats['level']}")
         print(f"  EXPERIENCE: {self.stats['experience']}")
         print("=" * 50)
         for stat, value in self.stats.items():
-            if stat not in ["experience", "level", "rank", "rank_xp"]:
+            if stat not in ["experience", "level", "rank"]:
                 print(f"  {stat.upper()}: {value}")
         print("=" * 50)
 
@@ -213,7 +298,7 @@ class Jarvis:
         numeric_stats = {
             stat: value 
             for stat, value in self.stats.items() 
-            if stat in ['health', 'intelligence', 'strength', 'wealth']
+            if stat in ['health', 'energy', 'focus']
         }
         
         lowest_stats = sorted(
@@ -229,26 +314,19 @@ class Jarvis:
                     "difficulty": "E",
                     "reward": "Health +5"
                 })
-            elif stat == "intelligence" and value < 50:
-                suggestions.append({
-                    "name": "Learning Sprint",
-                    "description": "Study a new topic for 30 minutes",
-                    "difficulty": "D",
-                    "reward": "Intelligence +5"
-                })
-            elif stat == "strength" and value < 50:
+            elif stat == "energy" and value < 50:
                 suggestions.append({
                     "name": "Quick Workout",
                     "description": "Complete a 20-minute workout session",
                     "difficulty": "D",
-                    "reward": "Strength +5"
+                    "reward": "Energy +5"
                 })
-            elif stat == "wealth" and value < 50:
+            elif stat == "focus" and value < 50:
                 suggestions.append({
-                    "name": "Side Project",
-                    "description": "Work on a side project for 1 hour",
-                    "difficulty": "C",
-                    "reward": "Wealth +5"
+                    "name": "Learning Sprint",
+                    "description": "Study a new topic for 30 minutes",
+                    "difficulty": "D",
+                    "reward": "Focus +5"
                 })
         
         if suggestions:
@@ -334,28 +412,24 @@ class Jarvis:
             }
             xp_gained = 10 * difficulty_multiplier.get(task.difficulty, 1)
             self.stats["experience"] += xp_gained
-            self.stats["rank_xp"] += xp_gained
             
             # Check for rank up
             current_rank = self.stats["rank"]
-            rank_order = ["E", "D", "C", "B", "A", "S", "SS"]
+            rank_order = ["E", "D", "C", "B", "A", "S"]
             current_rank_index = rank_order.index(current_rank)
             
-            if self.stats["rank_xp"] >= self.rank_requirements[current_rank] and current_rank_index < len(rank_order) - 1:
+            if self.stats["experience"] >= self.rank_requirements[current_rank] and current_rank_index < len(rank_order) - 1:
                 self.stats["rank"] = rank_order[current_rank_index + 1]
-                self.stats["rank_xp"] = 0
+                self.stats["experience"] -= self.rank_requirements[current_rank]
                 print(f"\n[RANK UP]")
                 print(f"New Rank: {self.stats['rank']}")
             
             # Apply stat rewards
-            if "Health" in task.reward:
-                self.stats["health"] += 5
-            elif "Intelligence" in task.reward:
-                self.stats["intelligence"] += 5
-            elif "Strength" in task.reward:
-                self.stats["strength"] += 5
-            elif "Wealth" in task.reward:
-                self.stats["wealth"] += 5
+            for stat, value in task.stat_modifiers.items():
+                if stat in self.stats:
+                    self.stats[stat] += value
+                    print(f"\n[STAT UPDATE]")
+                    print(f"{stat.upper()}: {self.stats[stat]}")
             
             # Level up if enough XP (more challenging now)
             xp_needed = self.stats["level"] * 150  # Increased XP requirement
@@ -410,13 +484,11 @@ class Jarvis:
                 # Determine reward based on activity type
                 reward = "Experience +10"
                 if any(word in activity.lower() for word in ["study", "learn", "read", "code"]):
-                    reward = "Intelligence +5"
+                    reward = "Focus +5"
                 elif any(word in activity.lower() for word in ["exercise", "workout", "run", "walk"]):
-                    reward = "Strength +5"
+                    reward = "Energy +5"
                 elif any(word in activity.lower() for word in ["meditate", "sleep", "rest"]):
                     reward = "Health +5"
-                elif any(word in activity.lower() for word in ["work", "earn", "business"]):
-                    reward = "Wealth +5"
                 
                 return {
                     "name": activity.capitalize(),
@@ -524,7 +596,7 @@ For example:
 Name: Python Learning Sprint
 Duration: 30
 Description: Complete a focused study session on Python programming
-Reward: Intelligence +5
+Reward: Focus +5
 
 Keep descriptions to ONE sentence only. DO NOT use any other format for quest suggestions. Keep responses concise and engaging.
 
@@ -588,6 +660,55 @@ Keep your responses in this style."""
         except Exception as e:
             print(f"\n[ERROR] System malfunction: {str(e)}")
             print("Please ensure the AI model is properly initialized.")
+
+    def initialize_user_profile(self, desires):
+        """Initialize user profile based on their desires."""
+        # Use desires to generate initial skills and stats
+        from .models.model_manager import get_model
+        import json
+        
+        # Get the AI model
+        model = get_model()
+        
+        # Generate skills based on desires
+        prompt = f"""Based on the user's desires: "{desires}"
+        Generate a JSON object with:
+        1. A list of relevant skills they want to develop (max 5)
+        2. Initial skill levels (1-100)
+        3. A focus score (1-100) based on their ambition
+        4. An energy score (1-100) based on their physical goals
+        5. A health score (1-100) based on their lifestyle goals
+        
+        Format:
+        {{
+            "skills": {{"skill_name": level}},
+            "focus": number,
+            "energy": number,
+            "health": number
+        }}
+        """
+        
+        try:
+            response = model.generate(prompt)
+            profile_data = json.loads(response)
+            
+            # Update stats
+            self.stats["skills"] = profile_data["skills"]
+            self.stats["focus"] = profile_data["focus"]
+            self.stats["energy"] = profile_data["energy"]
+            self.stats["health"] = profile_data["health"]
+            
+            # Save stats to memory
+            self.save_memory()
+            
+        except Exception as e:
+            print(f"Error initializing user profile: {e}")
+            # Set default values if AI generation fails
+            self.stats["skills"] = {
+                "Determination": 50,
+                "Adaptability": 50,
+                "Focus": 50
+            }
 
 def main():
     jarvis = Jarvis()

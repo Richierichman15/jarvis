@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash
 from jarvis import Jarvis
 import os
 from datetime import datetime
@@ -6,6 +6,8 @@ import json
 import firebase_admin
 from firebase_admin import credentials, messaging
 from dotenv import load_dotenv
+import hashlib
+import argparse
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +37,13 @@ app.secret_key = os.urandom(24)
 
 # Initialize Firebase Admin with credentials from environment variables
 firebase_enabled = False  # Flag to track if Firebase is properly initialized
+
+# Admin credentials from .env
+ADMIN_USERNAME = os.getenv('ADMIN')
+ADMIN_PASSWORD = os.getenv('ADMINPASSWORD')
+
+# Memory file path
+MEMORY_FILE = os.path.join(os.path.dirname(__file__), 'jarvis_memory.json')
 
 def validate_firebase_env():
     """Validate that all required Firebase environment variables are present"""
@@ -73,6 +82,51 @@ system = Jarvis()  # Initialize our System
 
 # Initialize the daily quest system
 daily_quest_system = DailyQuestGenerator(system)
+
+def load_memory():
+    """Load memory from JSON file"""
+    try:
+        # Create memory directory if it doesn't exist
+        os.makedirs(os.path.dirname(MEMORY_FILE), exist_ok=True)
+        
+        if os.path.exists(MEMORY_FILE):
+            with open(MEMORY_FILE, 'r') as f:
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    data = {}
+                if 'users' not in data:
+                    data['users'] = {}
+                if 'tasks' not in data:
+                    data['tasks'] = []
+                if 'conversation_history' not in data:
+                    data['conversation_history'] = []
+                return data
+    except Exception as e:
+        print(f"Error loading memory: {e}")
+    return {"users": {}, "tasks": [], "conversation_history": []}
+
+def save_memory(data):
+    """Save memory to JSON file"""
+    try:
+        # Create memory directory if it doesn't exist
+        os.makedirs(os.path.dirname(MEMORY_FILE), exist_ok=True)
+        with open(MEMORY_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving memory: {e}")
+
+def is_authenticated():
+    """Check if user is authenticated"""
+    return 'username' in session
+
+def require_auth(f):
+    """Decorator to require authentication"""
+    def decorated(*args, **kwargs):
+        if not is_authenticated():
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    decorated.__name__ = f.__name__
+    return decorated
 
 # Register notification callback for Firebase notifications
 def send_firebase_notification(notification_data):
@@ -135,16 +189,122 @@ DASHBOARD_CATEGORIES = {
 # Store notifications in memory (you might want to move this to a database in production)
 notifications = []
 
+class AttrDict:
+    def __init__(self, d):
+        self._data = {}
+        for k, v in d.items():
+            if isinstance(v, dict):
+                self._data[k] = AttrDict(v)
+            elif isinstance(v, list):
+                self._data[k] = [AttrDict(x) if isinstance(x, dict) else x for x in v]
+            else:
+                self._data[k] = v
+
+    def __getattr__(self, name):
+        try:
+            return self._data[name]
+        except KeyError:
+            return None
+
+    def __len__(self):
+        return len(self._data)
+
+    def items(self):
+        return self._data.items()
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
 @app.route('/')
 def index():
     """Render the main page"""
-    if "username" not in session:
-        session["username"] = "Gitonga"  # Set default username
+    if not is_authenticated():
+        return redirect(url_for('login'))
+    
+    # Check if user needs to complete welcome flow
+    memory = load_memory()
+    username = session['username']
+    if username not in memory['users'] or 'desires' not in memory['users'][username]:
+        return redirect(url_for('welcome'))
+        
     return render_template('start_menu.html', 
                          stats=system.stats,
                          rank_requirements=system.rank_requirements,
                          tasks=system.tasks,
                          categories=DASHBOARD_CATEGORIES)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handle user login"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Initialize memory if needed
+        if not hasattr(system, 'memory'):
+            system.memory = {}
+        if 'users' not in system.memory:
+            system.memory['users'] = {}
+        
+        # Create user if doesn't exist
+        if username not in system.memory['users']:
+            system.memory['users'][username] = {
+                'password': password,
+                'created_at': datetime.now().isoformat()
+            }
+            system.save_memory()
+        
+        # Verify password
+        if system.memory['users'][username]['password'] == password:
+            session['username'] = username
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password')
+    
+    return render_template('login.html')
+
+@app.route('/welcome')
+@require_auth
+def welcome():
+    """Show welcome page with three questions"""
+    return render_template('welcome.html')
+
+@app.route('/api/save-desires', methods=['POST'])
+@require_auth
+def save_desires():
+    """Save user's desires and generate initial stats"""
+    data = request.json
+    desires = data.get('desires')
+    
+    if not desires:
+        return jsonify({'success': False, 'error': 'No desires provided'})
+    
+    # Save desires to memory
+    memory = load_memory()
+    username = session['username']
+    
+    if username not in memory['users']:
+        memory['users'][username] = {
+            'created_at': datetime.utcnow().isoformat(),
+            'role': session.get('role', 'user')
+        }
+    
+    memory['users'][username]['desires'] = desires
+    save_memory(memory)
+    
+    # Initialize system with user's desires
+    system.initialize_user_profile(desires)
+    
+    return jsonify({'success': True})
+
+@app.route('/logout')
+def logout():
+    """Handle logout"""
+    session.clear()
+    return redirect(url_for('login'))
 
 @app.route('/dashboard')
 def dashboard():
@@ -280,12 +440,6 @@ def create_notification():
     })
     
     return jsonify({'success': True, 'redirect': url_for('show_notification', notification_type=notification_type)})
-
-@app.route('/logout')
-def logout():
-    """Handle user logout"""
-    session.clear()
-    return redirect(url_for('index'))
 
 @app.route('/api/stats')
 def get_stats():
@@ -446,16 +600,67 @@ def planning_dashboard():
     if "username" not in session:
         session["username"] = "User"
     
-    # Load the current 3-month plan
     try:
-        if daily_quest_system.three_month_plan:
-            plan = daily_quest_system.three_month_plan
-        else:
-            with open('three_month_plan.json', 'r') as f:
-                plan = json.load(f)
-                daily_quest_system.three_month_plan = plan
+        # Load the current 3-month plan
+        plan_data = daily_quest_system.three_month_plan
+        
+        # Ensure plan has required structure
+        if not isinstance(plan_data, dict):
+            plan_data = {}
+        if 'months' not in plan_data:
+            # Generate default plan structure
+            plan_data = {
+                "created_at": datetime.now().isoformat(),
+                "total_weeks": 12,
+                "current_week": 1,
+                "months": {
+                    "Month 1": {
+                        "theme": "Foundation Building",
+                        "focus_areas": ["health", "programming", "financial_literacy"],
+                        "weeks": {}
+                    },
+                    "Month 2": {
+                        "theme": "Skill Advancement", 
+                        "focus_areas": ["programming", "investing", "physical_performance"],
+                        "weeks": {}
+                    },
+                    "Month 3": {
+                        "theme": "Mastery & Integration",
+                        "focus_areas": ["wealth_building", "software_mastery", "peak_performance"],
+                        "weeks": {}
+                    }
+                }
+            }
+            daily_quest_system.three_month_plan = plan_data
+            daily_quest_system._save_three_month_plan()
+        
+        # Convert to AttrDict
+        plan = AttrDict(plan_data)
     except FileNotFoundError:
-        plan = None
+        # Create empty plan with required structure
+        plan_data = {
+            "created_at": datetime.now().isoformat(),
+            "total_weeks": 12,
+            "current_week": 1,
+            "months": {
+                "Month 1": {
+                    "theme": "Foundation Building",
+                    "focus_areas": ["health", "programming", "financial_literacy"],
+                    "weeks": {}
+                },
+                "Month 2": {
+                    "theme": "Skill Advancement",
+                    "focus_areas": ["programming", "investing", "physical_performance"],
+                    "weeks": {}
+                },
+                "Month 3": {
+                    "theme": "Mastery & Integration",
+                    "focus_areas": ["wealth_building", "software_mastery", "peak_performance"],
+                    "weeks": {}
+                }
+            }
+        }
+        plan = AttrDict(plan_data)
     
     return render_template('planning.html',
                          stats=system.stats,
@@ -659,5 +864,15 @@ def firebase_config():
         'vapidKey': os.getenv('VAPIDKEY')
     })
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5002) 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Jarvis Web Interface")
+    parser.add_argument("--web", action="store_true", help="Start the web interface")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=3000, help="Port to bind to")
+    
+    args = parser.parse_args()
+    
+    if args.web:
+        app.run(host=args.host, port=args.port, debug=True)
+    else:
+        app.run(debug=True) 
