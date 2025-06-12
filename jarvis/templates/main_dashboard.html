@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar h1 {
+            color: #667eea;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .user-info {
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .logout-btn {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .quest-card {
+            grid-column: span 2;
+        }
+        
+        .daily-quest {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-align: center;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .daily-quest h2 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .quest-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        .quest-description {
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.9;
+        }
+        
+        .complete-quest-btn {
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+        
+        .complete-quest-btn:hover {
+            background: white;
+            color: #667eea;
+        }
+        
+        .complete-quest-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            height: 20px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #51cf66, #40c057);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        
+        .goals-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .goal-item {
+            padding: 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .goal-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.1);
+        }
+        
+        .goal-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+        
+        .goal-description {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .goal-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #999;
+        }
+        
+        .chat-panel {
+            grid-column: span 2;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .chat-input-container input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 1rem;
+        }
+        
+        .chat-input-container input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .send-btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .send-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 10px;
+        }
+        
+        .message.user {
+            background: #667eea;
+            color: white;
+            text-align: right;
+        }
+        
+        .message.jarvis {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .no-quest {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quest-card {
+                grid-column: span 1;
+            }
+            
+            .chat-panel {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>JARVIS Dashboard</h1>
+        <div class="navbar-right">
+            <span class="user-info">Welcome, <span id="username"></span></span>
+            <button class="logout-btn" id="logout-btn">Logout</button>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="dashboard-grid">
+            <!-- Daily Quest Card -->
+            <div class="card quest-card">
+                <div class="daily-quest" id="daily-quest">
+                    <h2>🎯 Daily Quest</h2>
+                    <div id="quest-content" class="loading">Loading your daily quest...</div>
+                </div>
+            </div>
+            
+            <!-- Progress Stats -->
+            <div class="card">
+                <h2>📊 Your Progress</h2>
+                <div class="stats-grid" id="stats-grid">
+                    <div class="loading">Loading stats...</div>
+                </div>
+            </div>
+            
+            <!-- Goals -->
+            <div class="card">
+                <h2>🎯 Your Goals</h2>
+                <div class="goals-list" id="goals-list">
+                    <div class="loading">Loading goals...</div>
+                </div>
+            </div>
+            
+            <!-- Chat with Jarvis -->
+            <div class="card chat-panel">
+                <h2>💬 Chat with Jarvis</h2>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message jarvis">
+                        Hello! I'm here to help you achieve your goals. How can I assist you today?
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Ask Jarvis anything...">
+                    <button class="send-btn" id="send-btn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Dashboard {
+            constructor() {
+                this.username = localStorage.getItem('jarvis_username') || 'User';
+                this.sessionId = localStorage.getItem('jarvis_session');
+                
+                this.init();
+            }
+            
+            init() {
+                // Check authentication
+                if (!this.sessionId) {
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                // Set username
+                document.getElementById('username').textContent = this.username;
+                
+                // Setup event listeners
+                document.getElementById('logout-btn').addEventListener('click', () => this.logout());
+                document.getElementById('send-btn').addEventListener('click', () => this.sendMessage());
+                document.getElementById('chat-input').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendMessage();
+                });
+                
+                // Load dashboard data
+                this.loadDashboardData();
+            }
+            
+            async loadDashboardData() {
+                try {
+                    await Promise.all([
+                        this.loadDailyQuest(),
+                        this.loadProgress(),
+                        this.loadGoals()
+                    ]);
+                } catch (error) {
+                    console.error('Error loading dashboard data:', error);
+                }
+            }
+            
+            async loadDailyQuest() {
+                try {
+                    const response = await fetch('/api/quest/daily', {
+                        headers: {
+                            'Authorization': 'Bearer ' + this.sessionId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const quest = await response.json();
+                        this.displayDailyQuest(quest);
+                    } else {
+                        this.displayNoQuest();
+                    }
+                } catch (error) {
+                    this.displayNoQuest();
+                }
+            }
+            
+            displayDailyQuest(quest) {
+                const questContent = document.getElementById('quest-content');
+                questContent.innerHTML = `
+                    <div class="quest-title">${quest.title}</div>
+                    <div class="quest-description">${quest.description}</div>
+                    <button class="complete-quest-btn" onclick="dashboard.completeQuest('${quest.id}')">
+                        Complete Quest
+                    </button>
+                `;
+            }
+            
+            displayNoQuest() {
+                const questContent = document.getElementById('quest-content');
+                questContent.innerHTML = `
+                    <div class="no-quest">No daily quest available. Check back tomorrow!</div>
+                `;
+            }
+            
+            async loadProgress() {
+                try {
+                    const response = await fetch('/api/user/progress', {
+                        headers: {
+                            'Authorization': 'Bearer ' + this.sessionId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const progress = await response.json();
+                        this.displayProgress(progress);
+                    } else {
+                        this.displayDefaultProgress();
+                    }
+                } catch (error) {
+                    this.displayDefaultProgress();
+                }
+            }
+            
+            displayProgress(progress) {
+                const statsGrid = document.getElementById('stats-grid');
+                statsGrid.innerHTML = `
+                    <div class="stat-item">
+                        <div class="stat-number">${progress.quests_completed}</div>
+                        <div class="stat-label">Quests Completed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${progress.goals_completed}</div>
+                        <div class="stat-label">Goals Achieved</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${Math.round(progress.quest_completion_rate)}%</div>
+                        <div class="stat-label">Quest Success Rate</div>
+                    </div>
+                `;
+            }
+            
+            displayDefaultProgress() {
+                const statsGrid = document.getElementById('stats-grid');
+                statsGrid.innerHTML = `
+                    <div class="stat-item">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Quests Completed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Goals Achieved</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">0%</div>
+                        <div class="stat-label">Quest Success Rate</div>
+                    </div>
+                `;
+            }
+            
+            async loadGoals() {
+                try {
+                    const response = await fetch('/api/user/goals', {
+                        headers: {
+                            'Authorization': 'Bearer ' + this.sessionId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.displayGoals(data.goals || []);
+                    } else {
+                        this.displayNoGoals();
+                    }
+                } catch (error) {
+                    this.displayNoGoals();
+                }
+            }
+            
+            displayGoals(goals) {
+                const goalsList = document.getElementById('goals-list');
+                
+                if (goals.length === 0) {
+                    goalsList.innerHTML = '<div class="loading">No goals yet. Complete the welcome process to generate your personalized goals!</div>';
+                    return;
+                }
+                
+                goalsList.innerHTML = goals.map(goal => `
+                    <div class="goal-item">
+                        <div class="goal-title">${goal.title}</div>
+                        <div class="goal-description">${goal.description}</div>
+                        <div class="goal-meta">
+                            <span>Type: ${goal.type}</span>
+                            <span>Status: ${goal.status}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            displayNoGoals() {
+                const goalsList = document.getElementById('goals-list');
+                goalsList.innerHTML = '<div class="loading">No goals available. Complete the welcome process to get started!</div>';
+            }
+            
+            async completeQuest(questId) {
+                try {
+                    const response = await fetch('/api/quest/complete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + this.sessionId
+                        },
+                        body: JSON.stringify({ quest_id: questId })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        alert(result.message + ' ' + (result.reward || ''));
+                        this.loadDashboardData(); // Refresh data
+                    } else {
+                        alert('Failed to complete quest. Please try again.');
+                    }
+                } catch (error) {
+                    alert('Error completing quest. Please try again.');
+                }
+            }
+            
+            async sendMessage() {
+                const input = document.getElementById('chat-input');
+                const message = input.value.trim();
+                
+                if (!message) return;
+                
+                // Add user message to chat
+                this.addMessageToChat(message, 'user');
+                input.value = '';
+                
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + this.sessionId
+                        },
+                        body: JSON.stringify({ 
+                            message: message,
+                            user_name: this.username 
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.addMessageToChat(data.response, 'jarvis');
+                    } else {
+                        this.addMessageToChat('Sorry, I encountered an error. Please try again.', 'jarvis');
+                    }
+                } catch (error) {
+                    this.addMessageToChat('Sorry, I encountered an error. Please try again.', 'jarvis');
+                }
+            }
+            
+            addMessageToChat(message, sender) {
+                const chatMessages = document.getElementById('chat-messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}`;
+                messageDiv.textContent = message;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            async logout() {
+                try {
+                    await fetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + this.sessionId
+                        }
+                    });
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+                
+                localStorage.removeItem('jarvis_session');
+                localStorage.removeItem('jarvis_username');
+                window.location.href = '/login';
+            }
+        }
+        
+        // Initialize dashboard
+        const dashboard = new Dashboard();
+    </script>
+</body>
+</html>
