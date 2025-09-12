@@ -20,22 +20,6 @@
             <p class="text-xl text-white/80">Welcome, {{ session.username }}</p>
         </div>
 
-        <!-- Navigation Tabs -->
-        <div class="flex justify-center mb-8 space-x-4">
-            <a href="{{ url_for('dashboard') }}" class="nav-tab {% if request.path == '/dashboard' %}active{% endif %}">
-                Dashboard
-            </a>
-            <a href="{{ url_for('show_quests') }}" class="nav-tab {% if request.path == '/quests' %}active{% endif %}">
-                Quests
-            </a>
-            <a href="{{ url_for('character_status') }}" class="nav-tab {% if request.path == '/character-status' %}active{% endif %}">
-                Character
-            </a>
-            <a href="{{ url_for('planning_dashboard') }}" class="nav-tab {% if request.path == '/planning' %}active{% endif %}">
-                Planning
-            </a>
-        </div>
-
         <!-- Category Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {% for category in categories %}
@@ -102,30 +86,6 @@
             background-color: black;
         }
 
-        /* Navigation tabs */
-        .nav-tab {
-            background-color: black;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            color: white;
-            text-decoration: none;
-        }
-
-        .nav-tab:hover, .nav-tab.active {
-            border-color: rgba(255, 255, 255, 0.5);
-            box-shadow: 0 0 20px rgba(0, 102, 255, 0.5);
-            transform: translateY(-2px);
-            color: #0066ff;
-            text-shadow: 
-                0 0 5px #0066ff,
-                0 0 10px #0066ff,
-                0 0 20px #0066ff;
-        }
-
         /* Category button styling */
         .category-btn {
             background-color: black;
@@ -136,8 +96,6 @@
             font-weight: 500;
             transition: all 0.3s ease;
             box-shadow: 0 0 10px rgba(0, 102, 255, 0.3);
-            color: white;
-            cursor: pointer;
         }
 
         .category-btn:hover, .category-btn.active {

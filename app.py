@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash
 from jarvis import Jarvis
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -33,12 +33,7 @@ REQUIRED_FIREBASE_VARS = [
 app = Flask(__name__, 
            template_folder='jarvis/templates',
            static_folder='jarvis/static')
-# Configure session to be permanent and last for 30 days
-app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.secret_key = os.urandom(24)
 
 # Initialize Firebase Admin with credentials from environment variables
 firebase_enabled = False  # Flag to track if Firebase is properly initialized
@@ -223,27 +218,11 @@ class AttrDict:
     def get(self, key, default=None):
         return self._data.get(key, default)
 
-@app.before_request
-def before_request():
-    """Run before each request"""
-    # Skip for static files and login/logout routes
-    if request.endpoint in ['static', 'login', 'logout']:
-        return
-        
-    # Check if user is logged in
-    if 'username' not in session:
+@app.route('/')
+def index():
+    """Render the main page"""
+    if not is_authenticated():
         return redirect(url_for('login'))
-        
-    # Update last activity time
-    session['last_activity'] = datetime.now().isoformat()
-    
-    # For non-permanent sessions, check session timeout (4 hours)
-    if not session.permanent:
-        last_activity = session.get('last_activity')
-        if last_activity:
-            last_active = datetime.fromisoformat(last_activity)
-            if (datetime.now() - last_active) > timedelta(hours=4):
-                return redirect(url_for('logout'))
     
     # Check if user needs to complete welcome flow
     memory = load_memory()
@@ -260,14 +239,9 @@ def before_request():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Handle user login"""
-    # If already logged in, redirect to index
-    if 'username' in session:
-        return redirect(url_for('index'))
-        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        remember_me = request.form.get('remember_me') == 'on'
         
         # Initialize memory if needed
         if not hasattr(system, 'memory'):
@@ -285,23 +259,11 @@ def login():
         
         # Verify password
         if system.memory['users'][username]['password'] == password:
-            session.permanent = remember_me  # Make session permanent if remember me is checked
             session['username'] = username
-            session['last_activity'] = datetime.now().isoformat()
-            
-            # Set session expiration
-            if remember_me:
-                # 30 days for persistent sessions
-                session.permanent = True
-                app.permanent_session_lifetime = timedelta(days=30)
-            else:
-                # Browser session only
-                session.permanent = False
-                
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('index'))
         else:
             flash('Invalid username or password')
-            
+    
     return render_template('login.html')
 
 @app.route('/welcome')
