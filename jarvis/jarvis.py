@@ -132,6 +132,30 @@ class Jarvis:
             temperature=0.7
         )
     
+    def _task_identity(self, task: "Task"):
+        """Return a tuple that uniquely identifies a task to help deduplicate.
+        Uses name, description, difficulty as identity keys.
+        """
+        try:
+            return (task.name, task.description, task.difficulty)
+        except Exception:
+            return None
+
+    def _dedupe_tasks(self):
+        """Remove duplicate tasks, preserving the first occurrence.
+        Duplicates are determined by the task identity.
+        """
+        unique = {}
+        deduped = []
+        for t in self.tasks:
+            key = self._task_identity(t) if isinstance(t, Task) else (
+                t.get("name"), t.get("description"), t.get("difficulty")
+            ) if isinstance(t, dict) else None
+            if key and key not in unique:
+                unique[key] = True
+                deduped.append(t)
+        self.tasks = deduped
+    
     def load_memory(self):
         """Load memory from JSON file."""
         try:
@@ -147,6 +171,8 @@ class Jarvis:
                         data = {}
                     if 'users' not in data:
                         data['users'] = {}
+                    # Legacy support: top-level 'tasks' may exist from older versions.
+                    # We will ignore them to prevent duplicate loading.
                     if 'tasks' not in data:
                         data['tasks'] = []
                     
@@ -165,14 +191,11 @@ class Jarvis:
                                     except Exception as e:
                                         print(f"Error loading task: {e}")
                     
-                    # Load global tasks
-                    if isinstance(data.get('tasks', []), list):
-                        for t in data['tasks']:
-                            try:
-                                if isinstance(t, dict) and 'name' in t:
-                                    self.tasks.append(Task.from_dict(t))
-                            except Exception as e:
-                                print(f"Error loading global task: {e}")
+                    # IMPORTANT: Do NOT load legacy global tasks from data['tasks'] to avoid duplicates
+                    # Left intentionally ignored.
+                
+                # Ensure we don't keep duplicates if the file had overlapping entries
+                self._dedupe_tasks()
             else:
                 # Create default memory file if it doesn't exist
                 self.save_memory()
@@ -203,6 +226,9 @@ class Jarvis:
             if 'tasks' not in data:
                 data['tasks'] = []
             
+            # Deduplicate tasks before persisting
+            self._dedupe_tasks()
+
             # Update user data
             if self.user_name not in data['users']:
                 data['users'][self.user_name] = {}
@@ -221,6 +247,9 @@ class Jarvis:
                 'tasks': task_dicts
             })
             
+            # Clear legacy global tasks to prevent future duplicate loads
+            data['tasks'] = []
+
             # Save to file
             with open(self.memory_file, 'w') as f:
                 json.dump(data, f, indent=4)
@@ -370,8 +399,24 @@ class Jarvis:
 
     def create_task(self, name, description, difficulty, reward, deadline=None):
         """Create a new task"""
+        # Skip if an identical task already exists (same name, description, difficulty)
+        for existing in self.tasks:
+            try:
+                if (
+                    isinstance(existing, Task)
+                    and existing.name == name
+                    and existing.description == description
+                    and existing.difficulty == difficulty
+                    and existing.status != "completed"
+                ):
+                    print("\n[STATUS] Quest already exists. Skipping duplicate.")
+                    return
+            except Exception:
+                pass
+
         task = Task(name, description, difficulty, reward, deadline)
         self.tasks.append(task)
+        self._dedupe_tasks()
         self.save_memory()
         print(f"\n[QUEST CREATED]")
         print(f"Name: {name}")

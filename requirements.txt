@@ -30,8 +30,8 @@ huggingface_hub>=0.21.0
 # Tools
 langchain-community>=0.0.27
 langchain>=0.1.0
-langchain-core==0.1.27
-langchain-ollama==0.1.1
+langchain-core>=0.2.20
+langchain-ollama>=0.1.1
 langchain-openai>=0.0.5
 
 # Memory & Storage

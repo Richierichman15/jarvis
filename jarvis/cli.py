@@ -18,7 +18,7 @@ from rich.prompt import Prompt, Confirm
 from pathlib import Path
 
 from .jarvis import Jarvis
-from .dual_jarvis import DualJarvis
+# from .dual_jarvis import DualJarvis  # Commented out - module not available
 
 import argparse
 import logging
@@ -69,9 +69,9 @@ def chat(
     jarvis = Jarvis(user_name=name)
     
     # Display introduction
-    intro = jarvis.get_introduction()
-    console.print(f"JARVIS: ", style=assistant_style, end="")
-    console.print(Markdown(intro))
+    jarvis.greet()
+    console.print(f"\nJARVIS: ", style=assistant_style, end="")
+    console.print("Welcome! I'm ready to assist you. Type 'help' for available commands.")
     
     # Main interaction loop
     try:
@@ -86,11 +86,11 @@ def chat(
             # Show thinking animation
             with console.status("[bold green]Thinking...[/bold green]"):
                 # Process query
-                response = jarvis.process_query(user_input)
+                response = jarvis.chat(user_input)
                 
             # Display response
             console.print(f"\nJARVIS: ", style=assistant_style, end="")
-            console.print(Markdown(response))
+            console.print(response)
             
     except KeyboardInterrupt:
         console.print("\n\nJARVIS: Shutting down. Goodbye!", style=assistant_style)
@@ -118,11 +118,11 @@ def query(
     # Show thinking animation
     with console.status("[bold green]Thinking...[/bold green]"):
         # Process query
-        response = jarvis.process_query(question)
+        response = jarvis.chat(question)
         
     # Display response
     console.print(f"JARVIS: ", style=assistant_style, end="")
-    console.print(Markdown(response))
+    console.print(response)
     
     return 0
 
@@ -390,86 +390,29 @@ def weather(
         console.print(f"[bold red]Error retrieving weather data: {str(e)}[/bold red]")
 
 
-@app.command()
-def dual_chat(
-    name: str = typer.Option("Boss", help="How Jarvis should address you"),
-    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)"),
-    claude_key: Optional[str] = typer.Option(None, help="Claude API key (or set CLAUDE_API_KEY env var)")
-):
-    """Start an interactive chat session with both OpenAI and Claude models."""
-    # Set API keys if provided
-    if openai_key:
-        os.environ["OPENAI_API_KEY"] = openai_key
-    if claude_key:
-        os.environ["CLAUDE_API_KEY"] = claude_key
-        
-    # Display startup message
-    display_startup_message()
-    console.print(Panel.fit("Dual Model Mode (OpenAI + Claude)", title="JARVIS"))
-    
-    # Initialize Dual Jarvis
-    jarvis = DualJarvis(user_name=name)
-    
-    # Display introduction
-    intro = jarvis.get_introduction()
-    console.print(f"JARVIS: ", style=assistant_style, end="")
-    console.print(Markdown(intro))
-    
-    # Main interaction loop
-    try:
-        while True:
-            # Get user input
-            user_input = typer.prompt(f"\n{name}", prompt_suffix="")
-            
-            if user_input.lower() in ["exit", "quit", "bye", "goodbye"]:
-                console.print("\nJARVIS: Goodbye! It was nice comparing models with you.", style=assistant_style)
-                break
-                
-            # Show thinking animation
-            with console.status("[bold green]Both models thinking...[/bold green]"):
-                # Process query
-                response = jarvis.process_query(user_input)
-                
-            # Display response
-            console.print(f"\nJARVIS: ", style=assistant_style, end="")
-            console.print(Markdown(response))
-            
-    except KeyboardInterrupt:
-        console.print("\n\nJARVIS: Shutting down dual mode. Goodbye!", style=assistant_style)
-    except Exception as e:
-        console.print(f"\n\nError: {str(e)}", style="bold red")
-        return 1
-        
-    return 0
+# @app.command()
+# def dual_chat(
+#     name: str = typer.Option("Boss", help="How Jarvis should address you"),
+#     openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)"),
+#     claude_key: Optional[str] = typer.Option(None, help="Claude API key (or set CLAUDE_API_KEY env var)")
+# ):
+#     """Start an interactive chat session with both OpenAI and Claude models."""
+#     # Dual model functionality temporarily disabled - DualJarvis module not available
+#     console.print("Dual model functionality is currently disabled.", style="bold red")
+#     return 1
 
 
-@app.command()
-def dual_query(
-    question: str = typer.Argument(..., help="Question to ask both models"),
-    name: str = typer.Option("Boss", help="How Jarvis should address you"),
-    openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)"),
-    claude_key: Optional[str] = typer.Option(None, help="Claude API key (or set CLAUDE_API_KEY env var)")
-):
-    """Ask a single question and get responses from both OpenAI and Claude models."""
-    # Set API keys if provided
-    if openai_key:
-        os.environ["OPENAI_API_KEY"] = openai_key
-    if claude_key:
-        os.environ["CLAUDE_API_KEY"] = claude_key
-        
-    # Initialize Dual Jarvis
-    jarvis = DualJarvis(user_name=name)
-    
-    # Show thinking animation
-    with console.status("[bold green]Both models thinking...[/bold green]"):
-        # Process query
-        response = jarvis.process_query(question)
-        
-    # Display response
-    console.print(f"JARVIS: ", style=assistant_style, end="")
-    console.print(Markdown(response))
-    
-    return 0
+# @app.command()
+# def dual_query(
+#     question: str = typer.Argument(..., help="Question to ask both models"),
+#     name: str = typer.Option("Boss", help="How Jarvis should address you"),
+#     openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)"),
+#     claude_key: Optional[str] = typer.Option(None, help="Claude API key (or set CLAUDE_API_KEY env var)")
+# ):
+#     """Ask a single question and get responses from both OpenAI and Claude models."""
+#     # Dual model functionality temporarily disabled - DualJarvis module not available
+#     console.print("Dual model functionality is currently disabled.", style="bold red")
+#     return 1
 
 
 def register_commands(subparsers):

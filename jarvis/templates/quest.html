@@ -28,9 +28,9 @@
 
         <!-- Quest Categories -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <button class="category-btn active" onclick="filterQuests('all')">Available</button>
-            <button class="category-btn" onclick="filterQuests('active')">Active Quests</button>
-            <button class="category-btn" onclick="filterQuests('completed')">Completed</button>
+            <button class="category-btn active" onclick="filterQuests('all', this)">Available</button>
+            <button class="category-btn" onclick="filterQuests('active', this)">Active Quests</button>
+            <button class="category-btn" onclick="filterQuests('completed', this)">Completed</button>
         </div>
 
         <!-- Quest Grid -->
@@ -261,7 +261,7 @@
     </style>
 
     <script>
-        function filterQuests(status) {
+        function filterQuests(status, el) {
             const cards = document.querySelectorAll('.quest-card');
             cards.forEach(card => {
                 if (status === 'all' && !card.classList.contains('completed') || 
@@ -277,8 +277,21 @@
             document.querySelectorAll('.category-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (el) {
+                el.classList.add('active');
+            } else {
+                // Fallback: activate the corresponding button by index
+                const map = { all: 0, active: 1, completed: 2 };
+                const btns = document.querySelectorAll('.category-btn');
+                const idx = map[status];
+                if (btns[idx]) btns[idx].classList.add('active');
+            }
         }
+
+        // Apply default filter on initial load to hide completed quests from 'Available'
+        document.addEventListener('DOMContentLoaded', () => {
+            filterQuests('all');
+        });
 
         async function completeQuest(taskIndex, questName) {
             try {
