@@ -92,7 +92,7 @@
         <!-- Action Buttons -->
         <div class="flex justify-center gap-6 mt-12">
             <button onclick="suggestQuests()" class="menu-button group">
-                <span>Get Suggestions</span>
+                <span>New Quest</span>
                 <i class="fas fa-lightbulb text-white group-hover:text-glow"></i>
             </button>
             <a href="{{ url_for('index') }}" class="menu-button group">
@@ -293,38 +293,6 @@
             filterQuests('all');
         });
 
-        async function completeQuest(taskIndex, questName) {
-            try {
-                const response = await fetch('/api/complete_task', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        task_index: taskIndex,
-                        quest_name: questName 
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Show the notification in a modal overlay
-                    showNotificationModal(data.notification);
-                    
-                    // After notification timeout, refresh the page
-                    setTimeout(() => {
-                        location.reload();
-                    }, 5000);
-                } else {
-                    alert('Failed to complete quest: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Error completing quest:', error);
-                alert('Failed to complete quest. Please try again.');
-            }
-        }
-
         async function suggestQuests() {
             try {
                 const response = await fetch('/api/suggest_tasks');
@@ -389,5 +357,7 @@
             }
         }
     </script>
+    <!-- Load the main JavaScript file with notification functionality -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html> 

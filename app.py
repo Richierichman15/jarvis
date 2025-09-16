@@ -864,6 +864,28 @@ def firebase_config():
         'vapidKey': os.getenv('VAPIDKEY')
     })
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Check if we can access the memory file
+        if os.path.exists(MEMORY_FILE):
+            with open(MEMORY_FILE, 'r') as f:
+                json.load(f)  # Try to parse the JSON
+        
+        # If we get here, everything is working
+        return jsonify({
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Jarvis Web Interface")
     parser.add_argument("--web", action="store_true", help="Start the web interface")

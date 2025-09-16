@@ -1,0 +1,25 @@
+{
+  "buck": {
+    "personal_development": {
+      "description": "Become a jack of all traits and successful in everything",
+      "categories": ["learning", "skill_development", "personal_growth"]
+    },
+    "fitness": {
+      "description": "Gain 20 pounds of muscle in 6-8 months (currently 160 lbs)",
+      "categories": ["strength_training", "nutrition", "recovery"]
+    },
+    "finance": {
+      "description": "Earn $5k/month and understand how money works",
+      "categories": ["investing", "income_streams", "financial_education"]
+    },
+    "daily_wins": {
+      "description": "Achieve three daily wins: physical, mental, and spiritual",
+      "categories": ["physical_activity", "mental_stimulation", "spiritual_growth"]
+    },
+    "career": {
+      "description": "Grow as a software developer with finance knowledge",
+      "categories": ["programming", "finance_tech", "professional_development"]
+    },
+    "last_updated": "2025-06-12T10:20:20.071303"
+  }
+}

@@ -10,6 +10,7 @@ import time
 import logging
 import threading
 import secrets
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union
 from datetime import datetime, timedelta
 
@@ -17,6 +18,10 @@ from flask import Flask, request, jsonify, send_from_directory, abort
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 import jwt
+
+# Add parent directory to path to import goal_manager
+sys.path.append(str(Path(__file__).parent.parent))
+from goal_manager import GoalManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -368,6 +373,128 @@ class JarvisAPIServer:
                     "error": str(e)
                 }), 500
         
+        # Goal and quest management endpoints
+        @self.app.route('/api/suggest_tasks', methods=['GET'])
+        @require_auth
+        def suggest_tasks(self) -> Dict[str, Any]:
+            """Generate new quests based on user's goals and preferences."""
+            try:
+                # Initialize goal manager
+                manager = GoalManager()
+                
+                # Generate new quests
+                quests = manager.generate_daily_quests()
+                
+                return {
+                    "success": True,
+                    "quests": quests,
+                    "message": "New daily quests have been generated"
+                }
+                
+            except Exception as e:
+                logger.error(f"Error generating quests: {str(e)}")
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+                
+        @self.app.route('/api/generate_quests', methods=['POST'])
+        @require_auth
+        def generate_quests(self) -> Dict[str, Any]:
+            """Generate new quests from goals."""
+            try:
+                # Initialize goal manager
+                manager = GoalManager()
+                
+                # Generate new quests
+                quests = manager.generate_daily_quests()
+                
+                return {
+                    "success": True,
+                    "quests": quests,
+                    "message": "New quests have been generated"
+                }
+                
+            except Exception as e:
+                logger.error(f"Error generating quests: {str(e)}")
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+                
+        @self.app.route('/api/goals', methods=['GET'])
+        @require_auth
+        def get_goals(self) -> Dict[str, Any]:
+            """Get all goals for the user."""
+            try:
+                manager = GoalManager()
+                goals = manager.goals.get(manager.username, {}).get("goals", [])
+                
+                return {
+                    "success": True,
+                    "goals": goals
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting goals: {str(e)}")
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+                
+        @self.app.route('/api/quests', methods=['GET'])
+        @require_auth
+        def get_quests(self) -> Dict[str, Any]:
+            """Get all active quests for the user."""
+            try:
+                if not os.path.exists(GoalManager.QUESTS_FILE):
+                    return {"success": True, "quests": []}
+                    
+                with open(GoalManager.QUESTS_FILE, 'r') as f:
+                    quests = json.load(f).get(GoalManager().username, [])
+                    
+                # Filter out expired quests
+                now = datetime.now().isoformat()
+                active_quests = [q for q in quests if q.get("expires_at", "") > now and q.get("status") != "completed"]
+                
+                return {
+                    "success": True,
+                    "quests": active_quests
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting quests: {str(e)}")
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+                
+        @self.app.route('/api/complete_task', methods=['POST'])
+        @require_auth
+        def complete_task(self) -> Dict[str, Any]:
+            """Complete a task."""
+            try:
+                # Get task ID
+                task_id = request.json.get('task_id')
+                
+                # Initialize goal manager
+                manager = GoalManager()
+                
+                # Complete task
+                manager.complete_task(task_id)
+                
+                return {
+                    "success": True,
+                    "message": "Task has been completed"
+                }
+                
+            except Exception as e:
+                logger.error(f"Error completing task: {str(e)}")
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+                
         # Memory endpoints
         @self.app.route('/api/memory', methods=['GET'])
         @require_auth

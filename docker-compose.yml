@@ -1,22 +1,26 @@
-version: '3.8'
-
 services:
   jarvis:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "3000:3000"
     volumes:
       - ./jarvis/memory:/app/jarvis/memory
       - ./jarvis/debug_logs:/app/jarvis/debug_logs
       - ./.env:/app/.env
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+      - OLLAMA_HOST=ollama:11434
       - LOCAL_MODEL_BASE_URL=http://ollama:11434/api
     depends_on:
       - ollama
-    command: python main.py --web --host 0.0.0.0 --port 5000
+    command: python app.py --web --host 0.0.0.0 --port 3000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   ollama:
     image: ollama/ollama:latest
@@ -25,11 +29,15 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_INTEL_GPU=false
+      - OLLAMA_NOHISTORY=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:11434/api/version || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
-  ollama_data: 
+  ollama_data:
