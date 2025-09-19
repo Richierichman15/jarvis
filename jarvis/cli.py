@@ -47,7 +47,7 @@ def display_startup_message():
         "[bold blue]J[/bold blue][bold red]A[/bold red][bold yellow]R[/bold yellow]"
         "[bold green]V[/bold green][bold purple]I[/bold purple][bold cyan]S[/bold cyan]", 
         title="Welcome to", 
-        subtitle="Just A Rather Very Intelligent System"
+        subtitle="Just A Rather Very Intelligent System - Iron Man Edition"
     ))
     console.print("\n")
 

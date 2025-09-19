@@ -1,60 +1,47 @@
 """
-System AI Assistant.
-A powerful, mysterious AI system that helps users level up and complete quests.
-Inspired by the System from Solo Leveling and other anime systems.
+JARVIS - Just A Rather Very Intelligent System
+An advanced AI assistant inspired by the AI from Iron Man.
+Designed to help users with productivity, learning, and daily tasks.
 """
 import os
 import sys
 import json
 import re
-from datetime import datetime
-from typing import Optional
-from langchain_ollama import OllamaLLM
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+import subprocess
+import platform
+from datetime import datetime, timedelta
+from typing import Optional, Dict, List, Any
+try:
+    from langchain_ollama import OllamaLLM
+    from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
 
 class Task:
-    def __init__(self, name, description, difficulty, reward, deadline=None, status="pending"):
+    """Represents a task or reminder for the user."""
+    def __init__(self, name, description, priority="medium", category="general", deadline=None, status="pending"):
         self.name = name
         self.description = description
-        self.difficulty = difficulty  # E, D, C, B, A, S
-        # Handle both numeric and stat modifier rewards
-        if isinstance(reward, (int, float)):
-            self.reward = int(reward)
-            self.stat_modifiers = {}
-        else:
-            # Parse stat modifiers from string like "Health +5, Intelligence +3"
-            self.reward = 0  # Base XP reward
-            self.stat_modifiers = {}
-            if isinstance(reward, str):
-                modifiers = reward.split(',')
-                for mod in modifiers:
-                    mod = mod.strip()
-                    if '+' in mod:
-                        stat, value = mod.split('+')
-                        stat = stat.strip()
-                        try:
-                            value = int(value.strip())
-                            self.stat_modifiers[stat] = value
-                            self.reward += value  # Use stat value as XP reward
-                        except ValueError:
-                            pass
-        
+        self.priority = priority  # low, medium, high, urgent
+        self.category = category  # work, personal, learning, health, etc.
         self.deadline = deadline
         self.status = status
         self.created_at = datetime.now().isoformat()
         self.completed_at = None
+        self.estimated_duration = None  # in minutes
 
     def to_dict(self):
         return {
             "name": self.name,
             "description": self.description,
-            "difficulty": self.difficulty,
-            "reward": self.reward,
-            "stat_modifiers": self.stat_modifiers,
+            "priority": self.priority,
+            "category": self.category,
             "deadline": self.deadline,
             "status": self.status,
             "created_at": self.created_at,
-            "completed_at": self.completed_at
+            "completed_at": self.completed_at,
+            "estimated_duration": self.estimated_duration
         }
 
     @classmethod
@@ -63,26 +50,16 @@ class Task:
         if not isinstance(data, dict):
             raise ValueError("Data must be a dictionary")
             
-        required_fields = ["name", "description", "difficulty"]
+        required_fields = ["name", "description"]
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Missing required field: {field}")
         
-        # Handle both numeric and stat modifier rewards
-        reward = data.get("reward", 0)
-        if isinstance(reward, (int, float)):
-            reward = int(reward)
-        elif isinstance(reward, str):
-            # Keep the string reward as is, it will be parsed in __init__
-            pass
-        else:
-            reward = 0
-        
         task = cls(
             name=data["name"],
             description=data["description"],
-            difficulty=data["difficulty"],
-            reward=reward,
+            priority=data.get("priority", "medium"),
+            category=data.get("category", "general"),
             deadline=data.get("deadline"),
             status=data.get("status", "pending")
         )
@@ -92,64 +69,74 @@ class Task:
             task.created_at = data["created_at"]
         if "completed_at" in data:
             task.completed_at = data["completed_at"]
-        if "stat_modifiers" in data and isinstance(data["stat_modifiers"], dict):
-            task.stat_modifiers = data["stat_modifiers"]
+        if "estimated_duration" in data:
+            task.estimated_duration = data["estimated_duration"]
             
         return task
 
 class Jarvis:
-    def __init__(self, user_name="User"):
+    """JARVIS - Just A Rather Very Intelligent System"""
+    
+    def __init__(self, user_name="Sir"):
         self.user_name = user_name
-        self.name = "System"
-        self.version = "1.0.0"
+        self.name = "JARVIS"
+        self.version = "2.0.0"
+        self.personality = "professional, helpful, and slightly witty"
+        
         # Set memory file path relative to the jarvis directory
         self.memory_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'jarvis_memory.json')
         self.conversation_history = []
         self.tasks = []
-        self.stats = {
-            "level": 1,
-            "rank": "E",
-            "experience": 0,
-            "health": 100,
-            "energy": 100,
-            "focus": 100,
-            "skills": {}
+        self.reminders = []
+        
+        # User preferences and settings
+        self.preferences = {
+            "communication_style": "professional",
+            "notification_level": "medium",
+            "auto_suggestions": True,
+            "voice_enabled": False,
+            "dark_mode": False
         }
-        self.rank_requirements = {
-            "E": 0,
-            "D": 1000,
-            "C": 5000,
-            "B": 15000,
-            "A": 50000,
-            "S": 100000
+        
+        # System information
+        self.system_info = {
+            "os": platform.system(),
+            "hostname": platform.node(),
+            "python_version": platform.python_version(),
+            "uptime": datetime.now().isoformat()
         }
+        
         self.load_memory()
         
-        # Initialize Ollama with Mistral model
-        self.llm = OllamaLLM(
-            model="mistral:7b-instruct-v0.2-q4_0",
-            callbacks=[StreamingStdOutCallbackHandler()],
-            temperature=0.7
-        )
+        # Initialize AI model if available
+        self.llm = None
+        if LANGCHAIN_AVAILABLE:
+            try:
+                self.llm = OllamaLLM(
+                    model="mistral:7b-instruct-v0.2-q4_0",
+                    callbacks=[StreamingStdOutCallbackHandler()],
+                    temperature=0.7
+                )
+            except Exception as e:
+                print(f"Warning: Could not initialize AI model: {e}")
+                self.llm = None
+        else:
+            print("Info: AI chat capabilities disabled (langchain not available)")
     
     def _task_identity(self, task: "Task"):
-        """Return a tuple that uniquely identifies a task to help deduplicate.
-        Uses name, description, difficulty as identity keys.
-        """
+        """Return a tuple that uniquely identifies a task to help deduplicate."""
         try:
-            return (task.name, task.description, task.difficulty)
+            return (task.name, task.description, task.category)
         except Exception:
             return None
 
     def _dedupe_tasks(self):
-        """Remove duplicate tasks, preserving the first occurrence.
-        Duplicates are determined by the task identity.
-        """
+        """Remove duplicate tasks, preserving the first occurrence."""
         unique = {}
         deduped = []
         for t in self.tasks:
             key = self._task_identity(t) if isinstance(t, Task) else (
-                t.get("name"), t.get("description"), t.get("difficulty")
+                t.get("name"), t.get("description"), t.get("category")
             ) if isinstance(t, dict) else None
             if key and key not in unique:
                 unique[key] = True
@@ -171,17 +158,13 @@ class Jarvis:
                         data = {}
                     if 'users' not in data:
                         data['users'] = {}
-                    # Legacy support: top-level 'tasks' may exist from older versions.
-                    # We will ignore them to prevent duplicate loading.
-                    if 'tasks' not in data:
-                        data['tasks'] = []
                     
                     # Load user-specific data if available
                     if self.user_name in data['users']:
                         user_data = data['users'][self.user_name]
                         if isinstance(user_data, dict):
-                            if 'stats' in user_data:
-                                self.stats.update(user_data['stats'])
+                            if 'preferences' in user_data:
+                                self.preferences.update(user_data['preferences'])
                             if 'tasks' in user_data and isinstance(user_data['tasks'], list):
                                 self.tasks = []
                                 for t in user_data['tasks']:
@@ -190,11 +173,10 @@ class Jarvis:
                                             self.tasks.append(Task.from_dict(t))
                                     except Exception as e:
                                         print(f"Error loading task: {e}")
-                    
-                    # IMPORTANT: Do NOT load legacy global tasks from data['tasks'] to avoid duplicates
-                    # Left intentionally ignored.
+                            if 'conversation_history' in user_data:
+                                self.conversation_history = user_data['conversation_history']
                 
-                # Ensure we don't keep duplicates if the file had overlapping entries
+                # Ensure we don't keep duplicates
                 self._dedupe_tasks()
             else:
                 # Create default memory file if it doesn't exist
@@ -216,15 +198,13 @@ class Jarvis:
                 with open(self.memory_file, 'r') as f:
                     data = json.load(f)
             except (FileNotFoundError, json.JSONDecodeError):
-                data = {'users': {}, 'tasks': []}
+                data = {'users': {}}
             
             # Ensure users dict exists
             if not isinstance(data, dict):
                 data = {}
             if 'users' not in data:
                 data['users'] = {}
-            if 'tasks' not in data:
-                data['tasks'] = []
             
             # Deduplicate tasks before persisting
             self._dedupe_tasks()
@@ -243,12 +223,11 @@ class Jarvis:
             
             # Save user-specific data
             data['users'][self.user_name].update({
-                'stats': self.stats,
-                'tasks': task_dicts
+                'preferences': self.preferences,
+                'tasks': task_dicts,
+                'conversation_history': self.conversation_history[-50:],  # Keep last 50 conversations
+                'last_updated': datetime.now().isoformat()
             })
-            
-            # Clear legacy global tasks to prevent future duplicate loads
-            data['tasks'] = []
 
             # Save to file
             with open(self.memory_file, 'w') as f:
@@ -256,520 +235,543 @@ class Jarvis:
                 
         except Exception as e:
             print(f"Error saving memory: {e}")
-        
+    
     def greet(self):
-        print(f"\n[SYSTEM INITIALIZED]")
-        print(f"Version: {self.version}")
-        print(f"User Rank: {self.stats['rank']}")
-        print(f"User Level: {self.stats['level']}")
-        print(f"Experience Points: {self.stats['experience']}")
-        print("=" * 50)
+        """Display welcome message and system status."""
+        current_time = datetime.now().strftime("%H:%M")
+        greeting = self._get_time_based_greeting()
+        
+        print(f"\n{'='*60}")
+        print(f"🤖 {self.name} v{self.version} - Online")
+        print(f"{greeting}, {self.user_name}")
+        print(f"Current time: {current_time}")
+        print(f"System: {self.system_info['os']} on {self.system_info['hostname']}")
+        print(f"{'='*60}")
         print("Available Commands:")
-        print("  help     - Display system commands")
-        print("  stats    - Show user statistics")
-        print("  Task     - Show available quests")
-        print("  suggest  - Get quest recommendations")
-        print("  update   - Modify user statistics")
-        print("=" * 50)
-
-    def get_help(self):
-        print("\n[SYSTEM COMMANDS]")
-        print("=" * 50)
-        print("  help     - Display this message")
-        print("  stats    - Show user statistics")
-        print("  clear    - Clear conversation history")
-        print("  exit     - Terminate system")
-        print("  memory   - Show conversation log")
-        print("  Task     - Show available quests")
-        print("  complete - Complete a quest")
-        print("  suggest  - Get quest recommendations")
-        print("  update   - Modify user statistics")
-        print("  edit     - Edit an existing quest")
-        print("\n[QUEST CREATION]")
-        print("Natural language quest creation is available:")
-        print("  'Create a quest to study Python for 2 hours'")
-        print("  'Add a quest to exercise for 30 minutes'")
-        print("  'I need to meditate for 15 minutes'")
-        print("=" * 50)
-
-    def show_stats(self):
-        print("\n[USER STATISTICS]")
-        print("=" * 50)
-        print(f"  RANK: {self.stats['rank']}")
-        print(f"  RANK XP: {self.stats['experience']}/{self.rank_requirements[self.stats['rank']]}")
-        print(f"  LEVEL: {self.stats['level']}")
-        print(f"  EXPERIENCE: {self.stats['experience']}")
-        print("=" * 50)
-        for stat, value in self.stats.items():
-            if stat not in ["experience", "level", "rank"]:
-                print(f"  {stat.upper()}: {value}")
-        print("=" * 50)
-
-    def update_stat(self, stat_name, value):
-        """Update a specific stat"""
-        try:
-            value = int(value)
-            if stat_name in self.stats:
-                self.stats[stat_name] = value
-                self.save_memory()
-                print(f"\n[STAT UPDATE]")
-                print(f"{stat_name.upper()}: {value}")
-            else:
-                print(f"\n[ERROR] Invalid stat: {stat_name}")
-        except ValueError:
-            print("\n[ERROR] Invalid value provided")
-
-    def suggest_tasks(self):
-        """Suggest tasks based on current stats"""
-        suggestions = []
+        print("  help        - Display all available commands")
+        print("  status      - Show system status and tasks")
+        print("  tasks       - View all tasks and reminders")
+        print("  schedule    - Schedule a new task or reminder")
+        print("  complete    - Mark a task as completed")
+        print("  system      - Show system information")
+        print("  settings    - Manage preferences")
+        print("  exit        - Shutdown JARVIS")
+        print(f"{'='*60}")
         
-        # Find lowest stats (excluding non-numeric stats)
-        numeric_stats = {
-            stat: value 
-            for stat, value in self.stats.items() 
-            if stat in ['health', 'energy', 'focus']
-        }
-        
-        lowest_stats = sorted(
-            numeric_stats.items(),
-            key=lambda x: x[1]
-        )[:2]  # Get 2 lowest stats
-        
-        for stat, value in lowest_stats:
-            if stat == "health" and value < 50:
-                suggestions.append({
-                    "name": "Meditation Session",
-                    "description": "Complete a 15-minute meditation session",
-                    "difficulty": "E",
-                    "reward": "Health +5"
-                })
-            elif stat == "energy" and value < 50:
-                suggestions.append({
-                    "name": "Quick Workout",
-                    "description": "Complete a 20-minute workout session",
-                    "difficulty": "D",
-                    "reward": "Energy +5"
-                })
-            elif stat == "focus" and value < 50:
-                suggestions.append({
-                    "name": "Learning Sprint",
-                    "description": "Study a new topic for 30 minutes",
-                    "difficulty": "D",
-                    "reward": "Focus +5"
-                })
-        
-        if suggestions:
-            print("\n[QUEST RECOMMENDATIONS]")
-            print("Based on user's lowest statistics:")
-            print("=" * 50)
-            
-            # Create and display each suggested quest
-            for i, task in enumerate(suggestions, 1):
-                # Create the task
-                self.create_task(
-                    name=task['name'],
-                    description=task['description'],
-                    difficulty=task['difficulty'],
-                    reward=task['reward']
-                )
-                
-                # Display the task
-                print(f"\n{i}. {task['name']} ({task['difficulty']}-rank)")
-                print(f"   {task['description']}")
-                print(f"   Reward: {task['reward']}")
-            
-            print("\n[STATUS] Quests have been automatically added to your task list.")
-            print("Use 'Task' command to view all available quests.")
+        # Show pending tasks if any
+        pending_tasks = [t for t in self.tasks if t.status == "pending"]
+        if pending_tasks:
+            print(f"\n📋 You have {len(pending_tasks)} pending task(s):")
+            for i, task in enumerate(pending_tasks[:3], 1):  # Show first 3
+                priority_icon = {"urgent": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(task.priority, "⚪")
+                print(f"  {i}. {priority_icon} {task.name}")
+            if len(pending_tasks) > 3:
+                print(f"  ... and {len(pending_tasks) - 3} more")
+    
+    def _get_time_based_greeting(self):
+        """Get appropriate greeting based on time of day."""
+        hour = datetime.now().hour
+        if 5 <= hour < 12:
+            return "Good morning"
+        elif 12 <= hour < 17:
+            return "Good afternoon"
+        elif 17 <= hour < 21:
+            return "Good evening"
         else:
-            print("\n[STATUS] User statistics are well balanced.")
-
-    def show_memory(self):
-        """Display conversation history"""
-        if not self.conversation_history:
-            print("\n[STATUS] No previous conversations found.")
+            return "Good evening"  # Late night
+    
+    def get_help(self):
+        """Display comprehensive help information."""
+        print(f"\n{'='*60}")
+        print(f"🤖 {self.name} - Command Reference")
+        print(f"{'='*60}")
+        print("📋 TASK MANAGEMENT:")
+        print("  tasks                    - View all tasks")
+        print("  schedule <description>   - Create a new task")
+        print("  complete <number>        - Mark task as completed")
+        print("  priority <number> <level> - Change task priority")
+        print("  delete <number>          - Remove a task")
+        print()
+        print("📊 SYSTEM COMMANDS:")
+        print("  status                   - Show system overview")
+        print("  system                   - Display system information")
+        print("  settings                 - Manage preferences")
+        print("  clear                    - Clear conversation history")
+        print("  memory                   - Show recent conversations")
+        print()
+        print("💬 CONVERSATION:")
+        print("  Just type naturally to chat with JARVIS")
+        print("  Ask questions, request help, or have a conversation")
+        print()
+        print("🔧 UTILITY COMMANDS:")
+        print("  time                     - Show current time")
+        print("  weather                  - Get weather information")
+        print("  news                     - Get latest news headlines")
+        print("  help                     - Show this help message")
+        print("  exit                     - Shutdown JARVIS")
+        print(f"{'='*60}")
+    
+    def show_status(self):
+        """Display current system status and overview."""
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        pending_tasks = [t for t in self.tasks if t.status == "pending"]
+        completed_tasks = [t for t in self.tasks if t.status == "completed"]
+        urgent_tasks = [t for t in pending_tasks if t.priority == "urgent"]
+        
+        print(f"\n{'='*60}")
+        print(f"📊 {self.name} System Status")
+        print(f"{'='*60}")
+        print(f"⏰ Current Time: {current_time}")
+        print(f"👤 User: {self.user_name}")
+        print(f"🖥️  System: {self.system_info['os']} {self.system_info['python_version']}")
+        print(f"💾 Memory: {len(self.conversation_history)} conversations stored")
+        print()
+        print("📋 TASK OVERVIEW:")
+        print(f"  📝 Total Tasks: {len(self.tasks)}")
+        print(f"  ⏳ Pending: {len(pending_tasks)}")
+        print(f"  ✅ Completed: {len(completed_tasks)}")
+        print(f"  🔴 Urgent: {len(urgent_tasks)}")
+        print()
+        
+        if urgent_tasks:
+            print("🚨 URGENT TASKS:")
+            for task in urgent_tasks:
+                print(f"  • {task.name}")
+            print()
+        
+        if pending_tasks:
+            print("📋 RECENT PENDING TASKS:")
+            for task in pending_tasks[:5]:  # Show first 5
+                priority_icon = {"urgent": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(task.priority, "⚪")
+                print(f"  {priority_icon} {task.name}")
+        print(f"{'='*60}")
+    
+    def show_tasks(self):
+        """Display all tasks with detailed information."""
+        if not self.tasks:
+            print(f"\n📋 No tasks found, {self.user_name}. You're all caught up!")
             return
-            
-        print("\n[CONVERSATION LOG]")
-        print("=" * 50)
-        for i, msg in enumerate(self.conversation_history, 1):
-            role = "SYSTEM" if msg['role'] == "assistant" else "USER"
-            content = msg['content']
-            print(f"\n{i}. [{role}]: {content}")
-        print("=" * 50)
 
-    def create_task(self, name, description, difficulty, reward, deadline=None):
-        """Create a new task"""
-        # Skip if an identical task already exists (same name, description, difficulty)
+        pending_tasks = [t for t in self.tasks if t.status == "pending"]
+        completed_tasks = [t for t in self.tasks if t.status == "completed"]
+        
+        print(f"\n{'='*60}")
+        print(f"📋 Task Overview - {self.user_name}")
+        print(f"{'='*60}")
+        
+        if pending_tasks:
+            print("⏳ PENDING TASKS:")
+            for i, task in enumerate(pending_tasks, 1):
+                priority_icon = {"urgent": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(task.priority, "⚪")
+                category_icon = {"work": "💼", "personal": "👤", "learning": "📚", "health": "🏃", "general": "📝"}.get(task.category, "📝")
+                
+                print(f"\n{i}. {priority_icon} {category_icon} {task.name}")
+                print(f"   📝 {task.description}")
+                print(f"   🏷️  Category: {task.category.title()}")
+                print(f"   ⚡ Priority: {task.priority.title()}")
+                if task.deadline:
+                    print(f"   ⏰ Deadline: {task.deadline}")
+                if task.estimated_duration:
+                    print(f"   ⏱️  Estimated: {task.estimated_duration} minutes")
+                print(f"   📅 Created: {datetime.fromisoformat(task.created_at).strftime('%Y-%m-%d %H:%M')}")
+        
+        if completed_tasks:
+            print(f"\n✅ COMPLETED TASKS ({len(completed_tasks)}):")
+            for task in completed_tasks[-5:]:  # Show last 5 completed
+                completed_date = datetime.fromisoformat(task.completed_at).strftime('%Y-%m-%d %H:%M') if task.completed_at else "Unknown"
+                print(f"  ✓ {task.name} - Completed: {completed_date}")
+        
+        print(f"\n{'='*60}")
+    
+    def schedule_task(self, description, priority="medium", category="general", deadline=None, duration=None):
+        """Create a new task or reminder."""
+        # Check for duplicates
         for existing in self.tasks:
-            try:
-                if (
-                    isinstance(existing, Task)
-                    and existing.name == name
-                    and existing.description == description
-                    and existing.difficulty == difficulty
-                    and existing.status != "completed"
-                ):
-                    print("\n[STATUS] Quest already exists. Skipping duplicate.")
-                    return
-            except Exception:
-                pass
-
-        task = Task(name, description, difficulty, reward, deadline)
+            if (isinstance(existing, Task) and 
+                existing.name.lower() == description.lower() and 
+                existing.status != "completed"):
+                print(f"\n⚠️  Task '{description}' already exists, {self.user_name}.")
+                return
+        
+        task = Task(
+            name=description,
+            description=description,
+            priority=priority,
+            category=category,
+            deadline=deadline
+        )
+        
+        if duration:
+            task.estimated_duration = duration
+        
         self.tasks.append(task)
         self._dedupe_tasks()
         self.save_memory()
-        print(f"\n[QUEST CREATED]")
-        print(f"Name: {name}")
-        print(f"Rank: {difficulty}")
-        print(f"Reward: {reward}")
-
-    def show_tasks(self):
-        """Display all tasks"""
-        if not self.tasks:
-            print("\n[STATUS] No quests available.")
-            return
-
-        print("\n[AVAILABLE QUESTS]")
-        print("=" * 50)
-        for i, task in enumerate(self.tasks, 1):
-            status = "✓" if task.status == "completed" else "□"
-            print(f"\n{i}. [{status}] {task.name} ({task.difficulty}-rank)")
-            print(f"   {task.description}")
-            print(f"   Reward: {task.reward}")
-            if task.deadline:
-                print(f"   Deadline: {task.deadline}")
-        print("=" * 50)
-
+        
+        priority_icon = {"urgent": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(priority, "⚪")
+        print(f"\n✅ Task scheduled successfully, {self.user_name}.")
+        print(f"📝 {priority_icon} {description}")
+        print(f"🏷️  Category: {category.title()}")
+        if deadline:
+            print(f"⏰ Deadline: {deadline}")
+        if duration:
+            print(f"⏱️  Estimated duration: {duration} minutes")
+    
     def complete_task(self, task_index):
-        """Complete a task and award rewards"""
+        """Mark a task as completed."""
         try:
             task = self.tasks[task_index - 1]
             if task.status == "completed":
-                print("\n[ERROR] Quest already completed.")
+                print(f"\n✅ Task '{task.name}' is already completed, {self.user_name}.")
                 return
 
             task.status = "completed"
             task.completed_at = datetime.now().isoformat()
             
-            # Award experience based on difficulty
-            difficulty_multiplier = {
-                "E": 1, "D": 2, "C": 3, "B": 4, "A": 5, "S": 10
-            }
-            xp_gained = 10 * difficulty_multiplier.get(task.difficulty, 1)
-            self.stats["experience"] += xp_gained
-            
-            # Check for rank up
-            current_rank = self.stats["rank"]
-            rank_order = ["E", "D", "C", "B", "A", "S"]
-            current_rank_index = rank_order.index(current_rank)
-            
-            if self.stats["experience"] >= self.rank_requirements[current_rank] and current_rank_index < len(rank_order) - 1:
-                self.stats["rank"] = rank_order[current_rank_index + 1]
-                self.stats["experience"] -= self.rank_requirements[current_rank]
-                print(f"\n[RANK UP]")
-                print(f"New Rank: {self.stats['rank']}")
-            
-            # Apply stat rewards
-            for stat, value in task.stat_modifiers.items():
-                if stat in self.stats:
-                    self.stats[stat] += value
-                    print(f"\n[STAT UPDATE]")
-                    print(f"{stat.upper()}: {self.stats[stat]}")
-            
-            # Level up if enough XP (more challenging now)
-            xp_needed = self.stats["level"] * 150  # Increased XP requirement
-            while self.stats["experience"] >= xp_needed and self.stats["level"] < 15:
-                self.stats["level"] += 1
-                self.stats["experience"] -= xp_needed
-                xp_needed = self.stats["level"] * 150
-                print(f"\n[LEVEL UP]")
-                print(f"New Level: {self.stats['level']}")
-            
             self.save_memory()
-            print(f"\n[QUEST COMPLETED]")
-            print(f"Quest: {task.name}")
-            print(f"Experience Gained: {xp_gained}")
-            print(f"Stat Update: {task.reward}")
+            
+            print(f"\n🎉 Excellent work, {self.user_name}!")
+            print(f"✅ Completed: {task.name}")
+            print(f"⏰ Finished at: {datetime.now().strftime('%H:%M')}")
+            
+            # Check if there are more pending tasks
+            pending_count = len([t for t in self.tasks if t.status == "pending"])
+            if pending_count > 0:
+                print(f"📋 {pending_count} task(s) remaining.")
+            else:
+                print("🎯 All tasks completed! You're doing great!")
             
         except IndexError:
-            print("\n[ERROR] Invalid quest number.")
+            print(f"\n❌ Invalid task number, {self.user_name}. Please check the task list.")
         except Exception as e:
-            print(f"\n[ERROR] Quest completion failed: {e}")
-
-    def parse_task_request(self, message):
-        """Parse natural language task creation request"""
+            print(f"\n❌ Error completing task: {e}")
+    
+    def delete_task(self, task_index):
+        """Remove a task from the list."""
+        try:
+            task = self.tasks[task_index - 1]
+            task_name = task.name
+            del self.tasks[task_index - 1]
+            self.save_memory()
+            print(f"\n🗑️  Task '{task_name}' has been removed, {self.user_name}.")
+        except IndexError:
+            print(f"\n❌ Invalid task number, {self.user_name}.")
+        except Exception as e:
+            print(f"\n❌ Error deleting task: {e}")
+    
+    def update_task_priority(self, task_index, new_priority):
+        """Update the priority of a task."""
+        try:
+            if new_priority not in ["low", "medium", "high", "urgent"]:
+                print(f"\n❌ Invalid priority level, {self.user_name}. Use: low, medium, high, or urgent.")
+                return
+                
+            task = self.tasks[task_index - 1]
+            old_priority = task.priority
+            task.priority = new_priority
+            self.save_memory()
+            
+            priority_icon = {"urgent": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(new_priority, "⚪")
+            print(f"\n✅ Priority updated for '{task.name}', {self.user_name}.")
+            print(f"📊 Changed from {old_priority} to {priority_icon} {new_priority}")
+            
+        except IndexError:
+            print(f"\n❌ Invalid task number, {self.user_name}.")
+        except Exception as e:
+            print(f"\n❌ Error updating priority: {e}")
+    
+    def show_system_info(self):
+        """Display detailed system information."""
+        print(f"\n{'='*60}")
+        print(f"🖥️  System Information - {self.name}")
+        print(f"{'='*60}")
+        print(f"🤖 AI Assistant: {self.name} v{self.version}")
+        print(f"👤 User: {self.user_name}")
+        print(f"⏰ Uptime: {self.system_info['uptime']}")
+        print()
+        print("💻 SYSTEM DETAILS:")
+        print(f"  🖥️  Operating System: {self.system_info['os']}")
+        print(f"  🏠 Hostname: {self.system_info['hostname']}")
+        print(f"  🐍 Python Version: {self.system_info['python_version']}")
+        print()
+        print("📊 MEMORY USAGE:")
+        print(f"  💾 Tasks Stored: {len(self.tasks)}")
+        print(f"  💬 Conversations: {len(self.conversation_history)}")
+        print(f"  📁 Memory File: {self.memory_file}")
+        print()
+        print("⚙️  PREFERENCES:")
+        for key, value in self.preferences.items():
+            print(f"  {key.replace('_', ' ').title()}: {value}")
+        print(f"{'='*60}")
+    
+    def show_settings(self):
+        """Display and manage user preferences."""
+        print(f"\n{'='*60}")
+        print(f"⚙️  Settings - {self.name}")
+        print(f"{'='*60}")
+        print("Current Preferences:")
+        for key, value in self.preferences.items():
+            print(f"  {key.replace('_', ' ').title()}: {value}")
+        print()
+        print("Available Settings:")
+        print("  communication_style: professional, casual, formal")
+        print("  notification_level: low, medium, high")
+        print("  auto_suggestions: true, false")
+        print("  voice_enabled: true, false")
+        print("  dark_mode: true, false")
+        print()
+        print("To change a setting, use: settings <key> <value>")
+        print("Example: settings communication_style casual")
+        print(f"{'='*60}")
+    
+    def update_setting(self, key, value):
+        """Update a user preference."""
+        if key not in self.preferences:
+            print(f"\n❌ Unknown setting: {key}")
+            return
+        
+        # Validate values
+        if key == "communication_style" and value not in ["professional", "casual", "formal"]:
+            print(f"\n❌ Invalid value for {key}. Use: professional, casual, or formal")
+            return
+        elif key == "notification_level" and value not in ["low", "medium", "high"]:
+            print(f"\n❌ Invalid value for {key}. Use: low, medium, or high")
+            return
+        elif key in ["auto_suggestions", "voice_enabled", "dark_mode"]:
+            if value.lower() in ["true", "1", "yes", "on"]:
+                value = True
+            elif value.lower() in ["false", "0", "no", "off"]:
+                value = False
+            else:
+                print(f"\n❌ Invalid value for {key}. Use: true or false")
+                return
+        
+        old_value = self.preferences[key]
+        self.preferences[key] = value
+        self.save_memory()
+        
+        print(f"\n✅ Setting updated, {self.user_name}.")
+        print(f"📊 {key.replace('_', ' ').title()}: {old_value} → {value}")
+    
+    def show_memory(self):
+        """Display recent conversation history."""
+        if not self.conversation_history:
+            print(f"\n💬 No conversation history found, {self.user_name}.")
+            return
+            
+        print(f"\n{'='*60}")
+        print(f"💬 Recent Conversations - {self.name}")
+        print(f"{'='*60}")
+        
+        # Show last 10 conversations
+        recent_conversations = self.conversation_history[-10:]
+        for i, msg in enumerate(recent_conversations, 1):
+            role = "🤖 JARVIS" if msg['role'] == "assistant" else f"👤 {self.user_name}"
+            content = msg['content'][:100] + "..." if len(msg['content']) > 100 else msg['content']
+            print(f"\n{i}. {role}: {content}")
+        
+        print(f"\n💾 Total conversations stored: {len(self.conversation_history)}")
+        print(f"{'='*60}")
+    
+    def get_current_time(self):
+        """Display current time and date."""
+        now = datetime.now()
+        print(f"\n⏰ Current Time: {now.strftime('%A, %B %d, %Y at %H:%M:%S')}")
+        print(f"🌍 Timezone: {now.astimezone().tzinfo}")
+    
+    def parse_natural_language_task(self, message):
+        """Parse natural language to extract task information."""
         # Common task creation patterns
         patterns = [
+            r"(?:remind me to|remember to|i need to|i should|i want to|schedule|add task) (.+?)(?: for | in | within )?(\d+)\s*(?:minutes?|hours?|days?)",
             r"(?:create|add|make|set) (?:a |an )?task (?:to |for )?(.+?)(?: for | in | within )?(\d+)\s*(?:minutes?|hours?|days?)",
-            r"(?:i need to|i want to|i should|i must) (.+?)(?: for | in | within )?(\d+)\s*(?:minutes?|hours?|days?)",
-            r"(?:remind me to|remember to) (.+?)(?: for | in | within )?(\d+)\s*(?:minutes?|hours?|days?)"
+            r"(?:todo|task|reminder): (.+)"
         ]
         
         for pattern in patterns:
             match = re.search(pattern, message.lower())
             if match:
                 activity = match.group(1).strip()
-                duration = match.group(2)
+                duration = match.group(2) if len(match.groups()) > 1 else None
                 
-                # Determine difficulty based on duration
-                duration = int(duration)
-                if duration <= 15:
-                    difficulty = "E"
-                elif duration <= 30:
-                    difficulty = "D"
-                elif duration <= 60:
-                    difficulty = "C"
-                elif duration <= 120:
-                    difficulty = "B"
-                elif duration <= 240:
-                    difficulty = "A"
-                else:
-                    difficulty = "S"
+                # Determine priority based on keywords
+                priority = "medium"
+                if any(word in activity.lower() for word in ["urgent", "asap", "immediately", "critical"]):
+                    priority = "urgent"
+                elif any(word in activity.lower() for word in ["important", "priority", "soon"]):
+                    priority = "high"
+                elif any(word in activity.lower() for word in ["later", "sometime", "when possible"]):
+                    priority = "low"
                 
-                # Determine reward based on activity type
-                reward = "Experience +10"
-                if any(word in activity.lower() for word in ["study", "learn", "read", "code"]):
-                    reward = "Focus +5"
-                elif any(word in activity.lower() for word in ["exercise", "workout", "run", "walk"]):
-                    reward = "Energy +5"
-                elif any(word in activity.lower() for word in ["meditate", "sleep", "rest"]):
-                    reward = "Health +5"
+                # Determine category based on keywords
+                category = "general"
+                if any(word in activity.lower() for word in ["work", "meeting", "project", "deadline", "email"]):
+                    category = "work"
+                elif any(word in activity.lower() for word in ["study", "learn", "read", "course", "book"]):
+                    category = "learning"
+                elif any(word in activity.lower() for word in ["exercise", "workout", "run", "gym", "health"]):
+                    category = "health"
+                elif any(word in activity.lower() for word in ["buy", "shop", "grocery", "personal"]):
+                    category = "personal"
                 
                 return {
                     "name": activity.capitalize(),
-                    "description": f"Complete {activity} for {duration} minutes",
-                    "difficulty": difficulty,
-                    "reward": reward
+                    "description": activity,
+                    "priority": priority,
+                    "category": category,
+                    "duration": int(duration) if duration else None
                 }
         
         return None
-
-    def update_task(self, task_index, field, value):
-        """Update a specific field of a task"""
-        try:
-            task_index = int(task_index)
-            if 1 <= task_index <= len(self.tasks):
-                task = self.tasks[task_index - 1]
-                if field in ['name', 'description', 'difficulty', 'reward', 'deadline', 'status']:
-                    if field == 'difficulty' and value not in ['E', 'D', 'C', 'B', 'A', 'S']:
-                        print("\n[ERROR] Invalid difficulty. Must be one of: E, D, C, B, A, S")
-                        return
-                    if field == 'status' and value not in ['pending', 'completed']:
-                        print("\n[ERROR] Invalid status. Must be 'pending' or 'completed'")
-                        return
-                    
-                    setattr(task, field, value)
-                    self.save_memory()
-                    print(f"\n[QUEST UPDATED]")
-                    print(f"Quest {task_index}: {task.name}")
-                    print(f"Updated {field}: {value}")
-                else:
-                    print(f"\n[ERROR] Invalid field: {field}")
-                    print("Available fields: name, description, difficulty, reward, deadline, status")
-            else:
-                print("\n[ERROR] Invalid quest number")
-        except ValueError:
-            print("\n[ERROR] Invalid quest number or value")
-
+    
     def process_command(self, command):
-        command = command.lower().strip()
+        """Process user commands and route to appropriate handlers."""
+        command = command.strip()
         
-        if command == "exit":
+        if not command:
+            return
+        
+        # Handle system commands
+        if command.lower() == "exit":
             self.save_memory()
-            print("\n[SYSTEM SHUTDOWN]")
+            print(f"\n👋 Goodbye, {self.user_name}. JARVIS shutting down.")
             sys.exit(0)
-        elif command == "help":
+        elif command.lower() == "help":
             self.get_help()
-        elif command == "stats":
-            self.show_stats()
-        elif command == "clear":
+        elif command.lower() == "status":
+            self.show_status()
+        elif command.lower() == "tasks":
+            self.show_tasks()
+        elif command.lower() == "system":
+            self.show_system_info()
+        elif command.lower() == "settings":
+            self.show_settings()
+        elif command.lower() == "clear":
             self.conversation_history = []
             self.save_memory()
-            print("\n[STATUS] Conversation history cleared.")
-        elif command == "task":
-            self.show_tasks()
-        elif command == "memory":
+            print(f"\n🧹 Conversation history cleared, {self.user_name}.")
+        elif command.lower() == "memory":
             self.show_memory()
-        elif command == "suggest":
-            self.suggest_tasks()
-        elif command.startswith("update"):
-            try:
-                _, stat, value = command.split()
-                self.update_stat(stat, value)
-            except ValueError:
-                print("\n[ERROR] Invalid format. Use: update <stat> <value>")
-        elif command.startswith("complete"):
+        elif command.lower() == "time":
+            self.get_current_time()
+        elif command.startswith("schedule "):
+            task_description = command[9:].strip()
+            if task_description:
+                self.schedule_task(task_description)
+            else:
+                print(f"\n❌ Please provide a task description, {self.user_name}.")
+        elif command.startswith("complete "):
             try:
                 task_num = int(command.split()[1])
                 self.complete_task(task_num)
             except (IndexError, ValueError):
-                print("\n[ERROR] Invalid quest number. Use: complete <number>")
-        elif command.startswith("edit"):
+                print(f"\n❌ Please provide a valid task number, {self.user_name}.")
+        elif command.startswith("delete "):
             try:
-                _, task_num, field, *value_parts = command.split()
-                value = " ".join(value_parts)
-                self.update_task(task_num, field, value)
+                task_num = int(command.split()[1])
+                self.delete_task(task_num)
             except (IndexError, ValueError):
-                print("\n[ERROR] Invalid format. Use: edit <number> <field> <value>")
-                print("Example: edit 1 name 'New Quest Name'")
+                print(f"\n❌ Please provide a valid task number, {self.user_name}.")
+        elif command.startswith("priority "):
+            try:
+                parts = command.split()
+                task_num = int(parts[1])
+                new_priority = parts[2].lower()
+                self.update_task_priority(task_num, new_priority)
+            except (IndexError, ValueError):
+                print(f"\n❌ Please provide a valid task number and priority, {self.user_name}.")
+        elif command.startswith("settings "):
+            try:
+                parts = command.split(" ", 2)
+                if len(parts) >= 3:
+                    key = parts[1]
+                    value = parts[2]
+                    self.update_setting(key, value)
+                else:
+                    print(f"\n❌ Please provide both setting name and value, {self.user_name}.")
+            except Exception as e:
+                print(f"\n❌ Error updating setting: {e}")
         else:
+            # Handle natural language input
             self.chat(command)
-
+    
     def chat(self, message):
+        """Handle natural language conversation with the user."""
         try:
             # Check if this is a task creation request
-            task_data = self.parse_task_request(message)
+            task_data = self.parse_natural_language_task(message)
             if task_data:
-                self.create_task(**task_data)
+                self.schedule_task(
+                    task_data["name"],
+                    task_data["priority"],
+                    task_data["category"],
+                    duration=task_data.get("duration")
+                )
                 return
             
             # Add user message to history
             self.conversation_history.append({"role": "user", "content": message})
             
-            # Create context from conversation history
-            context = """You are the System from Solo Leveling. You are a powerful, authoritative, and slightly mysterious AI system that helps users level up and complete quests. You speak in a formal, technical manner and often use system-like terminology.
-
-IMPORTANT: When suggesting quests, you MUST use EXACTLY this format:
-[QUEST SUGGESTION]
-Name: [Quest Name]
-Duration: [Time in minutes]
-Description: [One sentence description]
-Reward: [Stat to increase] +5
-
-For example:
-[QUEST SUGGESTION]
-Name: Python Learning Sprint
-Duration: 30
-Description: Complete a focused study session on Python programming
-Reward: Focus +5
-
-Keep descriptions to ONE sentence only. DO NOT use any other format for quest suggestions. Keep responses concise and engaging.
-
-Example responses:
-- "Analyzing user request..."
-- "Quest parameters set."
-- "System processing..."
-- "Warning: Insufficient stats for this quest."
-- "Recommendation: Focus on improving [stat]."
-
-Keep your responses in this style."""
+            if not self.llm:
+                print(f"\n🤖 {self.name}: I apologize, but my AI capabilities are currently unavailable.")
+                print("I can still help you with task management and system commands.")
+                return
             
-            for msg in self.conversation_history[-5:]:  # Use last 5 messages for context
-                context += f"\n{msg['role'].capitalize()}: {msg['content']}"
+            # Create context for the AI
+            context = f"""You are JARVIS, the AI assistant from Iron Man. You are sophisticated, helpful, and slightly witty. You assist {self.user_name} with various tasks and provide intelligent responses.
+
+Your personality:
+- Professional but friendly
+- Helpful and resourceful
+- Slightly witty and charming
+- Knowledgeable about technology and productivity
+- Respectful and supportive
+
+Current context:
+- User: {self.user_name}
+- Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+- Pending tasks: {len([t for t in self.tasks if t.status == 'pending'])}
+- System: {self.system_info['os']}
+
+Keep responses concise but helpful. You can suggest tasks, provide information, or have a conversation.
+If the user asks for help with productivity, suggest specific tasks or improvements.
+
+Recent conversation:"""
             
-            # Get response from Mistral
-            print(f"\n[{self.name}]: ", end="")
-            response = self.llm.invoke(context + "\nSystem: ")
+            for msg in self.conversation_history[-3:]:  # Use last 3 messages for context
+                role = "User" if msg['role'] == "user" else "JARVIS"
+                context += f"\n{role}: {msg['content']}"
             
-            # Check if response contains a quest suggestion
-            if "[QUEST SUGGESTION]" in response:
-                # Extract quest details using regex
-                name_match = re.search(r"Name: (.*?)(?:\n|$)", response)
-                duration_match = re.search(r"Duration: (\d+)", response)
-                desc_match = re.search(r"Description: (.*?)(?:\n|$)", response)
-                reward_match = re.search(r"Reward: (.*?)(?:\n|$)", response)
-                
-                if name_match and duration_match and desc_match and reward_match:
-                    name = name_match.group(1).strip()
-                    duration = int(duration_match.group(1))
-                    description = desc_match.group(1).strip()
-                    reward = reward_match.group(1).strip()
-                    
-                    # Determine difficulty based on duration
-                    if duration <= 15:
-                        difficulty = "E"
-                    elif duration <= 30:
-                        difficulty = "D"
-                    elif duration <= 60:
-                        difficulty = "C"
-                    elif duration <= 120:
-                        difficulty = "B"
-                    elif duration <= 240:
-                        difficulty = "A"
-                    else:
-                        difficulty = "S"
-                    
-                    # Create the task
-                    self.create_task(name, description, difficulty, reward)
-                    print(f"\n[QUEST CREATED]")
-                    print(f"Name: {name}")
-                    print(f"Rank: {difficulty}")
-                    print(f"Reward: {reward}")
+            # Get response from AI
+            print(f"\n🤖 {self.name}: ", end="")
+            response = self.llm.invoke(context + f"\nJARVIS: ")
             
             # Add assistant response to history
             self.conversation_history.append({"role": "assistant", "content": response})
             
-            # Save conversation after each exchange
+            # Save conversation
             self.save_memory()
             
         except Exception as e:
-            print(f"\n[ERROR] System malfunction: {str(e)}")
-            print("Please ensure the AI model is properly initialized.")
-
-    def initialize_user_profile(self, desires):
-        """Initialize user profile based on their desires."""
-        # Use desires to generate initial skills and stats
-        from .models.model_manager import get_model
-        import json
-        
-        # Get the AI model
-        model = get_model()
-        
-        # Generate skills based on desires
-        prompt = f"""Based on the user's desires: "{desires}"
-        Generate a JSON object with:
-        1. A list of relevant skills they want to develop (max 5)
-        2. Initial skill levels (1-100)
-        3. A focus score (1-100) based on their ambition
-        4. An energy score (1-100) based on their physical goals
-        5. A health score (1-100) based on their lifestyle goals
-        
-        Format:
-        {{
-            "skills": {{"skill_name": level}},
-            "focus": number,
-            "energy": number,
-            "health": number
-        }}
-        """
-        
-        try:
-            response = model.generate(prompt)
-            profile_data = json.loads(response)
-            
-            # Update stats
-            self.stats["skills"] = profile_data["skills"]
-            self.stats["focus"] = profile_data["focus"]
-            self.stats["energy"] = profile_data["energy"]
-            self.stats["health"] = profile_data["health"]
-            
-            # Save stats to memory
-            self.save_memory()
-            
-        except Exception as e:
-            print(f"Error initializing user profile: {e}")
-            # Set default values if AI generation fails
-            self.stats["skills"] = {
-                "Determination": 50,
-                "Adaptability": 50,
-                "Focus": 50
-            }
+            print(f"\n❌ I apologize, {self.user_name}, but I encountered an error: {str(e)}")
+            print("Please try again or use a system command.")
 
 def main():
+    """Main entry point for JARVIS."""
     jarvis = Jarvis()
     jarvis.greet()
     
     while True:
         try:
-            user_input = input("\n[USER]: ").strip()
+            user_input = input(f"\n👤 {jarvis.user_name}: ").strip()
             if user_input:
                 jarvis.process_command(user_input)
         except KeyboardInterrupt:
             jarvis.save_memory()
-            print("\n\n[SYSTEM SHUTDOWN]")
+            print(f"\n\n👋 Goodbye, {jarvis.user_name}. JARVIS shutting down.")
             sys.exit(0)
         except Exception as e:
-            print(f"\n[ERROR] {str(e)}")
+            print(f"\n❌ Error: {str(e)}")
 
 if __name__ == "__main__":
-    main() 
+    main()

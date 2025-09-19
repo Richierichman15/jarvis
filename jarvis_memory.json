@@ -210,6 +210,68 @@
             "created_at": "2025-09-12T16:04:04.672015",
             "role": "user",
             "desires": "be great"
+        },
+        "Tony": {
+            "preferences": {
+                "communication_style": "casual",
+                "notification_level": "medium",
+                "auto_suggestions": true,
+                "voice_enabled": false,
+                "dark_mode": false
+            },
+            "tasks": [
+                {
+                    "name": "Review quarterly reports",
+                    "description": "Review quarterly reports",
+                    "priority": "high",
+                    "category": "work",
+                    "deadline": null,
+                    "status": "completed",
+                    "created_at": "2025-09-19T08:47:52.442695",
+                    "completed_at": "2025-09-19T08:47:52.469466",
+                    "estimated_duration": 60
+                },
+                {
+                    "name": "Call Pepper",
+                    "description": "Call Pepper",
+                    "priority": "medium",
+                    "category": "personal",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-19T08:47:52.444789",
+                    "completed_at": null,
+                    "estimated_duration": 15
+                },
+                {
+                    "name": "Update arc reactor design",
+                    "description": "Update arc reactor design",
+                    "priority": "urgent",
+                    "category": "work",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-19T08:47:52.456140",
+                    "completed_at": null,
+                    "estimated_duration": 120
+                },
+                {
+                    "name": "Check the lab equipment",
+                    "description": "Check the lab equipment",
+                    "priority": "medium",
+                    "category": "general",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-19T08:47:52.486879",
+                    "completed_at": null,
+                    "estimated_duration": 2
+                }
+            ],
+            "conversation_history": [
+                {
+                    "role": "user",
+                    "content": "I need to schedule a meeting with the board for tomorrow"
+                }
+            ],
+            "last_updated": "2025-09-19T08:47:52.512484"
         }
     },
     "conversation_history": []
