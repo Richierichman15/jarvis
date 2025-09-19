@@ -1,25 +1,18 @@
 """
 Web interface for Jarvis.
 This module provides a simple web-based interface for interacting with Jarvis.
+System functionality has been removed - this is now a clean AI assistant interface.
 """
 import os
-import re
-import sys
 import json
 import logging
-import hashlib
 from typing import Dict, Any, List, Optional
-from pathlib import Path
 from datetime import datetime
 
-from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
-import pygments
-from pygments import lexers, formatters
-from pygments.util import ClassNotFound
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
 from .jarvis import Jarvis
-from .tools.code_editor import CodeEditorTool
 
 # Load environment variables
 load_dotenv()
@@ -28,139 +21,140 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "templates"))
-app.secret_key = os.urandom(24)  # Required for session management
+# Initialize Flask app (no templates)
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
 # Initialize Jarvis
 jarvis_instance = None
-code_editor = CodeEditorTool()
 
-# Get admin credentials from environment variables
-ADMIN_USERNAME = os.getenv('ADMIN', 'buck')
-ADMIN_PASSWORD = os.getenv('ADMINPASSWORD', 'nasty')
-
-# User data file paths
-USERS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'users.json')
-SESSIONS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'sessions.json')
-
-def load_users():
-    """Load users from JSON file."""
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_users(users):
-    """Save users to JSON file."""
-    os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
-
-def hash_password(password):
-    """Hash password using SHA-256."""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def is_authenticated():
-    """Check if user is authenticated."""
-    return 'username' in session
-
-def require_auth(f):
-    """Decorator to require authentication."""
-    def decorated(*args, **kwargs):
-        if not is_authenticated():
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    decorated.__name__ = f.__name__
-    return decorated
+def get_jarvis(username: str = "default") -> Jarvis:
+    """Get or create Jarvis instance for user."""
+    global jarvis_instance
+    if jarvis_instance is None:
+        jarvis_instance = Jarvis()
+    return jarvis_instance
 
 @app.route('/')
 def index():
-    """Render the index page."""
-    if is_authenticated():
-        return redirect(url_for('start_menu'))
-    return redirect(url_for('login'))
+    """Simple API endpoint to check if Jarvis is running."""
+    return jsonify({
+        "status": "Jarvis is running",
+        "message": "Welcome to Jarvis AI Assistant",
+        "timestamp": datetime.now().isoformat()
+    })
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """Handle user login."""
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Chat endpoint for interacting with Jarvis."""
+    try:
+        data = request.get_json()
+        user_input = data.get('message', '')
+        username = data.get('username', 'default')
         
-        # Check admin credentials
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session['username'] = username
-            session['role'] = 'admin'
-            
-            # Check if user exists in users.json
-            users = load_users()
-            if username not in users:
-                # First time login, redirect to welcome page
-                return redirect(url_for('welcome'))
-            return redirect(url_for('start_menu'))
-            
-        # Check regular user credentials
-        users = load_users()
-        if username in users and users[username]['password_hash'] == hash_password(password):
-            session['username'] = username
-            session['role'] = users[username].get('role', 'user')
-            return redirect(url_for('start_menu'))
-            
-        return render_template('login.html', error='Invalid credentials')
+        if not user_input:
+            return jsonify({"error": "No message provided"}), 400
         
-    return render_template('login.html')
+        # Get Jarvis instance
+        jarvis = get_jarvis(username)
+        
+        # Get response from Jarvis
+        response = jarvis.chat(user_input)
+        
+        return jsonify({
+            "response": response,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/welcome')
-@require_auth
-def welcome():
-    """Show welcome page with three questions."""
-    return render_template('welcome.html')
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """Get Jarvis stats."""
+    try:
+        username = request.args.get('username', 'default')
+        jarvis = get_jarvis(username)
+        
+        return jsonify({
+            "stats": jarvis.stats,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/api/save-desires', methods=['POST'])
-@require_auth
-def save_desires():
-    """Save user's desires and generate initial stats."""
-    data = request.json
-    desires = data.get('desires')
-    
-    if not desires:
-        return jsonify({'success': False, 'error': 'No desires provided'})
-    
-    # Save desires to user data
-    users = load_users()
-    username = session['username']
-    
-    if username not in users:
-        users[username] = {
-            'password_hash': hash_password(ADMIN_PASSWORD) if username == ADMIN_USERNAME else None,
-            'role': session.get('role', 'user'),
-            'created_at': datetime.utcnow().isoformat(),
-            'desires': desires
-        }
-    else:
-        users[username]['desires'] = desires
-    
-    save_users(users)
-    
-    # Initialize Jarvis instance with user's desires
-    jarvis = get_jarvis(username)
-    jarvis.initialize_user_profile(desires)
-    
-    return jsonify({'success': True})
+@app.route('/api/tasks', methods=['GET'])
+def get_tasks():
+    """Get current tasks."""
+    try:
+        username = request.args.get('username', 'default')
+        jarvis = get_jarvis(username)
+        
+        tasks = [task.to_dict() if hasattr(task, 'to_dict') else task for task in jarvis.tasks]
+        return jsonify({
+            "tasks": tasks,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting tasks: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/start-menu')
-@require_auth
-def start_menu():
-    """Show the start menu."""
-    return render_template('start_menu.html', 
-                         stats=get_jarvis(session['username']).stats,
-                         categories=DASHBOARD_CATEGORIES)
+@app.route('/api/tasks', methods=['POST'])
+def add_task():
+    """Add a new task."""
+    try:
+        data = request.get_json()
+        username = data.get('username', 'default')
+        
+        # Create task using Jarvis
+        task_name = data.get('name', '')
+        task_description = data.get('description', '')
+        task_difficulty = data.get('difficulty', 'E')
+        task_reward = data.get('reward', 10)
+        
+        if not task_name:
+            return jsonify({"error": "Task name is required"}), 400
+        
+        # Get Jarvis instance and add task
+        jarvis = get_jarvis(username)
+        jarvis.add_task(task_name, task_description, task_difficulty, task_reward)
+        
+        return jsonify({
+            "message": "Task added successfully",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding task: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/logout')
-def logout():
-    """Handle user logout."""
-    session.clear()
-    return redirect(url_for('login'))
+@app.route('/api/tasks/<int:task_id>/complete', methods=['POST'])
+def complete_task(task_id):
+    """Complete a task."""
+    try:
+        data = request.get_json() or {}
+        username = data.get('username', 'default')
+        jarvis = get_jarvis(username)
+        
+        if task_id < 1 or task_id > len(jarvis.tasks):
+            return jsonify({"error": "Invalid task ID"}), 400
+        
+        # Complete the task
+        result = jarvis.complete_task(task_id)
+        
+        return jsonify({
+            "message": "Task completed successfully",
+            "result": result,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error completing task: {e}")
+        return jsonify({"error": str(e)}), 500
 
-# ... rest of your existing routes ... 
+if __name__ == '__main__':
+    print("Starting Jarvis Web Interface")
+    print("System functionality has been removed - Jarvis is now a clean AI assistant")
+    app.run(host='127.0.0.1', port=5000, debug=True)
