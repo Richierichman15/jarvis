@@ -37,7 +37,7 @@ system_style = Style(color="yellow", italic=True)
 code_style = Style(color="cyan")
 
 # Export all commands
-__all__ = ['chat', 'query', 'code', 'research', 'weather', 'dual_chat', 'dual_query']
+__all__ = ['chat', 'query', 'code', 'research', 'weather', 'mcp_server', 'mcp_http_server', 'dual_chat', 'dual_query']
 
 
 def display_startup_message():
@@ -388,6 +388,65 @@ def weather(
     
     except Exception as e:
         console.print(f"[bold red]Error retrieving weather data: {str(e)}[/bold red]")
+
+
+@app.command()
+def mcp_server(
+    name: str = typer.Option("Boss", help="How Jarvis should address you")
+):
+    """Start the MCP (Model Context Protocol) server for Jarvis."""
+    try:
+        from .mcp_server import create_mcp_server
+        import asyncio
+        
+        display_startup_message()
+        console.print(Panel.fit("MCP Server Mode", title="JARVIS"))
+        
+        console.print(f"JARVIS: ", style=assistant_style, end="")
+        console.print(f"Starting MCP server for {name}...")
+        console.print("The server will expose Jarvis functionality as MCP tools.")
+        console.print("Press Ctrl+C to stop the server.")
+        
+        # Create and run the MCP server
+        server = create_mcp_server(name)
+        asyncio.run(server.run())
+        
+    except ImportError:
+        console.print("[bold red]Error: MCP library not available.[/bold red]")
+        console.print("Install it with: pip install mcp")
+        return 1
+    except Exception as e:
+        console.print(f"[bold red]Error starting MCP server: {str(e)}[/bold red]")
+        return 1
+
+
+@app.command()
+def mcp_http_server(
+    name: str = typer.Option("Boss", help="How Jarvis should address you"),
+    host: str = typer.Option("0.0.0.0", help="Host to bind to (0.0.0.0 for external access)"),
+    port: int = typer.Option(3010, help="Port to bind to")
+):
+    """Start the HTTP MCP server for Jarvis on localhost:3010."""
+    try:
+        from .mcp_http_server import create_http_mcp_server
+        import asyncio
+        
+        display_startup_message()
+        console.print(Panel.fit("HTTP MCP Server Mode", title="JARVIS"))
+        
+        console.print(f"JARVIS: ", style=assistant_style, end="")
+        console.print(f"Starting HTTP MCP server for {name}...")
+        console.print(f"Server will run on: http://{host}:{port}")
+        console.print("The server will expose Jarvis functionality as HTTP endpoints.")
+        console.print("Press Ctrl+C to stop the server.")
+        
+        # Create and run the HTTP MCP server
+        server = create_http_mcp_server(name, host, port)
+        asyncio.run(server.run())
+        
+    except Exception as e:
+        console.print(f"[bold red]Error starting HTTP MCP server: {str(e)}[/bold red]")
+        return 1
 
 
 # @app.command()

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "jarvis": {
+      "command": "python",
+      "args": ["run_mcp_server.py", "Boss"],
+      "env": {
+        "OPENAI_API_KEY": "",
+        "CLAUDE_API_KEY": "",
+        "OPENWEATHER_API_KEY": ""
+      }
+    }
+  }
+}

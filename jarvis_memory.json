@@ -76,7 +76,7 @@
             "stats": {
                 "level": 1,
                 "rank": "D",
-                "experience": 20,
+                "experience": 30,
                 "health": 75,
                 "energy": 70,
                 "focus": 85,
@@ -176,9 +176,9 @@
                         "XP": 10
                     },
                     "deadline": "2025-06-13T13:15:02.888009",
-                    "status": "pending",
+                    "status": "completed",
                     "created_at": "2025-06-12T13:15:02.888015",
-                    "completed_at": null
+                    "completed_at": "2025-09-16T20:04:26.391595"
                 },
                 {
                     "name": "Beginner's Budgeting Challenge",
@@ -272,6 +272,68 @@
                 }
             ],
             "last_updated": "2025-09-19T08:47:52.512484"
+        },
+        "TestUser": {
+            "preferences": {
+                "communication_style": "professional",
+                "notification_level": "medium",
+                "auto_suggestions": true,
+                "voice_enabled": false,
+                "dark_mode": false
+            },
+            "tasks": [
+                {
+                    "name": "Test task from MCP server test",
+                    "description": "Test task from MCP server test",
+                    "priority": "medium",
+                    "category": "general",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-22T14:43:29.089962",
+                    "completed_at": null,
+                    "estimated_duration": null
+                },
+                {
+                    "name": "Test task from HTTP API",
+                    "description": "Test task from HTTP API",
+                    "priority": "medium",
+                    "category": "general",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-22T14:50:18.345644",
+                    "completed_at": null,
+                    "estimated_duration": null
+                },
+                {
+                    "name": "Test task from MCP client",
+                    "description": "Test task from MCP client",
+                    "priority": "medium",
+                    "category": "general",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-22T15:04:51.004749",
+                    "completed_at": null,
+                    "estimated_duration": null
+                },
+                {
+                    "name": "Enhance Jarvis with Iron Man-style capabilities",
+                    "description": "Enhance Jarvis with Iron Man-style capabilities",
+                    "priority": "high",
+                    "category": "work",
+                    "deadline": null,
+                    "status": "pending",
+                    "created_at": "2025-09-22T16:03:13.380480",
+                    "completed_at": null,
+                    "estimated_duration": 120
+                }
+            ],
+            "conversation_history": [
+                {
+                    "role": "user",
+                    "content": "Hello Jarvis! This is a test message."
+                }
+            ],
+            "last_updated": "2025-09-22T16:03:13.387403"
         }
     },
     "conversation_history": []

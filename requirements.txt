@@ -47,3 +47,6 @@ typing-extensions==4.8.0
 schedule==1.2.0
 firebase-admin==6.2.0
 cryptography==42.0.2
+
+# MCP (Model Context Protocol)
+mcp>=1.0.0
