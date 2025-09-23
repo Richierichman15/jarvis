@@ -12,6 +12,7 @@ import re
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from tabulate import tabulate
 
 from colorama import init, Fore, Style
 from prompt_toolkit import prompt
@@ -431,6 +432,33 @@ class JarvisClient:
         """Display tool result in a formatted way."""
         print(f"\n{Fore.GREEN}Result:{Style.RESET_ALL}")
         
+        # Try to pretty-print orchestrator results
+        try:
+            text_view = self._extract_text(result)
+            import json as _json
+            data = _json.loads(text_view)
+            if isinstance(data, dict) and isinstance(data.get("results"), list):
+                rows = []
+                for entry in data["results"]:
+                    tool = entry.get("tool")
+                    ok = entry.get("ok")
+                    if ok:
+                        preview_src = str(entry.get("data", ""))
+                    else:
+                        preview_src = "ERR: " + str(entry.get("error", ""))
+                    preview = preview_src.replace("\n", " ")
+                    if len(preview) > 96:
+                        preview = preview[:93] + "..."
+                    rows.append([tool, "✅" if ok else "❌", preview])
+                print(tabulate(rows, headers=["Tool", "OK", "Preview"], tablefmt="github"))
+                # Also keep the raw JSON compact for copy/paste if needed
+                print("\nRaw:")
+                print(text_view)
+                print()
+                return
+        except Exception:
+            pass
+
         # String-like response
         if isinstance(result, str):
             print(result)

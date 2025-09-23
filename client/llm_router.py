@@ -24,7 +24,7 @@ except Exception:
     BRAIN_AVAILABLE = False
 
 
-def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None) -> Tuple[Optional[str], Optional[Dict]]:
+def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None, allow_multi: bool = True) -> Tuple[Optional[str], Optional[Dict]]:
     """Route a free-text query to a tool name and args.
 
     Returns (tool_name, args) on match. Falls back to ("jarvis_chat", {"message": query}).
@@ -35,9 +35,66 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None) -
 
     ql = q.lower()
 
+    # Multi-intent detection FIRST so it doesn't get short-circuited by single-intent heuristics
+    multi_intent = bool(re.search(r"\b(and|then|;|,\s*then)\b", ql))
+    if allow_multi and multi_intent and tools and "orchestrator.run_plan" in tools:
+        # Build a concise tool catalog for the LLM
+        tool_specs: List[Dict[str, Any]] = []
+        if tools:
+            for name, t in tools.items():
+                schema = getattr(t, 'inputSchema', None)
+                if schema is not None and not isinstance(schema, dict):
+                    schema = {
+                        "properties": getattr(schema, 'properties', None) or {},
+                        "required": getattr(schema, 'required', None) or [],
+                    }
+                tool_specs.append({
+                    "name": name,
+                    "description": getattr(t, 'description', '') or '',
+                    "inputSchema": schema or {},
+                })
+        # Try LLM plan only if brain LLM is available; otherwise skip to heuristics
+        if BRAIN_AVAILABLE:
+            system = (
+                "You create execution plans for an MCP client. "
+                "Return ONLY JSON of the form {\"steps\": [{\"tool\": <name>, \"args\": {...}, \"parallel\": <bool>?}, ...]}. "
+                "Use only tools from the list provided. Prefer minimal, valid args per schema. "
+                "Include parallel=true when independent steps can run together."
+            )
+            user = json.dumps({"tools": tool_specs, "query": query})
+            try:
+                raw = llm_generate(system, user)
+                payload = _extract_json_object(raw)
+                if isinstance(payload, dict) and isinstance(payload.get("steps"), list):
+                    return "orchestrator.run_plan", {"steps": payload["steps"]}
+            except Exception:
+                pass
+        # Heuristic split into steps (works even without LLM)
+        try:
+            parts = re.split(r"\s*(?:;|,?\s*then\s+|\s+and\s+)\s*", q.strip(), flags=re.IGNORECASE)
+        except Exception:
+            parts = []
+        step_list: List[Dict[str, Any]] = []
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            t, a = route_natural_language(part, tools, allow_multi=False)
+            if not t:
+                continue
+            step_list.append({"tool": t, "args": a or {}})
+        # Prefer concrete tool steps, but fall back if necessary
+        concrete = [s for s in step_list if s["tool"] != "jarvis_chat"]
+        steps_out = concrete if concrete else step_list
+        if len(steps_out) >= 2:
+            return "orchestrator.run_plan", {"steps": steps_out}
+
     # Simple deterministic routes as a first pass (fast and reliable)
     # Tasks: list
-    if "list tasks" in ql or ql.startswith("get tasks") or ql in {"tasks", "show tasks"}:
+    if (
+        "list tasks" in ql or ql.startswith("get tasks") or ql in {"tasks", "show tasks"}
+        or "list task" in ql or ql.startswith("get task")
+    ):
         return "jarvis_get_tasks", {"status": "all"}
     m = re.search(r"complete\s+task\s+(\d+)", ql)
     if m:
@@ -116,10 +173,6 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None) -
         if tools is None or "jarvis_get_memory" in tools:
             return "jarvis_get_memory", {"limit": limit}
 
-    # If the in-repo LLM is not available, default to chat
-    if not BRAIN_AVAILABLE:
-        return "jarvis_chat", {"message": query}
-
     # Build a concise tool catalog for the LLM
     tool_specs: List[Dict[str, Any]] = []
     if tools:
@@ -137,20 +190,39 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None) -
                 "inputSchema": schema or {},
             })
 
+    # Detect multi-intent requests heuristically
+    multi_intent = bool(re.search(r"\b(and|then|;|,\s+then)\b", ql))
+
+    if multi_intent and tools and "orchestrator.run_plan" in tools:
+        # Ask LLM for a plan when multiple intents detected
+        system = (
+            "You create execution plans for an MCP client. "
+            "Return ONLY JSON of the form {\"steps\": [{\"tool\": <name>, \"args\": {...}, \"parallel\": <bool>?}, ...]}. "
+            "Use only tools from the list provided. Prefer minimal, valid args per schema. "
+            "Include parallel=true when independent steps can run together."
+        )
+        user = json.dumps({"tools": tool_specs, "query": query})
+        try:
+            raw = llm_generate(system, user)
+            payload = _extract_json_object(raw)
+            if not isinstance(payload, dict) or not isinstance(payload.get("steps"), list):
+                raise ValueError("No steps array found")
+            return "orchestrator.run_plan", {"steps": payload["steps"]}
+        except Exception:
+            # Fall through to single-tool routing below
+            pass
+
+    # Single-tool routing via LLM
     system = (
         "You are a router that maps user requests to MCP tools. "
         "Respond ONLY with a compact JSON object of the form {\"tool\": <name>, \"args\": {..}}. "
-        "Choose the best tool from the catalog. If the user is just chatting, pick 'jarvis_chat' with {message}. "
+        "Choose the best tool from the list. If the user is just chatting, pick 'jarvis_chat' with {message}. "
         "Never invent tools not in the list. Prefer minimal, valid args matching each tool's schema."
     )
-    user = json.dumps({
-        "tools": tool_specs,
-        "query": query,
-    })
+    user = json.dumps({"tools": tool_specs, "query": query})
 
     try:
         raw = llm_generate(system, user)
-        # Extract the first JSON object from the response
         payload = _extract_json_object(raw)
         if not isinstance(payload, dict):
             raise ValueError("No JSON object found")
@@ -158,15 +230,12 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None) -
         args = payload.get("args") or {}
         if not isinstance(args, dict):
             args = {}
-        # Validate tool exists
         if tools and tool not in tools:
             return "jarvis_chat", {"message": query}
-        # Ensure jarvis_chat has message
         if tool == "jarvis_chat" and "message" not in args:
             args["message"] = query
         return tool, args
     except Exception:
-        # Fallback to chat
         return "jarvis_chat", {"message": query}
 
 
