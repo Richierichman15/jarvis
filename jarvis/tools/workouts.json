@@ -251,6 +251,153 @@
           "type": "strength"
         }
       ]
+    },
+    {
+      "id": "push",
+      "name": "Push",
+      "workouts": [
+        {
+          "id": "push-ups",
+          "name": "Push-Ups",
+          "description": "Bodyweight push movement for chest, shoulders, and triceps.",
+          "reps": "3 sets of 15",
+          "difficulty": "beginner",
+          "equipment": "bodyweight",
+          "type": "endurance"
+        },
+        {
+          "id": "bench-press",
+          "name": "Bench Press",
+          "description": "Compound barbell press for chest and triceps.",
+          "reps": "4 sets of 8-10",
+          "difficulty": "intermediate",
+          "equipment": "barbell",
+          "type": "strength"
+        },
+        {
+          "id": "incline-dumbbell-press",
+          "name": "Incline Dumbbell Press",
+          "description": "Upper-chest emphasis with dumbbells.",
+          "reps": "3 sets of 10-12",
+          "difficulty": "intermediate",
+          "equipment": "dumbbell",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "overhead-press",
+          "name": "Overhead Press",
+          "description": "Vertical barbell press for shoulders and triceps.",
+          "reps": "4 sets of 8",
+          "difficulty": "intermediate",
+          "equipment": "barbell",
+          "type": "strength"
+        },
+        {
+          "id": "lateral-raises",
+          "name": "Lateral Raises",
+          "description": "Isolation move for side delts.",
+          "reps": "3 sets of 15",
+          "difficulty": "beginner",
+          "equipment": "dumbbell",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "arnold-press",
+          "name": "Arnold Press",
+          "description": "Shoulder press variation hitting multiple heads.",
+          "reps": "3 sets of 10",
+          "difficulty": "intermediate",
+          "equipment": "dumbbell",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "front-raises",
+          "name": "Front Raises",
+          "description": "Isolation for front delts.",
+          "reps": "3 sets of 15",
+          "difficulty": "beginner",
+          "equipment": "dumbbell",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "tricep-dips",
+          "name": "Tricep Dips",
+          "description": "Bodyweight movement for triceps.",
+          "reps": "3 sets of 15",
+          "difficulty": "intermediate",
+          "equipment": "bodyweight",
+          "type": "strength"
+        },
+        {
+          "id": "cable-tricep-pushdown",
+          "name": "Cable Tricep Pushdown",
+          "description": "Cable isolation for triceps.",
+          "reps": "4 sets of 12",
+          "difficulty": "beginner",
+          "equipment": "cable",
+          "type": "hypertrophy"
+        }
+      ]
+    },
+    {
+      "id": "pull",
+      "name": "Pull",
+      "workouts": [
+        {
+          "id": "pull-ups",
+          "name": "Pull-Ups",
+          "description": "Bodyweight pull for lats and upper back.",
+          "reps": "3 sets of 8-10",
+          "difficulty": "intermediate",
+          "equipment": "bodyweight",
+          "type": "strength"
+        },
+        {
+          "id": "deadlifts",
+          "name": "Deadlifts",
+          "description": "Posterior chain strength movement.",
+          "reps": "4 sets of 5",
+          "difficulty": "advanced",
+          "equipment": "barbell",
+          "type": "strength"
+        },
+        {
+          "id": "bent-over-rows",
+          "name": "Bent-Over Rows",
+          "description": "Barbell row for middle/upper back.",
+          "reps": "4 sets of 10",
+          "difficulty": "intermediate",
+          "equipment": "barbell",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "lat-pulldowns",
+          "name": "Lat Pulldowns",
+          "description": "Machine-based lat isolation.",
+          "reps": "4 sets of 12",
+          "difficulty": "beginner",
+          "equipment": "machine",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "barbell-curl",
+          "name": "Barbell Curl",
+          "description": "Biceps exercise using a barbell.",
+          "reps": "4 sets of 10",
+          "difficulty": "beginner",
+          "equipment": "barbell",
+          "type": "hypertrophy"
+        },
+        {
+          "id": "hammer-curls",
+          "name": "Hammer Curls",
+          "description": "Targets biceps and brachialis.",
+          "reps": "3 sets of 12",
+          "difficulty": "beginner",
+          "equipment": "dumbbell",
+          "type": "hypertrophy"
+        }
+      ]
     }
   ]
-} 
+}

@@ -27,6 +27,7 @@ except ImportError:
 
 from .jarvis import Jarvis
 from .config import PROJECT_ROOT
+from .tools.fitness import list_workouts as fitness_list_workouts, search_workouts as fitness_search_workouts
 try:
     # Use the new brain package for memory + LLM
     from brain import memory as brain_memory
@@ -436,6 +437,27 @@ class JarvisMCPServer:
                         },
                         "required": ["steps"]
                     }
+                ),
+                Tool(
+                    name="fitness.list_workouts",
+                    description="List workouts from the fitness library; optionally filter by muscle group.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "muscle_group": {"type": "string", "description": "Optional muscle group to filter by"}
+                        }
+                    }
+                ),
+                Tool(
+                    name="fitness.search_workouts",
+                    description="Search workouts by keyword in the fitness library.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search query"}
+                        },
+                        "required": ["query"]
+                    }
                 )
             ]
         
@@ -681,6 +703,20 @@ class JarvisMCPServer:
                     plan_results = await execute_plan(steps, _LocalClient())
                     import json as _json
                     return [TextContent(type="text", text=_json.dumps({"results": plan_results}, indent=2))]
+
+                elif name == "fitness.list_workouts":
+                    mg = arguments.get("muscle_group")
+                    import json as _json
+                    payload = fitness_list_workouts(mg)
+                    return [TextContent(type="text", text=_json.dumps(payload, indent=2))]
+
+                elif name == "fitness.search_workouts":
+                    q = arguments.get("query", "")
+                    if not q:
+                        return [TextContent(type="text", text="Error: No query provided")]
+                    import json as _json
+                    payload = fitness_search_workouts(q)
+                    return [TextContent(type="text", text=_json.dumps(payload, indent=2))]
                 
                 else:
                     return [TextContent(type="text", text=f"Unknown tool: {name}")]

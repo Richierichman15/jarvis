@@ -136,6 +136,19 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None, a
     if ("system info" in ql or "system information" in ql or re.search(r"\b(cpu|memory|disk|ram)\b", ql)) and (tools is None or "jarvis_get_system_info" in tools):
         return "jarvis_get_system_info", {}
 
+    # Fitness: list workouts by muscle group
+    m = re.search(r"\b(list|show)\b\s+(?:me\s+)?([a-zA-Z ]+?)\s+workouts\b", q, flags=re.IGNORECASE)
+    if m and (tools is None or "fitness.list_workouts" in tools):
+        group = m.group(2).strip()
+        return "fitness.list_workouts", {"muscle_group": group}
+
+    # Fitness: search workouts
+    # Patterns: "find workouts with bench", "search workouts for curls", "find something with curls"
+    m = re.search(r"\b(find|search)\b\s*(?:workouts?)?\s*(?:with|for|about|on)?\s+(.+)$", q, flags=re.IGNORECASE)
+    if m and (tools is None or "fitness.search_workouts" in tools):
+        query_str = m.group(2).strip()
+        return "fitness.search_workouts", {"query": query_str}
+
     # Settings: get
     if any(p in ql for p in ["show settings", "list settings", "get settings", "what are your settings"]) and (tools is None or "jarvis_get_settings" in tools):
         return "jarvis_get_settings", {}
