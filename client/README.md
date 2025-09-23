@@ -31,6 +31,14 @@ Quickstart
 - Optional: point to a custom server path:
   - `python client/cli.py ./run_mcp_server.py`
 
+Multi-Server Orchestration
+- Connect another server:
+  - `connect system "python ../System/system_server.py"`
+  - The client spawns and handshakes the server, storing it under alias `system` and persisting to `.jarvis_servers.json`.
+- Run a cross-server plan (client executes locally):
+  - `orchestrator.run_plan {"steps": [{"server":"jarvis","tool":"fitness.list_workouts","args":{"muscle_group":"chest"}},{"server":"system","tool":"system.add_goal","args":{"title":"BMW 335i","target":12000}}]}`
+  - Each step routes to the specified server session; results are shown in a compact table.
+
 CLI Usage
 - Type `list` to re-list tools.
 - Type `help` to see usage and examples.

@@ -13,6 +13,7 @@ from typing import Dict
 
 
 DEFAULT_FILE = ".jarvis_projects.json"
+SERVERS_FILE = ".jarvis_servers.json"
 
 
 def load_projects(filepath: str = DEFAULT_FILE) -> Dict[str, dict]:
@@ -46,3 +47,19 @@ def save_projects(projects: Dict[str, dict], filepath: str = DEFAULT_FILE) -> No
     """
     path = Path(filepath)
     path.write_text(json.dumps(projects, indent=2, sort_keys=True))
+
+
+def load_servers(filepath: str = SERVERS_FILE) -> Dict[str, dict]:
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            return {}
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_servers(servers: Dict[str, dict], filepath: str = SERVERS_FILE) -> None:
+    path = Path(filepath)
+    path.write_text(json.dumps(servers, indent=2, sort_keys=True))

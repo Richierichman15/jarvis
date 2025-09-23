@@ -62,13 +62,18 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None, a
                 "Include parallel=true when independent steps can run together."
             )
             user = json.dumps({"tools": tool_specs, "query": query})
-            try:
-                raw = llm_generate(system, user)
-                payload = _extract_json_object(raw)
-                if isinstance(payload, dict) and isinstance(payload.get("steps"), list):
-                    return "orchestrator.run_plan", {"steps": payload["steps"]}
-            except Exception:
-                pass
+        try:
+            raw = llm_generate(system, user)
+            payload = _extract_json_object(raw)
+            if isinstance(payload, dict) and isinstance(payload.get("steps"), list):
+                steps = payload["steps"]
+                # Default server to 'jarvis' if missing
+                for s in steps:
+                    if isinstance(s, dict) and "server" not in s:
+                        s["server"] = "jarvis"
+                return "orchestrator.run_plan", {"steps": steps}
+        except Exception:
+            pass
         # Heuristic split into steps (works even without LLM)
         try:
             parts = re.split(r"\s*(?:;|,?\s*then\s+|\s+and\s+)\s*", q.strip(), flags=re.IGNORECASE)
@@ -82,7 +87,7 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None, a
             t, a = route_natural_language(part, tools, allow_multi=False)
             if not t:
                 continue
-            step_list.append({"tool": t, "args": a or {}})
+            step_list.append({"server": "jarvis", "tool": t, "args": a or {}})
         # Prefer concrete tool steps, but fall back if necessary
         concrete = [s for s in step_list if s["tool"] != "jarvis_chat"]
         steps_out = concrete if concrete else step_list
