@@ -1,0 +1,16 @@
+# MCP Client Dependencies (pin to match server)
+mcp==1.14.1
+colorama>=0.4.6  # For colored CLI output
+prompt_toolkit>=3.0.0  # For better CLI experience
+
+# API layer
+fastapi>=0.110.0
+uvicorn>=0.23.0
+
+# Optional: For future LLM integration
+# openai>=1.0.0
+# ollama>=0.1.0
+
+# Optional: For future web UI
+# fastapi>=0.100.0
+# uvicorn>=0.23.0

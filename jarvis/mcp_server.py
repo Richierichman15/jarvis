@@ -27,6 +27,13 @@ except ImportError:
 
 from .jarvis import Jarvis
 from .config import PROJECT_ROOT
+try:
+    # Use the new brain package for memory + LLM
+    from brain import memory as brain_memory
+    from brain.llm import generate as brain_generate
+    BRAIN_AVAILABLE = True
+except Exception:
+    BRAIN_AVAILABLE = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -238,8 +245,58 @@ class JarvisMCPServer:
                     message = arguments.get("message", "")
                     if not message:
                         return [TextContent(type="text", text="Error: No message provided")]
-                    
-                    # Capture the response from Jarvis
+
+                    # If brain is available, use it as the chat backend (memory + LLM)
+                    if BRAIN_AVAILABLE:
+                        try:
+                            # Save user message
+                            brain_memory.save_message("user", message)
+
+                            # Retrieve relevant memories (simple LIKE search)
+                            mems = brain_memory.search_memories(message, limit=5)
+                            used_memories = [m[2] for m in mems]
+
+                            # Build a concise Jarvis persona prompt with surfaced memories
+                            base = (
+                                "You are Jarvis, a concise, helpful AI assistant. "
+                                "Use short sentences and helpful bullet points when useful."
+                            )
+                            if used_memories:
+                                joined = "\n- ".join(used_memories)
+                                system_prompt = base + f"\n\nRelevant memories:\n- {joined}"
+                            else:
+                                system_prompt = base
+
+                            reply = brain_generate(system_prompt, message)
+                            # Hard fallback if brain returns unavailability marker
+                            if not reply or reply.startswith("[LLM unavailable"):
+                                reply = "I registered your message. I'll remember key details and respond succinctly."
+
+                            # Save assistant reply
+                            brain_memory.save_message("assistant", reply)
+
+                            # Periodically summarize to long-term memory
+                            try:
+                                recent = brain_memory.recent_messages(100)
+                                if len(recent) % 10 == 0:
+                                    brain_memory.summarize_thread()
+                            except Exception:
+                                pass
+
+                            # Include a small recall preview to make memory use visible
+                            if used_memories:
+                                preview = "\n\nRecall: " + "; ".join(used_memories[:2])
+                                if preview not in reply:
+                                    reply = (reply or "").strip() + preview
+
+                            return [TextContent(type="text", text=reply)]
+                        except Exception as e:
+                            # Fall back to legacy Jarvis chat on any brain error
+                            logger.warning(f"Brain chat failed, falling back to Jarvis.chat: {e}")
+                            response = self.jarvis.chat(message)
+                            return [TextContent(type="text", text=response)]
+
+                    # Fallback if brain package is not available
                     response = self.jarvis.chat(message)
                     return [TextContent(type="text", text=response)]
                 

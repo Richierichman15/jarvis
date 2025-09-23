@@ -13,6 +13,7 @@ python-dotenv==1.0.0
 typer==0.9.0
 rich==13.7.0
 tabulate==0.9.0
+httpx>=0.24.0,<1.0.0
 beautifulsoup4==4.12.2
 lxml==4.9.3
 html5lib==1.1
@@ -37,7 +38,9 @@ langchain-community>=0.0.10,<1.0.0
 aiohttp==3.12.15
 # httpx version will be resolved by pip to satisfy other dependencies
 sniffio==1.3.1
-anyio==3.7.1
+# anyio 3.x conflicts with modern mcp (>=1.2) which requires anyio>=4.5.
+# OpenAI SDK supports anyio <5 and >=3.5, so 4.x is compatible.
+anyio>=4.5,<5
 
 # Other
 chardet==5.2.0
@@ -48,5 +51,5 @@ schedule==1.2.0
 firebase-admin==6.2.0
 cryptography==42.0.2
 
-# MCP (Model Context Protocol)
-mcp>=1.0.0
+# MCP (Model Context Protocol) — keep client/server in lockstep
+mcp==1.14.1
