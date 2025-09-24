@@ -221,6 +221,8 @@ class JarvisClient:
             self._list_servers()
         elif cmd == 'use-server':
             await self._use_server(args)
+        elif cmd == 'disconnect':
+            await self._disconnect_server(args)
         elif cmd in self.tools:
             await self._call_tool(cmd, args)
         else:
@@ -261,6 +263,7 @@ class JarvisClient:
         print(f"  {Fore.CYAN}connect <alias> <cmd> [args...] {Style.RESET_ALL}- Connect an MCP server as <alias>")
         print(f"  {Fore.CYAN}servers{Style.RESET_ALL}           - List connected MCP servers")
         print(f"  {Fore.CYAN}use-server <alias>{Style.RESET_ALL} - Make <alias> the active session for direct tool calls")
+        print(f"  {Fore.CYAN}disconnect <alias>{Style.RESET_ALL} - Disconnect and remove a server alias")
         print(f"  {Fore.CYAN}<tool> [args]{Style.RESET_ALL}     - Call a tool with JSON arguments")
         print(f"  {Fore.CYAN}--project <name>{Style.RESET_ALL}  - Override active project for a call (if supported)")
         print(f"  Natural language routing supported for a few intents.")
@@ -492,6 +495,41 @@ class JarvisClient:
             print(f"{Fore.GREEN}Active server set to '{alias}'.{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.YELLOW}Warning: failed to refresh tools for '{alias}': {e}{Style.RESET_ALL}")
+
+    async def _disconnect_server(self, args: str) -> None:
+        alias = (args or '').strip()
+        if not alias:
+            print(f"{Fore.YELLOW}Usage: disconnect <alias>{Style.RESET_ALL}")
+            return
+        existed = False
+        task = self._server_tasks.pop(alias, None)
+        if task is not None:
+            existed = True
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
+        if alias in self.sessions:
+            existed = True
+            self.sessions.pop(alias, None)
+        if not existed:
+            print(f"{Fore.YELLOW}Server '{alias}' not connected.{Style.RESET_ALL}")
+            return
+        # If the active session was removed, pick another if available
+        if self.active_session == alias:
+            new_active = next(iter(self.sessions.keys()), None)
+            self.active_session = new_active or "jarvis"
+            # Refresh tools if a session exists
+            if new_active and new_active in self.sessions:
+                try:
+                    tools_response = await self.sessions[new_active].list_tools()
+                    self.tools = {tool.name: tool for tool in tools_response.tools}
+                except Exception:
+                    self.tools = {}
+            else:
+                self.tools = {}
+        print(f"{Fore.GREEN}Disconnected '{alias}'.{Style.RESET_ALL}")
     
     def _parse_simple_args(self, args_str: str) -> Dict[str, Any]:
         """
