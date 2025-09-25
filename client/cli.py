@@ -25,9 +25,17 @@ from mcp.client.stdio import stdio_client
 
 # Allow running as a script by making local imports work
 THIS_DIR = Path(__file__).parent
+ROOT_DIR = THIS_DIR.parent  # repo root
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
-from storage import load_projects as load_local_projects, save_projects as save_local_projects
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
+from storage import (
+    load_projects as load_local_projects,
+    save_projects as save_local_projects,
+    load_servers as load_saved_servers,
+    save_servers as save_saved_servers,
+)
 from llm_router import route_natural_language
 
 
@@ -70,6 +78,7 @@ class JarvisClient:
         self.tool_completer: Optional[WordCompleter] = None
         self.local_projects: Dict[str, Dict[str, Any]] = {}
         self.active_project: Optional[str] = None
+        self.saved_servers: Dict[str, Dict[str, Any]] = load_saved_servers()
         
     async def start(self):
         """Start default 'jarvis' server, then run the interactive CLI."""
@@ -101,6 +110,20 @@ class JarvisClient:
         except Exception as e:
             print(f"{Fore.RED}Failed to start default server: {e}{Style.RESET_ALL}")
             return
+
+        # Auto-reconnect any saved servers (except the default 'jarvis')
+        if self.saved_servers:
+            for alias, entry in self.saved_servers.items():
+                if alias == "jarvis" or alias in self.sessions:
+                    continue
+                cmd = entry.get("command")
+                args = entry.get("args") or []
+                if not cmd:
+                    continue
+                try:
+                    await self._spawn_and_hold(alias, StdioServerParameters(command=cmd, args=args))
+                except Exception as e:
+                    print(f"{Fore.YELLOW}Warning: failed to auto-connect saved server '{alias}': {e}{Style.RESET_ALL}")
 
         # Initialize client-side state and show tools from active session
         await self._initialize()
@@ -261,7 +284,7 @@ class JarvisClient:
         print(f"  {Fore.CYAN}start-api{Style.RESET_ALL}         - Start FastAPI on http://127.0.0.1:8000")
         print(f"  {Fore.CYAN}exit/quit{Style.RESET_ALL}         - Exit the client")
         print(f"  {Fore.CYAN}connect <alias> <cmd> [args...] {Style.RESET_ALL}- Connect an MCP server as <alias>")
-        print(f"  {Fore.CYAN}servers{Style.RESET_ALL}           - List connected MCP servers")
+        print(f"  {Fore.CYAN}servers{Style.RESET_ALL}           - List connected and saved MCP servers")
         print(f"  {Fore.CYAN}use-server <alias>{Style.RESET_ALL} - Make <alias> the active session for direct tool calls")
         print(f"  {Fore.CYAN}disconnect <alias>{Style.RESET_ALL} - Disconnect and remove a server alias")
         print(f"  {Fore.CYAN}<tool> [args]{Style.RESET_ALL}     - Call a tool with JSON arguments")
@@ -443,12 +466,27 @@ class JarvisClient:
             print(f"{Fore.YELLOW}Usage: connect <alias> <command> [args...]{Style.RESET_ALL}")
             return
         alias, cmd, *cmd_args = parts
+        # If the command was quoted as a single string containing spaces,
+        # split it into executable and its arguments for stdio spawning.
+        if (not cmd_args) and (" " in cmd or "\t" in cmd):
+            try:
+                reparsed = shlex.split(cmd)
+                if reparsed:
+                    cmd, *cmd_args = reparsed
+            except Exception:
+                pass
         params = StdioServerParameters(command=cmd, args=cmd_args)
         try:
             await self._spawn_and_hold(alias, params)
         except Exception as e:
             print(f"{Fore.RED}Failed to connect '{alias}': {e}{Style.RESET_ALL}")
-
+            return
+        # Persist saved connection
+        try:
+            self.saved_servers[alias] = {"command": cmd, "args": cmd_args}
+            save_saved_servers(self.saved_servers)
+        except Exception:
+            pass
         # Optionally refresh tool list if connecting the active alias
         if alias == self.active_session:
             try:
@@ -457,13 +495,23 @@ class JarvisClient:
                 pass
 
     def _list_servers(self) -> None:
-        if not self.sessions:
-            print(f"{Fore.YELLOW}No servers connected.{Style.RESET_ALL}")
-            return
-        print(f"\n{Fore.YELLOW}Connected Servers:{Style.RESET_ALL}")
-        for alias in sorted(self.sessions.keys()):
-            marker = "*" if alias == self.active_session else " "
-            print(f" {marker} {alias}")
+        print(f"\n{Fore.YELLOW}Servers:{Style.RESET_ALL}")
+        connected = set(self.sessions.keys())
+        if connected:
+            print(" Connected:")
+            for alias in sorted(connected):
+                marker = "*" if alias == self.active_session else " "
+                print(f"  {marker} {alias}")
+        else:
+            print(" Connected: (none)")
+        saved = set(self.saved_servers.keys()) - connected
+        if saved:
+            print(" Saved (not connected):")
+            for alias in sorted(saved):
+                entry = self.saved_servers.get(alias, {})
+                cmd = entry.get("command", "?")
+                args = " ".join(entry.get("args", []))
+                print(f"    {alias} → {cmd} {args}")
 
     async def _shutdown_all_servers(self) -> None:
         tasks = list(self._server_tasks.values())
