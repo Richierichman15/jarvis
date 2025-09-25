@@ -1,0 +1,14 @@
+{
+  "budget": {
+    "connected": true
+  },
+  "jarvis": {
+    "connected": true
+  },
+  "search": {
+    "connected": true
+  },
+  "system": {
+    "connected": true
+  }
+}

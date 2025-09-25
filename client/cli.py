@@ -35,6 +35,8 @@ from storage import (
     save_projects as save_local_projects,
     load_servers as load_saved_servers,
     save_servers as save_saved_servers,
+    load_active_servers,
+    save_active_servers,
 )
 from llm_router import route_natural_language
 
@@ -79,6 +81,7 @@ class JarvisClient:
         self.local_projects: Dict[str, Dict[str, Any]] = {}
         self.active_project: Optional[str] = None
         self.saved_servers: Dict[str, Dict[str, Any]] = load_saved_servers()
+        self.active_servers: Dict[str, Dict[str, Any]] = load_active_servers()
         
     async def start(self):
         """Start default 'jarvis' server, then run the interactive CLI."""
@@ -103,6 +106,10 @@ class JarvisClient:
             command=sys.executable,
             args=["-u", str(self.server_path), "Boss"],
         )
+
+        # Reset active server tracker for this session
+        self.active_servers = {}
+        save_active_servers(self.active_servers)
 
         # Spawn and hold the default 'jarvis' session
         try:
@@ -432,6 +439,7 @@ class JarvisClient:
                         self.sessions[alias] = session
                         if not ready_fut.done():
                             ready_fut.set_result(True)
+                        self._mark_server_connected(alias)
                         # Hold open until cancelled
                         try:
                             while True:
@@ -449,6 +457,7 @@ class JarvisClient:
                 self.sessions.pop(alias, None)
                 # Also remove task handle so reconnect is possible
                 self._server_tasks.pop(alias, None)
+                self._mark_server_disconnected(alias)
 
         task = asyncio.create_task(runner(), name=f"mcp-server:{alias}")
         self._server_tasks[alias] = task
@@ -522,6 +531,8 @@ class JarvisClient:
                 await asyncio.gather(*tasks, return_exceptions=True)
             finally:
                 self._server_tasks.clear()
+        self.active_servers = {}
+        save_active_servers(self.active_servers)
 
     async def _use_server(self, args: str) -> None:
         alias = (args or '').strip()
@@ -577,7 +588,23 @@ class JarvisClient:
                     self.tools = {}
             else:
                 self.tools = {}
+        self._mark_server_disconnected(alias)
         print(f"{Fore.GREEN}Disconnected '{alias}'.{Style.RESET_ALL}")
+
+    def _mark_server_connected(self, alias: str) -> None:
+        try:
+            self.active_servers[alias] = {"connected": True}
+            save_active_servers(self.active_servers)
+        except Exception:
+            pass
+
+    def _mark_server_disconnected(self, alias: str) -> None:
+        try:
+            if alias in self.active_servers:
+                self.active_servers.pop(alias, None)
+                save_active_servers(self.active_servers)
+        except Exception:
+            pass
     
     def _parse_simple_args(self, args_str: str) -> Dict[str, Any]:
         """
@@ -648,32 +675,15 @@ class JarvisClient:
     def _display_result(self, result: Any):
         """Display tool result in a formatted way."""
         print(f"\n{Fore.GREEN}Result:{Style.RESET_ALL}")
-        
-        # Try to pretty-print orchestrator results
-        try:
-            text_view = self._extract_text(result)
-            import json as _json
-            data = _json.loads(text_view)
-            if isinstance(data, dict) and isinstance(data.get("results"), list):
-                # Only pretty-print as orchestrator table if entries look like orchestrator outputs
-                results_list = data["results"]
-                if results_list and isinstance(results_list[0], dict) and {"tool", "ok"}.issubset(results_list[0].keys()):
-                    rows = []
-                    for entry in results_list:
-                        tool = entry.get("tool")
-                        ok = entry.get("ok")
-                        if ok:
-                            preview_src = str(entry.get("data", ""))
-                        else:
-                            preview_src = "ERR: " + str(entry.get("error", ""))
-                        preview = preview_src.replace("\n", " ")
-                        if len(preview) > 96:
-                            preview = preview[:93] + "..."
-                        rows.append([tool, "✅" if ok else "❌", preview])
-                    print(tabulate(rows, headers=["Tool", "OK", "Preview"], tablefmt="github"))
-                    return
-        except Exception:
-            pass
+        text_view = self._extract_text(result)
+
+        if self._try_render_orchestrator_table(text_view):
+            print()
+            return
+
+        if self._try_render_json_payload(text_view):
+            print()
+            return
 
         # String-like response
         if isinstance(result, str):
@@ -700,6 +710,89 @@ class JarvisClient:
             # Fallback for unexpected result format
             print(result)
         print()
+
+    def _try_render_orchestrator_table(self, text_view: str) -> bool:
+        """Render orchestrator results in a compact table if possible."""
+        if not text_view:
+            return False
+        try:
+            data = json.loads(text_view)
+        except Exception:
+            return False
+
+        if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+            return False
+
+        results_list = data["results"]
+        if not results_list or not isinstance(results_list[0], dict):
+            return False
+
+        if not {"tool", "ok"}.issubset(results_list[0].keys()):
+            return False
+
+        rows = []
+        for entry in results_list:
+            tool = entry.get("tool")
+            ok = entry.get("ok")
+            if ok:
+                preview_src = str(entry.get("data", ""))
+            else:
+                preview_src = "ERR: " + str(entry.get("error", ""))
+            preview = preview_src.replace("\n", " ")
+            if len(preview) > 96:
+                preview = preview[:93] + "..."
+            rows.append([tool, "✅" if ok else "❌", preview])
+
+        print(tabulate(rows, headers=["Tool", "OK", "Preview"], tablefmt="github"))
+        return True
+
+    def _try_render_json_payload(self, text_view: str, max_table_rows: int = 20) -> bool:
+        """Detect JSON payloads and pretty-print or tabulate them."""
+        if not text_view:
+            return False
+
+        stripped = text_view.strip()
+        if not stripped or stripped[0] not in "{[":
+            return False
+
+        try:
+            data = json.loads(stripped)
+        except Exception:
+            return False
+
+        # List of dicts → render as table
+        if isinstance(data, list) and data and all(isinstance(item, dict) for item in data):
+            headers = list(data[0].keys())
+            for item in data[1:]:
+                for key in item.keys():
+                    if key not in headers:
+                        headers.append(key)
+
+            def _cell(value: Any) -> str:
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value, ensure_ascii=False)
+                return "" if value is None else str(value)
+
+            rows = [
+                [_cell(item.get(header)) for header in headers]
+                for item in data[:max_table_rows]
+            ]
+
+            if rows:
+                print(tabulate(rows, headers=headers, tablefmt="github"))
+            else:
+                print("(no rows)")
+
+            if len(data) > max_table_rows:
+                print("... (more)")
+            return True
+
+        # Any other JSON → pretty-print inside a code block
+        pretty = json.dumps(data, indent=2, ensure_ascii=False)
+        print("```json")
+        print(pretty)
+        print("```")
+        return True
 
     def _should_reconnect_error(self, e: Exception) -> bool:
         msg = str(e).lower()

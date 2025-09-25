@@ -1,4 +1,17 @@
 {
+  "budget": {
+    "args": [
+      "-lc",
+      "cd /Users/gitonga-nyaga/github/budget && node_modules/.bin/tsx backend/src/mcp/server.ts"
+    ],
+    "command": "bash"
+  },
+  "search": {
+    "args": [
+      "search/mcp_server.py"
+    ],
+    "command": "python3"
+  },
   "system": {
     "args": [
       "-u",

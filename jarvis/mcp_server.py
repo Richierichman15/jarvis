@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
@@ -13,6 +14,8 @@ from datetime import datetime
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
     from mcp.types import (
         Tool, 
         TextContent, 
@@ -52,6 +55,60 @@ class JarvisMCPServer:
         self.jarvis = Jarvis(user_name=user_name)
         self.server = Server("jarvis-mcp-server")
         self._register_tools()
+
+    def _active_sessions_path(self) -> Path:
+        return PROJECT_ROOT / ".jarvis_active_sessions.json"
+
+    def _saved_servers_path(self) -> Path:
+        return PROJECT_ROOT / ".jarvis_servers.json"
+
+    def _is_external_server_connected(self, alias: str) -> bool:
+        try:
+            data = json.loads(self._active_sessions_path().read_text())
+            return alias in data
+        except Exception:
+            return False
+
+    def _load_saved_server_command(self, alias: str) -> Optional[StdioServerParameters]:
+        try:
+            data = json.loads(self._saved_servers_path().read_text())
+        except Exception:
+            return None
+
+        entry = data.get(alias)
+        if not isinstance(entry, dict):
+            return None
+
+        command = entry.get("command")
+        args = entry.get("args") or []
+        if not command:
+            return None
+
+        return StdioServerParameters(command=command, args=args)
+
+    async def _invoke_external_tool(
+        self,
+        params: StdioServerParameters,
+        tool: str,
+        args: Dict[str, Any],
+    ) -> Any:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await session.call_tool(tool, args)
+
+    def _extract_text_content(self, result: Any) -> str:
+        if isinstance(result, str):
+            return result
+        if hasattr(result, "content") and getattr(result, "content") is not None:
+            texts: List[str] = []
+            for content in result.content:
+                if hasattr(content, "text"):
+                    texts.append(getattr(content, "text") or "")
+                elif isinstance(content, dict) and "text" in content:
+                    texts.append(str(content.get("text") or ""))
+            return "\n".join(t for t in texts if t)
+        return str(result)
 
     async def _dispatch_tool(self, name: str, arguments: Dict[str, Any]) -> List[Union[TextContent, ImageContent, EmbeddedResource]]:
         """Internal dispatcher to invoke a tool by name.
@@ -190,18 +247,21 @@ class JarvisMCPServer:
             return [TextContent(type="text", text=settings_text)]
 
         if name == "jarvis_web_search":
-            query = arguments.get("query", "")
+            query = (arguments or {}).get("query", "")
             if not query:
                 return [TextContent(type="text", text="Error: No search query provided")]
-            if hasattr(self.jarvis, 'tool_manager') and 'web_search' in self.jarvis.tool_manager.tools:
-                try:
-                    web_search_tool = self.jarvis.tool_manager.tools['web_search']
-                    results = web_search_tool.search(query)
-                    return [TextContent(type="text", text=results)]
-                except Exception as e:
-                    return [TextContent(type="text", text=f"Web search error: {str(e)}")]
-            else:
-                return [TextContent(type="text", text="Web search tool not available")]
+            if not self._is_external_server_connected("search"):
+                return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
+            params = self._load_saved_server_command("search")
+            if params is None:
+                return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+            try:
+                response = await self._invoke_external_tool(params, "web.search", {"query": query})
+                text = self._extract_text_content(response)
+                return [TextContent(type="text", text=text)]
+            except Exception as e:
+                logger.error("Proxy search failed: %s", e)
+                return [TextContent(type="text", text=f"Search proxy failed: {e}")]
 
         if name == "jarvis_calculate":
             expression = arguments.get("expression", "")
@@ -299,7 +359,7 @@ class JarvisMCPServer:
                 ),
                 Tool(
                     name="jarvis_web_search",
-                    description="Perform a web search using Jarvis's web search tool.",
+                    description="Proxy web search via the external 'search' MCP server.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -308,7 +368,8 @@ class JarvisMCPServer:
                                 "description": "Search query"
                             }
                         },
-                        "required": ["query"]
+                        "required": ["query"],
+                        "additionalProperties": False
                     }
                 ),
                 Tool(
@@ -507,20 +568,24 @@ class JarvisMCPServer:
                     return [TextContent(type="text", text=settings_text)]
                 
                 elif name == "jarvis_web_search":
-                    query = arguments.get("query", "")
+                    query = (arguments or {}).get("query", "")
                     if not query:
                         return [TextContent(type="text", text="Error: No search query provided")]
-                    
-                    # Use the web search tool if available
-                    if hasattr(self.jarvis, 'tool_manager') and 'web_search' in self.jarvis.tool_manager.tools:
-                        try:
-                            web_search_tool = self.jarvis.tool_manager.tools['web_search']
-                            results = web_search_tool.search(query)
-                            return [TextContent(type="text", text=results)]
-                        except Exception as e:
-                            return [TextContent(type="text", text=f"Web search error: {str(e)}")]
-                    else:
-                        return [TextContent(type="text", text="Web search tool not available")]
+
+                    if not self._is_external_server_connected("search"):
+                        return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
+
+                    params = self._load_saved_server_command("search")
+                    if params is None:
+                        return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+
+                    try:
+                        response = await self._invoke_external_tool(params, "web.search", {"query": query})
+                        text = self._extract_text_content(response)
+                        return [TextContent(type="text", text=text)]
+                    except Exception as e:
+                        logger.error("Proxy search failed: %s", e)
+                        return [TextContent(type="text", text=f"Search proxy failed: {e}")]
                 
                 elif name == "jarvis_calculate":
                     expression = arguments.get("expression", "")
