@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -134,15 +134,23 @@ def create_app() -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    class RunPlanRequest(BaseModel):
-        steps: List[Dict[str, Any]]
-
     @app.post("/run-plan")
-    async def run_plan(req: RunPlanRequest):
+    async def run_plan(body: Any = Body(...)):
         session: ClientSession = app.state.session
 
+        # Accept either {"steps": [...]} or a bare list
+        if isinstance(body, dict) and "steps" in body:
+            steps = body["steps"]
+        elif isinstance(body, list):
+            steps = body
+        else:
+            raise HTTPException(status_code=400, detail="Expected request body to be {\"steps\": [...]} or a JSON array of steps")
+
+        if not isinstance(steps, list):
+            raise HTTPException(status_code=400, detail="steps must be a list")
+
         # If any step attempts server routing, reject with a clear message
-        for s in req.steps:
+        for s in steps:
             if isinstance(s, dict) and s.get("server") not in (None, "", "jarvis"):
                 raise HTTPException(status_code=400, detail="server routing not supported in HTTP API")
 
@@ -160,13 +168,13 @@ def create_app() -> FastAPI:
                     return await self._session.call_tool(tool, args or {})
 
             router = _Router(session)
-            results = await execute_plan(req.steps, router)
+            results = await execute_plan(steps, router)
             # results already contain normalized data strings
             return results
         except Exception:
             # Fallback: sequential execution
             out: List[Dict[str, Any]] = []
-            for s in req.steps:
+            for s in steps:
                 tool = (s or {}).get("tool")
                 args = (s or {}).get("args") or {}
                 if not tool:

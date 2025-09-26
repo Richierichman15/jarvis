@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE = (import.meta as any).env?.VITE_JARVIS_API ?? "http://127.0.0.1:8000";
+const BASE = (import.meta.env?.VITE_JARVIS_API as string | undefined) ?? "http://127.0.0.1:8000";
 
 export async function listTools() {
   const { data } = await axios.get(`${BASE}/tools`);
@@ -16,4 +16,3 @@ export async function runPlan(steps: any[]) {
   const { data } = await axios.post(`${BASE}/run-plan`, { steps });
   return data;
 }
-

@@ -56,6 +56,20 @@ class JarvisMCPServer:
         self.server = Server("jarvis-mcp-server")
         self._register_tools()
 
+    @staticmethod
+    def _as_text(value: Any) -> str:
+        """Ensure tool responses are serialized to a safe string."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (dict, list)):
+            try:
+                return json.dumps(value, ensure_ascii=False)
+            except Exception:
+                pass
+        return str(value)
+
     def _active_sessions_path(self) -> Path:
         return PROJECT_ROOT / ".jarvis_active_sessions.json"
 
@@ -502,11 +516,15 @@ class JarvisMCPServer:
                         except Exception as e:
                             # Fall back to legacy Jarvis chat on any brain error
                             logger.warning(f"Brain chat failed, falling back to Jarvis.chat: {e}")
-                            response = self.jarvis.chat(message)
+                            response = self._as_text(self.jarvis.chat(message))
+                            if not response:
+                                response = "I heard you. Let's keep chatting!"
                             return [TextContent(type="text", text=response)]
 
                     # Fallback if brain package is not available
-                    response = self.jarvis.chat(message)
+                    response = self._as_text(self.jarvis.chat(message))
+                    if not response:
+                        response = "I heard you. Let's keep chatting!"
                     return [TextContent(type="text", text=response)]
                 
                 elif name in ("jarvis_schedule_task", "jarvis_get_tasks", "jarvis_complete_task", "jarvis_delete_task"):
