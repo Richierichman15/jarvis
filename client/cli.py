@@ -288,7 +288,7 @@ class JarvisClient:
         print(f"  {Fore.CYAN}list{Style.RESET_ALL}              - List all available tools")
         print(f"  {Fore.CYAN}projects{Style.RESET_ALL}          - List locally saved projects (if any)")
         print(f"  {Fore.CYAN}use <name>{Style.RESET_ALL}        - Set active project for tool calls (if supported)")
-        print(f"  {Fore.CYAN}start-api{Style.RESET_ALL}         - Start FastAPI on http://127.0.0.1:8000")
+        print(f"  {Fore.CYAN}start-api{Style.RESET_ALL}         - Start FastAPI on http://127.0.0.1:8001")
         print(f"  {Fore.CYAN}exit/quit{Style.RESET_ALL}         - Exit the client")
         print(f"  {Fore.CYAN}connect <alias> <cmd> [args...] {Style.RESET_ALL}- Connect an MCP server as <alias>")
         print(f"  {Fore.CYAN}servers{Style.RESET_ALL}           - List connected and saved MCP servers")
@@ -652,7 +652,7 @@ class JarvisClient:
         print(f"{Fore.GREEN}Active project set to '{name}'.{Style.RESET_ALL}")
 
     def _start_api_server(self) -> None:
-        """Launch the FastAPI server in a separate process on port 8000."""
+        """Launch the FastAPI server in a separate process on port 8001."""
         env = os.environ.copy()
         env["MCP_SERVER_PATH"] = str(self.server_path)
         cmd = [
@@ -662,11 +662,11 @@ class JarvisClient:
             "client.api:create_app",
             "--factory",
             "--port",
-            "8000",
+            "8001",
         ]
         try:
             subprocess.Popen(cmd, env=env)
-            print(f"{Fore.BLUE}API server starting at http://127.0.0.1:8000 (Ctrl+C to stop in its terminal).{Style.RESET_ALL}")
+            print(f"{Fore.BLUE}API server starting at http://127.0.0.1:8001 (Ctrl+C to stop in its terminal).{Style.RESET_ALL}")
         except FileNotFoundError:
             print(f"{Fore.RED}uvicorn not found. Install deps: pip install -r client/requirements.txt{Style.RESET_ALL}")
         except Exception as e:

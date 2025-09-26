@@ -68,6 +68,26 @@ def _result_to_json(result: Any) -> Dict[str, Any]:
     return {"type": "unknown", "value": str(result)}
 
 
+def _normalize_mcp_result(result: Any) -> str:
+    if isinstance(result, str):
+        return result
+    if hasattr(result, 'content') and getattr(result, 'content') is not None:
+        texts: List[str] = []
+        for content in result.content:
+            if hasattr(content, 'text'):
+                texts.append(getattr(content, 'text') or '')
+            elif isinstance(content, dict) and 'text' in content:
+                texts.append(str(content.get('text') or ''))
+        joined = "\n".join(t for t in texts if t)
+        if joined:
+            return joined[:5000]
+    try:
+        dumped = json.dumps(result, ensure_ascii=False)
+    except Exception:
+        dumped = str(result)
+    return dumped[:5000]
+
+
 class RunToolRequest(BaseModel):
     tool: str
     args: Dict[str, Any] = {}
@@ -186,6 +206,51 @@ def create_app() -> FastAPI:
                 except Exception as e:
                     out.append({"tool": tool, "ok": False, "error": str(e)})
             return out
+
+    @app.post("/nl")
+    async def natural_language(payload: Dict[str, Any]):
+        session: ClientSession = app.state.session
+        message = (payload or {}).get("message")
+        if not message or not isinstance(message, str):
+            return {"text": "Sorry, that failed: message is required", "meta": {"routed_tool": None}}
+
+        try:
+            # Step 1: collect tools
+            tools_resp = await session.list_tools()
+            tools_map = {t.name: t for t in tools_resp.tools}
+
+            routed_tool = "jarvis_chat"
+            routed_args: Dict[str, Any] = {"message": message}
+
+            # Step 2: try NL routing
+            try:
+                sys.path.append(str(Path(__file__).resolve().parent))
+                from llm_router import route_natural_language  # type: ignore
+
+                route_tool, route_args = route_natural_language(message, tools_map)
+                if route_tool:
+                    routed_tool = route_tool
+                    routed_args = route_args or {}
+            except Exception:
+                routed_tool = "jarvis_chat"
+                routed_args = {"message": message}
+
+            # Call routed tool
+            raw_result = await session.call_tool(routed_tool, routed_args)
+            raw_text = _normalize_mcp_result(raw_result)
+
+            # Step 4: summarise via jarvis_chat
+            summary_prompt = (
+                "Summarize this tool output for the user in 3-6 concise bullet points or 1 short paragraph. "
+                "Remove raw JSON. Answer directly and plainly. Output only the summary.\n\n---\n"
+                f"{raw_text[:4000]}"
+            )
+            summary_result = await session.call_tool("jarvis_chat", {"message": summary_prompt})
+            summary_text = _normalize_mcp_result(summary_result) or raw_text
+
+            return {"text": summary_text, "meta": {"routed_tool": routed_tool}}
+        except Exception as e:
+            return {"text": f"Sorry, that failed: {e}", "meta": {"routed_tool": None}}
 
     return app
 
