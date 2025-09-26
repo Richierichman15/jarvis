@@ -10,5 +10,8 @@
   },
   "system": {
     "connected": true
+  },
+  "trading": {
+    "connected": true
   }
 }

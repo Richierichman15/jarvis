@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from mcp import ClientSession, StdioServerParameters
@@ -89,6 +90,20 @@ def create_app() -> FastAPI:
 
     app = FastAPI(lifespan=lifespan)
 
+    # Enable CORS for common local dev ports (e.g., Vite)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     @app.get("/tools")
     async def list_tools():
         session: ClientSession = app.state.session
@@ -118,6 +133,51 @@ def create_app() -> FastAPI:
             return {"ok": True, "result": _result_to_json(result)}
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    class RunPlanRequest(BaseModel):
+        steps: List[Dict[str, Any]]
+
+    @app.post("/run-plan")
+    async def run_plan(req: RunPlanRequest):
+        session: ClientSession = app.state.session
+
+        # If any step attempts server routing, reject with a clear message
+        for s in req.steps:
+            if isinstance(s, dict) and s.get("server") not in (None, "", "jarvis"):
+                raise HTTPException(status_code=400, detail="server routing not supported in HTTP API")
+
+        # Prefer orchestrator if available for retries/parallelism; else simple loop
+        try:
+            from orchestrator.executor import execute_plan  # type: ignore
+
+            class _Router:
+                def __init__(self, _session: ClientSession):
+                    self._session = _session
+
+                async def call_tool_server(self, server, tool, args):
+                    if server not in (None, "", "jarvis"):
+                        raise HTTPException(status_code=400, detail="server routing not supported in HTTP API")
+                    return await self._session.call_tool(tool, args or {})
+
+            router = _Router(session)
+            results = await execute_plan(req.steps, router)
+            # results already contain normalized data strings
+            return results
+        except Exception:
+            # Fallback: sequential execution
+            out: List[Dict[str, Any]] = []
+            for s in req.steps:
+                tool = (s or {}).get("tool")
+                args = (s or {}).get("args") or {}
+                if not tool:
+                    out.append({"tool": None, "ok": False, "error": "missing tool name"})
+                    continue
+                try:
+                    res = await session.call_tool(tool, args)
+                    out.append({"tool": tool, "ok": True, "data": _result_to_json(res)})
+                except Exception as e:
+                    out.append({"tool": tool, "ok": False, "error": str(e)})
+            return out
 
     return app
 

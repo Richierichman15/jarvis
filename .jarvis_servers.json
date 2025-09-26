@@ -18,5 +18,12 @@
       "/Users/gitonga-nyaga/github/system/system_server.py"
     ],
     "command": "python3"
+  },
+  "trading": {
+    "args": [
+      "-lc",
+      "cd /Users/gitonga-nyaga/github/finance && /Users/gitonga-nyaga/github/finance/venv/bin/python3 -u trading_mcp_server.py"
+    ],
+    "command": "bash"
   }
 }
