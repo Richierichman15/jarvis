@@ -10,6 +10,7 @@ import subprocess
 import sys
 import re
 import os
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import shlex
@@ -81,6 +82,7 @@ class JarvisClient:
         self.local_projects: Dict[str, Dict[str, Any]] = {}
         self.active_project: Optional[str] = None
         self.saved_servers: Dict[str, Dict[str, Any]] = load_saved_servers()
+        self._tools_cache: Dict[str, Dict[str, Any]] = {}
         self.active_servers: Dict[str, Dict[str, Any]] = load_active_servers()
         
     async def start(self):
@@ -157,8 +159,8 @@ class JarvisClient:
         active = self.sessions.get(self.active_session)
         if not active:
             raise RuntimeError(f"Active session '{self.active_session}' not connected")
-        tools_response = await active.list_tools()
-        self.tools = {tool.name: tool for tool in tools_response.tools}
+        tools_list = await self._get_tools_cached(self.active_session)
+        self.tools = {tool.name: tool for tool in tools_list}
         
         # Create tool name completer for CLI
         tool_names = list(self.tools.keys())
@@ -307,6 +309,8 @@ class JarvisClient:
     async def _list_tools(self):
         """List all available tools with their descriptions."""
         print(f"\n{Fore.YELLOW}Available Tools:{Style.RESET_ALL}")
+        tools_list = await self._get_tools_cached(self.active_session)
+        self.tools = {tool.name: tool for tool in tools_list}
         for name, tool in self.tools.items():
             print(f"\n{Fore.CYAN}{name}{Style.RESET_ALL}")
             print(f"  Description: {tool.description}")
@@ -545,8 +549,8 @@ class JarvisClient:
         self.active_session = alias
         # Refresh available tools/completion from the new active session
         try:
-            tools_response = await self.sessions[alias].list_tools()
-            self.tools = {tool.name: tool for tool in tools_response.tools}
+            tools_list = await self._get_tools_cached(alias)
+            self.tools = {tool.name: tool for tool in tools_list}
             tool_names = list(self.tools.keys())
             self.tool_completer = WordCompleter(
                 tool_names + ['help', 'list', 'exit', 'quit', 'projects', 'use', 'start-api', 'connect', 'servers', 'use-server']
@@ -582,8 +586,8 @@ class JarvisClient:
             # Refresh tools if a session exists
             if new_active and new_active in self.sessions:
                 try:
-                    tools_response = await self.sessions[new_active].list_tools()
-                    self.tools = {tool.name: tool for tool in tools_response.tools}
+                    tools_list = await self._get_tools_cached(new_active)
+                    self.tools = {tool.name: tool for tool in tools_list}
                 except Exception:
                     self.tools = {}
             else:
@@ -595,6 +599,7 @@ class JarvisClient:
         try:
             self.active_servers[alias] = {"connected": True}
             save_active_servers(self.active_servers)
+            self._tools_cache.pop(alias, None)
         except Exception:
             pass
 
@@ -603,8 +608,21 @@ class JarvisClient:
             if alias in self.active_servers:
                 self.active_servers.pop(alias, None)
                 save_active_servers(self.active_servers)
+            self._tools_cache.pop(alias, None)
         except Exception:
             pass
+
+    async def _get_tools_cached(self, alias: str):
+        session = self.sessions.get(alias)
+        if not session:
+            raise RuntimeError(f"Session '{alias}' not connected")
+        cache = self._tools_cache.setdefault(alias, {"data": None, "expires": 0.0})
+        now = time.time()
+        if cache["data"] is None or now >= cache["expires"]:
+            response = await session.list_tools()
+            cache["data"] = response.tools
+            cache["expires"] = now + 60.0
+        return cache["data"]
     
     def _parse_simple_args(self, args_str: str) -> Dict[str, Any]:
         """

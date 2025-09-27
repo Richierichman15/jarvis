@@ -24,6 +24,56 @@ except Exception:
     BRAIN_AVAILABLE = False
 
 
+def _trading_symbol(match: re.Match[str]) -> Dict[str, Any]:
+    symbol = match.group(1).upper()
+    if symbol in {"BTC", "ETH", "SOL", "ADA", "XRP"}:
+        return {"symbol": f"{symbol}/USDT"}
+    if symbol.endswith("/USDT"):
+        return {"symbol": symbol}
+    return {"symbol": f"{symbol}/USDT"}
+
+
+KEYWORD_SHORTCUTS = [
+    {"tool": "fitness.list_workouts", "args": {"muscle_group": "legs"}, "contains": ["leg workout", "leg workouts", "legs", "lower body"]},
+    {"tool": "fitness.list_workouts", "args": {"muscle_group": "upper"}, "contains": ["upper body", "upper workouts", "arm workout", "shoulder workout", "chest workout"]},
+    {"tool": "fitness.list_workouts", "args": {"muscle_group": "core"}, "contains": ["core workout", "ab workout", "abs", "midsection"]},
+    {"tool": "fitness.list_workouts", "args": {}, "contains": ["all workouts", "every workout", "full workout list"]},
+    {"tool": "fitness.search_workouts", "args": {"query": "cardio"}, "contains": ["cardio workout", "hiit", "endurance"]},
+    {"tool": "budget.get_balance", "args": {}, "contains": ["budget balance", "current balance", "wallet balance", "financial overview", "income vs expenses"]},
+    {"tool": "budget.get_transactions", "args": {"limit": 20}, "contains": ["recent transactions", "list transactions", "show expenses", "spending history", "last purchases"]},
+    {"tool": "budget.get_monthly_stats", "args": {}, "contains": ["monthly spending", "month over month", "monthly stats", "this month's spend"]},
+    {"tool": "budget.get_category_stats", "args": {}, "contains": ["category breakdown", "spending by category", "top categories"]},
+    {"tool": "jarvis_get_status", "args": {}, "contains": ["system status", "jarvis status", "overall status", "give me a status"]},
+    {"tool": "jarvis_get_settings", "args": {}, "contains": ["list settings", "show settings", "configuration"]},
+    {"tool": "system.get_status", "args": {}, "contains": ["quest status", "xp status", "game status", "daily quests" ]},
+    {"tool": "system.list_tasks", "args": {}, "contains": ["list quests", "list tasks", "show quests", "show tasks"]},
+    {"tool": "system.check_progress", "pattern": re.compile(r"progress on (.+)", re.IGNORECASE), "builder": lambda m: {"title": m.group(1).strip()}},
+    {"tool": "trading.get_price", "args": {"symbol": "BTC/USDT"}, "contains": ["btc price", "bitcoin price", "price of btc"]},
+    {"tool": "trading.get_price", "args": {"symbol": "ETH/USDT"}, "contains": ["eth price", "ethereum price", "price of eth"]},
+    {"tool": "trading.get_price", "pattern": re.compile(r"(?:price|quote) of ([A-Za-z]{2,6}(?:/USDT)?)", re.IGNORECASE), "builder": _trading_symbol},
+    {"tool": "jarvis_web_search", "args": {"query": "weather"}, "contains": ["current weather", "today's weather", "weather report"]},
+]
+
+
+def _match_keyword_shortcut(query: str, tools: Optional[Dict[str, Any]] = None) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    for shortcut in KEYWORD_SHORTCUTS:
+        tool = shortcut["tool"]
+        if tools and tool not in tools:
+            continue
+        contains = shortcut.get("contains") or []
+        for phrase in contains:
+            if phrase in query:
+                args = shortcut.get("args", {}).copy()
+                return tool, args
+        pattern = shortcut.get("pattern")
+        if pattern:
+            match = pattern.search(query)
+            if match:
+                builder = shortcut.get("builder")
+                args = builder(match) if builder else shortcut.get("args", {}).copy()
+                return tool, args
+    return None, None
+
 def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None, allow_multi: bool = True) -> Tuple[Optional[str], Optional[Dict]]:
     """Route a free-text query to a tool name and args.
 
@@ -34,6 +84,10 @@ def route_natural_language(query: str, tools: Optional[Dict[str, Any]] = None, a
         return "jarvis_chat", {"message": ""}
 
     ql = q.lower()
+
+    tool_shortcut, args_shortcut = _match_keyword_shortcut(ql, tools)
+    if tool_shortcut:
+        return tool_shortcut, args_shortcut
 
     # Multi-intent detection FIRST so it doesn't get short-circuited by single-intent heuristics
     multi_intent = bool(re.search(r"\b(and|then|;|,\s*then)\b", ql))
