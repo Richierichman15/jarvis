@@ -13,7 +13,8 @@ from typing import Dict
 
 
 DEFAULT_FILE = ".jarvis_projects.json"
-SERVERS_FILE = ".jarvis_servers.json"
+DEFAULT_SERVERS_FILE = ".jarvis_servers.json"
+DEFAULT_ACTIVE_SERVERS_FILE = ".jarvis_active_sessions.json"
 
 
 def load_projects(filepath: str = DEFAULT_FILE) -> Dict[str, dict]:
@@ -49,17 +50,41 @@ def save_projects(projects: Dict[str, dict], filepath: str = DEFAULT_FILE) -> No
     path.write_text(json.dumps(projects, indent=2, sort_keys=True))
 
 
-def load_servers(filepath: str = SERVERS_FILE) -> Dict[str, dict]:
+def load_servers(filepath: str = DEFAULT_SERVERS_FILE) -> Dict[str, dict]:
+    """Load saved MCP server connections (alias -> {command, args})."""
     try:
         path = Path(filepath)
         if not path.exists():
             return {}
         data = json.loads(path.read_text())
-        return data if isinstance(data, dict) else {}
+        if isinstance(data, dict):
+            return data
+        return {}
     except Exception:
         return {}
 
 
-def save_servers(servers: Dict[str, dict], filepath: str = SERVERS_FILE) -> None:
+def save_servers(servers: Dict[str, dict], filepath: str = DEFAULT_SERVERS_FILE) -> None:
+    """Persist saved MCP server connections."""
     path = Path(filepath)
     path.write_text(json.dumps(servers, indent=2, sort_keys=True))
+
+
+def load_active_servers(filepath: str = DEFAULT_ACTIVE_SERVERS_FILE) -> Dict[str, dict]:
+    """Load currently connected MCP server aliases."""
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            return {}
+        data = json.loads(path.read_text())
+        if isinstance(data, dict):
+            return data
+        return {}
+    except Exception:
+        return {}
+
+
+def save_active_servers(active: Dict[str, dict], filepath: str = DEFAULT_ACTIVE_SERVERS_FILE) -> None:
+    """Persist currently connected MCP server aliases."""
+    path = Path(filepath)
+    path.write_text(json.dumps(active, indent=2, sort_keys=True))

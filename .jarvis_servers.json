@@ -1,0 +1,29 @@
+{
+  "budget": {
+    "args": [
+      "-lc",
+      "cd /Users/gitonga-nyaga/github/budget && node_modules/.bin/tsx backend/src/mcp/server.ts"
+    ],
+    "command": "bash"
+  },
+  "search": {
+    "args": [
+      "search/mcp_server.py"
+    ],
+    "command": "python3"
+  },
+  "system": {
+    "args": [
+      "-u",
+      "/Users/gitonga-nyaga/github/system/system_server.py"
+    ],
+    "command": "python3"
+  },
+  "trading": {
+    "args": [
+      "-lc",
+      "cd /Users/gitonga-nyaga/github/finance && /Users/gitonga-nyaga/github/finance/venv/bin/python3 -u trading_mcp_server.py"
+    ],
+    "command": "bash"
+  }
+}

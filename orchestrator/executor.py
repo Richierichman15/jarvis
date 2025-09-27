@@ -2,8 +2,8 @@
 Orchestrator executor for multi-tool plans.
 
 execute_plan(steps, mcp_client) -> list[dict]
- - steps: list of dicts { tool: str, args: dict, parallel?: bool }
- - mcp_client: object with async method call_tool(name: str, args: dict)
+ - steps: list of dicts { server?: str, tool: str, args: dict, parallel?: bool }
+ - mcp_client: object with async method call_tool_server(server, tool, args)
 
 Runs sequentially by default. If consecutive steps have parallel=True,
 they are grouped and executed concurrently. Retries each failed step up to
@@ -17,16 +17,19 @@ import asyncio
 from typing import Any, Dict, List
 
 
-async def _run_with_retries(mcp_client, tool: str, args: Dict[str, Any], server: str | None = None, max_retries: int = 2) -> Dict[str, Any]:
+async def _run_with_retries(
+    mcp_client,
+    server: str | None,
+    tool: str,
+    args: Dict[str, Any],
+    max_retries: int = 2,
+) -> Dict[str, Any]:
     attempt = 0
     delay = 0.5
     while True:
         try:
-            # Prefer multi-server call if available
-            if hasattr(mcp_client, "call_tool_server"):
-                result = await mcp_client.call_tool_server(server, tool, args or {})
-            else:
-                result = await mcp_client.call_tool(tool, args or {})
+            # Delegate to the client's router so it can choose the server
+            result = await mcp_client.call_tool_server(server, tool, args or {})
             return {"tool": tool, "ok": True, "data": _normalize_result(result)}
         except Exception as e:
             if attempt >= max_retries:
@@ -75,7 +78,12 @@ async def execute_plan(steps: List[Dict[str, Any]], mcp_client) -> List[Dict[str
         server = step.get("server") or "jarvis"
         if not is_parallel:
             # Run sequential step
-            res = await _run_with_retries(mcp_client, step.get("tool", ""), step.get("args") or {}, server)
+            res = await _run_with_retries(
+                mcp_client,
+                step.get("server"),
+                step.get("tool", ""),
+                step.get("args") or {},
+            )
             results.append(res)
             i += 1
             continue
@@ -89,7 +97,13 @@ async def execute_plan(steps: List[Dict[str, Any]], mcp_client) -> List[Dict[str
 
         # Launch all in parallel, preserving order
         coros = [
-            _run_with_retries(mcp_client, s.get("tool", ""), s.get("args") or {}, s.get("server") or "jarvis") for s in batch
+            _run_with_retries(
+                mcp_client,
+                s.get("server"),
+                s.get("tool", ""),
+                s.get("args") or {},
+            )
+            for s in batch
         ]
         batch_results = await asyncio.gather(*coros, return_exceptions=False)
         results.extend(batch_results)

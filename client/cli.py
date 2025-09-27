@@ -10,8 +10,10 @@ import subprocess
 import sys
 import re
 import os
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+import shlex
 from tabulate import tabulate
 
 from colorama import init, Fore, Style
@@ -24,15 +26,19 @@ from mcp.client.stdio import stdio_client
 
 # Allow running as a script by making local imports work
 THIS_DIR = Path(__file__).parent
+ROOT_DIR = THIS_DIR.parent  # repo root
 if str(THIS_DIR) not in sys.path:
     sys.path.append(str(THIS_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
 from storage import (
     load_projects as load_local_projects,
     save_projects as save_local_projects,
-    load_servers,
-    save_servers,
+    load_servers as load_saved_servers,
+    save_servers as save_saved_servers,
+    load_active_servers,
+    save_active_servers,
 )
-import shlex
 from llm_router import route_natural_language
 
 
@@ -67,18 +73,20 @@ class JarvisClient:
         else:
             self.server_path = Path(server_path)
             
+        # Multi-server sessions
         self.sessions: Dict[str, ClientSession] = {}
-        self.session_tasks: Dict[str, asyncio.Task] = {}
-        self.session_params: Dict[str, StdioServerParameters] = {}
-        self.session_events: Dict[str, asyncio.Event] = {}
+        self._server_tasks: Dict[str, asyncio.Task] = {}
         self.active_session: str = "jarvis"
         self.tools: Dict[str, Any] = {}
         self.tool_completer: Optional[WordCompleter] = None
         self.local_projects: Dict[str, Dict[str, Any]] = {}
         self.active_project: Optional[str] = None
+        self.saved_servers: Dict[str, Dict[str, Any]] = load_saved_servers()
+        self._tools_cache: Dict[str, Dict[str, Any]] = {}
+        self.active_servers: Dict[str, Dict[str, Any]] = load_active_servers()
         
     async def start(self):
-        """Start the MCP server and establish connection with retries."""
+        """Start default 'jarvis' server, then run the interactive CLI."""
         print(f"{Fore.BLUE}Starting Jarvis MCP server...{Style.RESET_ALL}")
 
         # Check if server exists
@@ -95,52 +103,49 @@ class JarvisClient:
                 f"Or: pip install -r client/requirements-all.txt\n"
             )
 
-        # Create server parameters for stdio transport
+        # Default Jarvis server via Python stdio
         server_params = StdioServerParameters(
-            command=sys.executable,  # Python executable
-            args=["-u", str(self.server_path), "Boss"]  # unbuffered stdio, default user
+            command=sys.executable,
+            args=["-u", str(self.server_path), "Boss"],
         )
 
-        max_attempts = 3
-        attempt = 0
-        while attempt < max_attempts:
-            attempt += 1
-            try:
-                # Start the server and create a session
-                # Start default 'jarvis' session and hold open
-                await self._spawn_and_hold("jarvis", server_params)
-                await self.session_events["jarvis"].wait()
-                # Initialize and run CLI using the jarvis session
-                await self._initialize()
-                await self._run_cli()
-                # On exit, signal all sessions to close
-                for alias, ev in self.session_events.items():
-                    ev.set()
-                return
-            except ReconnectNeeded:
-                if attempt < max_attempts:
-                    print(f"{Fore.BLUE}Server down, retrying (attempt {attempt}/{max_attempts})...{Style.RESET_ALL}")
-                    await asyncio.sleep(1.0)
+        # Reset active server tracker for this session
+        self.active_servers = {}
+        save_active_servers(self.active_servers)
+
+        # Spawn and hold the default 'jarvis' session
+        try:
+            await self._spawn_and_hold("jarvis", server_params)
+        except Exception as e:
+            print(f"{Fore.RED}Failed to start default server: {e}{Style.RESET_ALL}")
+            return
+
+        # Auto-reconnect any saved servers (except the default 'jarvis')
+        if self.saved_servers:
+            for alias, entry in self.saved_servers.items():
+                if alias == "jarvis" or alias in self.sessions:
                     continue
-                else:
-                    print(f"{Fore.RED}Server unavailable after {max_attempts} attempts.{Style.RESET_ALL}")
-                    break
-            except Exception as e:
-                if attempt < max_attempts:
-                    print(f"{Fore.BLUE}Server down, retrying (attempt {attempt}/{max_attempts})...{Style.RESET_ALL}")
-                    await asyncio.sleep(1.0)
+                cmd = entry.get("command")
+                args = entry.get("args") or []
+                if not cmd:
                     continue
-                else:
-                    print(f"{Fore.RED}Failed to start client: {e}{Style.RESET_ALL}")
-                    break
+                try:
+                    await self._spawn_and_hold(alias, StdioServerParameters(command=cmd, args=args))
+                except Exception as e:
+                    print(f"{Fore.YELLOW}Warning: failed to auto-connect saved server '{alias}': {e}{Style.RESET_ALL}")
+
+        # Initialize client-side state and show tools from active session
+        await self._initialize()
+
+        # Run CLI until exit, then shutdown all sessions
+        try:
+            await self._run_cli()
+        finally:
+            await self._shutdown_all_servers()
     
     async def _initialize(self):
         """Initialize the connection and discover available tools."""
-        print(f"{Fore.GREEN}Connected to server!{Style.RESET_ALL}")
-
-        # Perform protocol initialization/handshake
-        # This ensures versions/capabilities are negotiated before using tools
-        await self.sessions[self.active_session].initialize()
+        print(f"{Fore.GREEN}Connected to server(s)!{Style.RESET_ALL}")
 
         # Load any locally saved projects (client-side persistence)
         self.local_projects = load_local_projects()
@@ -150,12 +155,18 @@ class JarvisClient:
             print(f"{Fore.BLUE}No locally saved projects found (starting fresh).{Style.RESET_ALL}")
 
         # Get available tools
-        tools_response = await self.sessions[self.active_session].list_tools()
-        self.tools = {tool.name: tool for tool in tools_response.tools}
+        # Use the active session for tool listing/completion
+        active = self.sessions.get(self.active_session)
+        if not active:
+            raise RuntimeError(f"Active session '{self.active_session}' not connected")
+        tools_list = await self._get_tools_cached(self.active_session)
+        self.tools = {tool.name: tool for tool in tools_list}
         
         # Create tool name completer for CLI
         tool_names = list(self.tools.keys())
-        self.tool_completer = WordCompleter(tool_names + ['help', 'list', 'exit', 'quit', 'projects', 'use', 'start-api', 'connect', 'servers'])
+        self.tool_completer = WordCompleter(
+            tool_names + ['help', 'list', 'exit', 'quit', 'projects', 'use', 'start-api', 'connect', 'servers']
+        )
         
         print(f"\n{Fore.YELLOW}Available tools:{Style.RESET_ALL}")
         for name, tool in self.tools.items():
@@ -195,7 +206,7 @@ class JarvisClient:
                 print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
 
     def _prompt(self) -> str:
-        label = "jarvis"
+        label = self.active_session or "jarvis"
         if self.active_project:
             label += f"[{self.active_project}]"
         return f"{label}> "
@@ -240,6 +251,10 @@ class JarvisClient:
             await self._connect_server(args)
         elif cmd == 'servers':
             self._list_servers()
+        elif cmd == 'use-server':
+            await self._use_server(args)
+        elif cmd == 'disconnect':
+            await self._disconnect_server(args)
         elif cmd in self.tools:
             await self._call_tool(cmd, args)
         else:
@@ -275,8 +290,12 @@ class JarvisClient:
         print(f"  {Fore.CYAN}list{Style.RESET_ALL}              - List all available tools")
         print(f"  {Fore.CYAN}projects{Style.RESET_ALL}          - List locally saved projects (if any)")
         print(f"  {Fore.CYAN}use <name>{Style.RESET_ALL}        - Set active project for tool calls (if supported)")
-        print(f"  {Fore.CYAN}start-api{Style.RESET_ALL}         - Start FastAPI on http://127.0.0.1:8000")
+        print(f"  {Fore.CYAN}start-api{Style.RESET_ALL}         - Start FastAPI on http://127.0.0.1:8001")
         print(f"  {Fore.CYAN}exit/quit{Style.RESET_ALL}         - Exit the client")
+        print(f"  {Fore.CYAN}connect <alias> <cmd> [args...] {Style.RESET_ALL}- Connect an MCP server as <alias>")
+        print(f"  {Fore.CYAN}servers{Style.RESET_ALL}           - List connected and saved MCP servers")
+        print(f"  {Fore.CYAN}use-server <alias>{Style.RESET_ALL} - Make <alias> the active session for direct tool calls")
+        print(f"  {Fore.CYAN}disconnect <alias>{Style.RESET_ALL} - Disconnect and remove a server alias")
         print(f"  {Fore.CYAN}<tool> [args]{Style.RESET_ALL}     - Call a tool with JSON arguments")
         print(f"  {Fore.CYAN}--project <name>{Style.RESET_ALL}  - Override active project for a call (if supported)")
         print(f"  Natural language routing supported for a few intents.")
@@ -290,6 +309,8 @@ class JarvisClient:
     async def _list_tools(self):
         """List all available tools with their descriptions."""
         print(f"\n{Fore.YELLOW}Available Tools:{Style.RESET_ALL}")
+        tools_list = await self._get_tools_cached(self.active_session)
+        self.tools = {tool.name: tool for tool in tools_list}
         for name, tool in self.tools.items():
             print(f"\n{Fore.CYAN}{name}{Style.RESET_ALL}")
             print(f"  Description: {tool.description}")
@@ -358,31 +379,34 @@ class JarvisClient:
         print(f"{Fore.BLUE}Calling {tool_name}...{Style.RESET_ALL}")
         
         try:
-            # Intercept client-side plan execution for multi-server support
+            # Special-case: orchestrator.run_plan executed client-side with multi-server routing
             if tool_name == "orchestrator.run_plan":
-                try:
-                    from orchestrator.executor import execute_plan
-                    steps = args.get("steps") if isinstance(args, dict) else None
-                    if not isinstance(steps, list):
-                        raise ValueError("'steps' must be a list")
+                from orchestrator import executor
 
-                    class _Router:
-                        async def call_tool_server(self_inner, server: Optional[str], tool: str, a: Dict[str, Any]):
-                            alias = server or "jarvis"
-                            if alias not in self.sessions:
-                                raise RuntimeError(f"Server alias '{alias}' not connected")
-                            return await self.sessions[alias].call_tool(tool, a)
+                class _Router:
+                    def __init__(self, outer: 'JarvisClient'):
+                        self._outer = outer
 
-                    plan_results = await execute_plan(steps, _Router())
-                    import json as _json
-                    self._display_result(_json.dumps({"results": plan_results}))
-                    return
-                except Exception as e:
-                    print(f"{Fore.RED}Plan execution failed: {e}{Style.RESET_ALL}")
-                    return
+                    async def call_tool_server(self, server: Optional[str], tool: str, args: Dict[str, Any]):
+                        alias = server or "jarvis"
+                        if alias not in self._outer.sessions:
+                            raise RuntimeError(f"Server '{alias}' not connected")
+                        return await self._outer.sessions[alias].call_tool(tool, args)
 
-            # Call the tool on the active session by default
-            result = await self.sessions[self.active_session].call_tool(tool_name, args)
+                steps = args.get("steps") if isinstance(args, dict) else None
+                if not isinstance(steps, list):
+                    raise ValueError("orchestrator.run_plan requires args.steps as a list")
+
+                router = _Router(self)
+                results = await executor.execute_plan(steps, router)
+                # Wrap to be pretty-printable by _display_result
+                result = json.dumps({"results": results}, ensure_ascii=False)
+            else:
+                # Default: call tool on the active session
+                session = self.sessions.get(self.active_session)
+                if not session:
+                    raise RuntimeError(f"Active session '{self.active_session}' not connected")
+                result = await session.call_tool(tool_name, args)
 
             # Display the result
             self._display_result(result)
@@ -397,6 +421,208 @@ class JarvisClient:
                 # Signal the outer loop to reconnect
                 raise ReconnectNeeded() from e
             print(f"{Fore.RED}Error calling tool: {e}{Style.RESET_ALL}")
+
+    async def _spawn_and_hold(self, alias: str, params: StdioServerParameters) -> None:
+        """Spawn a subprocess MCP server and hold its session open under alias."""
+        # If a prior task exists but has finished, clean it up and allow reconnect
+        existing = self._server_tasks.get(alias)
+        if existing is not None:
+            if existing.done():
+                self._server_tasks.pop(alias, None)
+            else:
+                raise RuntimeError(f"Server alias '{alias}' already connected")
+
+        ready_fut: asyncio.Future = asyncio.get_event_loop().create_future()
+
+        async def runner():
+            try:
+                async with stdio_client(params) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        # Attach
+                        self.sessions[alias] = session
+                        if not ready_fut.done():
+                            ready_fut.set_result(True)
+                        self._mark_server_connected(alias)
+                        # Hold open until cancelled
+                        try:
+                            while True:
+                                await asyncio.sleep(3600)
+                        except asyncio.CancelledError:
+                            pass
+            except Exception as e:
+                if not ready_fut.done():
+                    ready_fut.set_exception(e)
+                else:
+                    # Surface runtime errors
+                    print(f"{Fore.RED}Server '{alias}' stopped: {e}{Style.RESET_ALL}")
+            finally:
+                # Cleanup on exit
+                self.sessions.pop(alias, None)
+                # Also remove task handle so reconnect is possible
+                self._server_tasks.pop(alias, None)
+                self._mark_server_disconnected(alias)
+
+        task = asyncio.create_task(runner(), name=f"mcp-server:{alias}")
+        self._server_tasks[alias] = task
+        # Wait until initialized or failed
+        await ready_fut
+        print(f"{Fore.GREEN}Connected server '{alias}'.{Style.RESET_ALL}")
+
+    async def _connect_server(self, args: str) -> None:
+        """connect <alias> <command> [args...]"""
+        try:
+            parts = shlex.split(args or "")
+        except Exception:
+            parts = (args or "").split()
+        if len(parts) < 2:
+            print(f"{Fore.YELLOW}Usage: connect <alias> <command> [args...]{Style.RESET_ALL}")
+            return
+        alias, cmd, *cmd_args = parts
+        # If the command was quoted as a single string containing spaces,
+        # split it into executable and its arguments for stdio spawning.
+        if (not cmd_args) and (" " in cmd or "\t" in cmd):
+            try:
+                reparsed = shlex.split(cmd)
+                if reparsed:
+                    cmd, *cmd_args = reparsed
+            except Exception:
+                pass
+        params = StdioServerParameters(command=cmd, args=cmd_args)
+        try:
+            await self._spawn_and_hold(alias, params)
+        except Exception as e:
+            print(f"{Fore.RED}Failed to connect '{alias}': {e}{Style.RESET_ALL}")
+            return
+        # Persist saved connection
+        try:
+            self.saved_servers[alias] = {"command": cmd, "args": cmd_args}
+            save_saved_servers(self.saved_servers)
+        except Exception:
+            pass
+        # Optionally refresh tool list if connecting the active alias
+        if alias == self.active_session:
+            try:
+                await self._initialize()
+            except Exception:
+                pass
+
+    def _list_servers(self) -> None:
+        print(f"\n{Fore.YELLOW}Servers:{Style.RESET_ALL}")
+        connected = set(self.sessions.keys())
+        if connected:
+            print(" Connected:")
+            for alias in sorted(connected):
+                marker = "*" if alias == self.active_session else " "
+                print(f"  {marker} {alias}")
+        else:
+            print(" Connected: (none)")
+        saved = set(self.saved_servers.keys()) - connected
+        if saved:
+            print(" Saved (not connected):")
+            for alias in sorted(saved):
+                entry = self.saved_servers.get(alias, {})
+                cmd = entry.get("command", "?")
+                args = " ".join(entry.get("args", []))
+                print(f"    {alias} → {cmd} {args}")
+
+    async def _shutdown_all_servers(self) -> None:
+        tasks = list(self._server_tasks.values())
+        for t in tasks:
+            t.cancel()
+        if tasks:
+            try:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            finally:
+                self._server_tasks.clear()
+        self.active_servers = {}
+        save_active_servers(self.active_servers)
+
+    async def _use_server(self, args: str) -> None:
+        alias = (args or '').strip()
+        if not alias:
+            print(f"{Fore.YELLOW}Usage: use-server <alias>{Style.RESET_ALL}")
+            return
+        if alias not in self.sessions:
+            print(f"{Fore.RED}Server '{alias}' not connected. Use: connect {alias} <cmd> [args...]{Style.RESET_ALL}")
+            return
+        self.active_session = alias
+        # Refresh available tools/completion from the new active session
+        try:
+            tools_list = await self._get_tools_cached(alias)
+            self.tools = {tool.name: tool for tool in tools_list}
+            tool_names = list(self.tools.keys())
+            self.tool_completer = WordCompleter(
+                tool_names + ['help', 'list', 'exit', 'quit', 'projects', 'use', 'start-api', 'connect', 'servers', 'use-server']
+            )
+            print(f"{Fore.GREEN}Active server set to '{alias}'.{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.YELLOW}Warning: failed to refresh tools for '{alias}': {e}{Style.RESET_ALL}")
+
+    async def _disconnect_server(self, args: str) -> None:
+        alias = (args or '').strip()
+        if not alias:
+            print(f"{Fore.YELLOW}Usage: disconnect <alias>{Style.RESET_ALL}")
+            return
+        existed = False
+        task = self._server_tasks.pop(alias, None)
+        if task is not None:
+            existed = True
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
+        if alias in self.sessions:
+            existed = True
+            self.sessions.pop(alias, None)
+        if not existed:
+            print(f"{Fore.YELLOW}Server '{alias}' not connected.{Style.RESET_ALL}")
+            return
+        # If the active session was removed, pick another if available
+        if self.active_session == alias:
+            new_active = next(iter(self.sessions.keys()), None)
+            self.active_session = new_active or "jarvis"
+            # Refresh tools if a session exists
+            if new_active and new_active in self.sessions:
+                try:
+                    tools_list = await self._get_tools_cached(new_active)
+                    self.tools = {tool.name: tool for tool in tools_list}
+                except Exception:
+                    self.tools = {}
+            else:
+                self.tools = {}
+        self._mark_server_disconnected(alias)
+        print(f"{Fore.GREEN}Disconnected '{alias}'.{Style.RESET_ALL}")
+
+    def _mark_server_connected(self, alias: str) -> None:
+        try:
+            self.active_servers[alias] = {"connected": True}
+            save_active_servers(self.active_servers)
+            self._tools_cache.pop(alias, None)
+        except Exception:
+            pass
+
+    def _mark_server_disconnected(self, alias: str) -> None:
+        try:
+            if alias in self.active_servers:
+                self.active_servers.pop(alias, None)
+                save_active_servers(self.active_servers)
+            self._tools_cache.pop(alias, None)
+        except Exception:
+            pass
+
+    async def _get_tools_cached(self, alias: str):
+        session = self.sessions.get(alias)
+        if not session:
+            raise RuntimeError(f"Session '{alias}' not connected")
+        cache = self._tools_cache.setdefault(alias, {"data": None, "expires": 0.0})
+        now = time.time()
+        if cache["data"] is None or now >= cache["expires"]:
+            response = await session.list_tools()
+            cache["data"] = response.tools
+            cache["expires"] = now + 60.0
+        return cache["data"]
     
     def _parse_simple_args(self, args_str: str) -> Dict[str, Any]:
         """
@@ -444,7 +670,7 @@ class JarvisClient:
         print(f"{Fore.GREEN}Active project set to '{name}'.{Style.RESET_ALL}")
 
     def _start_api_server(self) -> None:
-        """Launch the FastAPI server in a separate process on port 8000."""
+        """Launch the FastAPI server in a separate process on port 8001."""
         env = os.environ.copy()
         env["MCP_SERVER_PATH"] = str(self.server_path)
         cmd = [
@@ -454,11 +680,11 @@ class JarvisClient:
             "client.api:create_app",
             "--factory",
             "--port",
-            "8000",
+            "8001",
         ]
         try:
             subprocess.Popen(cmd, env=env)
-            print(f"{Fore.BLUE}API server starting at http://127.0.0.1:8000 (Ctrl+C to stop in its terminal).{Style.RESET_ALL}")
+            print(f"{Fore.BLUE}API server starting at http://127.0.0.1:8001 (Ctrl+C to stop in its terminal).{Style.RESET_ALL}")
         except FileNotFoundError:
             print(f"{Fore.RED}uvicorn not found. Install deps: pip install -r client/requirements.txt{Style.RESET_ALL}")
         except Exception as e:
@@ -467,32 +693,15 @@ class JarvisClient:
     def _display_result(self, result: Any):
         """Display tool result in a formatted way."""
         print(f"\n{Fore.GREEN}Result:{Style.RESET_ALL}")
-        
-        # Try to pretty-print orchestrator results
-        try:
-            text_view = self._extract_text(result)
-            import json as _json
-            data = _json.loads(text_view)
-            if isinstance(data, dict) and isinstance(data.get("results"), list):
-                # Only pretty-print as orchestrator table if entries look like orchestrator outputs
-                results_list = data["results"]
-                if results_list and isinstance(results_list[0], dict) and {"tool", "ok"}.issubset(results_list[0].keys()):
-                    rows = []
-                    for entry in results_list:
-                        tool = entry.get("tool")
-                        ok = entry.get("ok")
-                        if ok:
-                            preview_src = str(entry.get("data", ""))
-                        else:
-                            preview_src = "ERR: " + str(entry.get("error", ""))
-                        preview = preview_src.replace("\n", " ")
-                        if len(preview) > 96:
-                            preview = preview[:93] + "..."
-                        rows.append([tool, "✅" if ok else "❌", preview])
-                    print(tabulate(rows, headers=["Tool", "OK", "Preview"], tablefmt="github"))
-                    return
-        except Exception:
-            pass
+        text_view = self._extract_text(result)
+
+        if self._try_render_orchestrator_table(text_view):
+            print()
+            return
+
+        if self._try_render_json_payload(text_view):
+            print()
+            return
 
         # String-like response
         if isinstance(result, str):
@@ -519,6 +728,89 @@ class JarvisClient:
             # Fallback for unexpected result format
             print(result)
         print()
+
+    def _try_render_orchestrator_table(self, text_view: str) -> bool:
+        """Render orchestrator results in a compact table if possible."""
+        if not text_view:
+            return False
+        try:
+            data = json.loads(text_view)
+        except Exception:
+            return False
+
+        if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+            return False
+
+        results_list = data["results"]
+        if not results_list or not isinstance(results_list[0], dict):
+            return False
+
+        if not {"tool", "ok"}.issubset(results_list[0].keys()):
+            return False
+
+        rows = []
+        for entry in results_list:
+            tool = entry.get("tool")
+            ok = entry.get("ok")
+            if ok:
+                preview_src = str(entry.get("data", ""))
+            else:
+                preview_src = "ERR: " + str(entry.get("error", ""))
+            preview = preview_src.replace("\n", " ")
+            if len(preview) > 96:
+                preview = preview[:93] + "..."
+            rows.append([tool, "✅" if ok else "❌", preview])
+
+        print(tabulate(rows, headers=["Tool", "OK", "Preview"], tablefmt="github"))
+        return True
+
+    def _try_render_json_payload(self, text_view: str, max_table_rows: int = 20) -> bool:
+        """Detect JSON payloads and pretty-print or tabulate them."""
+        if not text_view:
+            return False
+
+        stripped = text_view.strip()
+        if not stripped or stripped[0] not in "{[":
+            return False
+
+        try:
+            data = json.loads(stripped)
+        except Exception:
+            return False
+
+        # List of dicts → render as table
+        if isinstance(data, list) and data and all(isinstance(item, dict) for item in data):
+            headers = list(data[0].keys())
+            for item in data[1:]:
+                for key in item.keys():
+                    if key not in headers:
+                        headers.append(key)
+
+            def _cell(value: Any) -> str:
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value, ensure_ascii=False)
+                return "" if value is None else str(value)
+
+            rows = [
+                [_cell(item.get(header)) for header in headers]
+                for item in data[:max_table_rows]
+            ]
+
+            if rows:
+                print(tabulate(rows, headers=headers, tablefmt="github"))
+            else:
+                print("(no rows)")
+
+            if len(data) > max_table_rows:
+                print("... (more)")
+            return True
+
+        # Any other JSON → pretty-print inside a code block
+        pretty = json.dumps(data, indent=2, ensure_ascii=False)
+        print("```json")
+        print(pretty)
+        print("```")
+        return True
 
     def _should_reconnect_error(self, e: Exception) -> bool:
         msg = str(e).lower()

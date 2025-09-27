@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
@@ -13,6 +14,8 @@ from datetime import datetime
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
     from mcp.types import (
         Tool, 
         TextContent, 
@@ -52,6 +55,74 @@ class JarvisMCPServer:
         self.jarvis = Jarvis(user_name=user_name)
         self.server = Server("jarvis-mcp-server")
         self._register_tools()
+
+    @staticmethod
+    def _as_text(value: Any) -> str:
+        """Ensure tool responses are serialized to a safe string."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (dict, list)):
+            try:
+                return json.dumps(value, ensure_ascii=False)
+            except Exception:
+                pass
+        return str(value)
+
+    def _active_sessions_path(self) -> Path:
+        return PROJECT_ROOT / ".jarvis_active_sessions.json"
+
+    def _saved_servers_path(self) -> Path:
+        return PROJECT_ROOT / ".jarvis_servers.json"
+
+    def _is_external_server_connected(self, alias: str) -> bool:
+        try:
+            data = json.loads(self._active_sessions_path().read_text())
+            return alias in data
+        except Exception:
+            return False
+
+    def _load_saved_server_command(self, alias: str) -> Optional[StdioServerParameters]:
+        try:
+            data = json.loads(self._saved_servers_path().read_text())
+        except Exception:
+            return None
+
+        entry = data.get(alias)
+        if not isinstance(entry, dict):
+            return None
+
+        command = entry.get("command")
+        args = entry.get("args") or []
+        if not command:
+            return None
+
+        return StdioServerParameters(command=command, args=args)
+
+    async def _invoke_external_tool(
+        self,
+        params: StdioServerParameters,
+        tool: str,
+        args: Dict[str, Any],
+    ) -> Any:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await session.call_tool(tool, args)
+
+    def _extract_text_content(self, result: Any) -> str:
+        if isinstance(result, str):
+            return result
+        if hasattr(result, "content") and getattr(result, "content") is not None:
+            texts: List[str] = []
+            for content in result.content:
+                if hasattr(content, "text"):
+                    texts.append(getattr(content, "text") or "")
+                elif isinstance(content, dict) and "text" in content:
+                    texts.append(str(content.get("text") or ""))
+            return "\n".join(t for t in texts if t)
+        return str(result)
 
     async def _dispatch_tool(self, name: str, arguments: Dict[str, Any]) -> List[Union[TextContent, ImageContent, EmbeddedResource]]:
         """Internal dispatcher to invoke a tool by name.
@@ -190,18 +261,21 @@ class JarvisMCPServer:
             return [TextContent(type="text", text=settings_text)]
 
         if name == "jarvis_web_search":
-            query = arguments.get("query", "")
+            query = (arguments or {}).get("query", "")
             if not query:
                 return [TextContent(type="text", text="Error: No search query provided")]
-            if hasattr(self.jarvis, 'tool_manager') and 'web_search' in self.jarvis.tool_manager.tools:
-                try:
-                    web_search_tool = self.jarvis.tool_manager.tools['web_search']
-                    results = web_search_tool.search(query)
-                    return [TextContent(type="text", text=results)]
-                except Exception as e:
-                    return [TextContent(type="text", text=f"Web search error: {str(e)}")]
-            else:
-                return [TextContent(type="text", text="Web search tool not available")]
+            if not self._is_external_server_connected("search"):
+                return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
+            params = self._load_saved_server_command("search")
+            if params is None:
+                return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+            try:
+                response = await self._invoke_external_tool(params, "web.search", {"query": query})
+                text = self._extract_text_content(response)
+                return [TextContent(type="text", text=text)]
+            except Exception as e:
+                logger.error("Proxy search failed: %s", e)
+                return [TextContent(type="text", text=f"Search proxy failed: {e}")]
 
         if name == "jarvis_calculate":
             expression = arguments.get("expression", "")
@@ -253,84 +327,8 @@ class JarvisMCPServer:
                         "required": ["message"]
                     }
                 ),
-                Tool(
-                    name="jarvis_schedule_task",
-                    description="Schedule a new task or reminder with Jarvis.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "description": {
-                                "type": "string",
-                                "description": "Description of the task"
-                            },
-                            "priority": {
-                                "type": "string",
-                                "enum": ["low", "medium", "high", "urgent"],
-                                "description": "Priority level of the task",
-                                "default": "medium"
-                            },
-                            "category": {
-                                "type": "string",
-                                "description": "Category of the task (work, personal, learning, health, general)",
-                                "default": "general"
-                            },
-                            "deadline": {
-                                "type": "string",
-                                "description": "Deadline for the task (ISO format)",
-                                "default": None
-                            },
-                            "duration": {
-                                "type": "integer",
-                                "description": "Estimated duration in minutes",
-                                "default": None
-                            }
-                        },
-                        "required": ["description"]
-                    }
-                ),
-                Tool(
-                    name="jarvis_get_tasks",
-                    description="Get all tasks from Jarvis, including pending and completed tasks.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "status": {
-                                "type": "string",
-                                "enum": ["all", "pending", "completed"],
-                                "description": "Filter tasks by status",
-                                "default": "all"
-                            }
-                        }
-                    }
-                ),
-                Tool(
-                    name="jarvis_complete_task",
-                    description="Mark a task as completed by its index number.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "task_index": {
-                                "type": "integer",
-                                "description": "Index number of the task to complete (1-based)"
-                            }
-                        },
-                        "required": ["task_index"]
-                    }
-                ),
-                Tool(
-                    name="jarvis_delete_task",
-                    description="Delete a task by its index number.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "task_index": {
-                                "type": "integer",
-                                "description": "Index number of the task to delete (1-based)"
-                            }
-                        },
-                        "required": ["task_index"]
-                    }
-                ),
+                # Task management tools have been removed from Jarvis to avoid
+                # redundancy with the dedicated 'system' server.
                 Tool(
                     name="jarvis_get_status",
                     description="Get current system status and overview from Jarvis.",
@@ -375,7 +373,7 @@ class JarvisMCPServer:
                 ),
                 Tool(
                     name="jarvis_web_search",
-                    description="Perform a web search using Jarvis's web search tool.",
+                    description="Proxy web search via the external 'search' MCP server.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -384,7 +382,8 @@ class JarvisMCPServer:
                                 "description": "Search query"
                             }
                         },
-                        "required": ["query"]
+                        "required": ["query"],
+                        "additionalProperties": False
                     }
                 ),
                 Tool(
@@ -517,82 +516,29 @@ class JarvisMCPServer:
                         except Exception as e:
                             # Fall back to legacy Jarvis chat on any brain error
                             logger.warning(f"Brain chat failed, falling back to Jarvis.chat: {e}")
-                            response = self.jarvis.chat(message)
+                            response = self._as_text(self.jarvis.chat(message))
+                            if not response:
+                                response = "I heard you. Let's keep chatting!"
                             return [TextContent(type="text", text=response)]
 
                     # Fallback if brain package is not available
-                    response = self.jarvis.chat(message)
+                    response = self._as_text(self.jarvis.chat(message))
+                    if not response:
+                        response = "I heard you. Let's keep chatting!"
                     return [TextContent(type="text", text=response)]
                 
-                elif name == "jarvis_schedule_task":
-                    description = arguments.get("description", "")
-                    priority = arguments.get("priority", "medium")
-                    category = arguments.get("category", "general")
-                    deadline = arguments.get("deadline")
-                    duration = arguments.get("duration")
-                    
-                    if not description:
-                        return [TextContent(type="text", text="Error: No task description provided")]
-                    
-                    # Schedule the task
-                    self.jarvis.schedule_task(description, priority, category, deadline, duration)
-                    return [TextContent(type="text", text=f"Task scheduled successfully: {description}")]
-                
-                elif name == "jarvis_get_tasks":
-                    status_filter = arguments.get("status", "all")
-                    
-                    if status_filter == "all":
-                        tasks = self.jarvis.tasks
-                    elif status_filter == "pending":
-                        tasks = [t for t in self.jarvis.tasks if t.status == "pending"]
-                    elif status_filter == "completed":
-                        tasks = [t for t in self.jarvis.tasks if t.status == "completed"]
-                    else:
-                        tasks = self.jarvis.tasks
-                    
-                    if not tasks:
-                        return [TextContent(type="text", text="No tasks found.")]
-                    
-                    # Format tasks for display
-                    task_list = []
-                    for i, task in enumerate(tasks, 1):
-                        task_dict = task.to_dict() if hasattr(task, 'to_dict') else task
-                        priority_icon = {"urgent": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(task_dict.get("priority", "medium"), "⚪")
-                        status_icon = "✅" if task_dict.get("status") == "completed" else "⏳"
-                        
-                        task_info = f"{i}. {priority_icon} {status_icon} {task_dict.get('name', 'Unknown')}"
-                        if task_dict.get('description'):
-                            task_info += f"\n   📝 {task_dict['description']}"
-                        if task_dict.get('category'):
-                            task_info += f"\n   🏷️ Category: {task_dict['category']}"
-                        if task_dict.get('deadline'):
-                            task_info += f"\n   ⏰ Deadline: {task_dict['deadline']}"
-                        
-                        task_list.append(task_info)
-                    
-                    return [TextContent(type="text", text="\n\n".join(task_list))]
-                
-                elif name == "jarvis_complete_task":
-                    task_index = arguments.get("task_index")
-                    if not task_index:
-                        return [TextContent(type="text", text="Error: No task index provided")]
-                    
-                    try:
-                        self.jarvis.complete_task(task_index)
-                        return [TextContent(type="text", text=f"Task {task_index} completed successfully!")]
-                    except (IndexError, ValueError) as e:
-                        return [TextContent(type="text", text=f"Error: {str(e)}")]
-                
-                elif name == "jarvis_delete_task":
-                    task_index = arguments.get("task_index")
-                    if not task_index:
-                        return [TextContent(type="text", text="Error: No task index provided")]
-                    
-                    try:
-                        self.jarvis.delete_task(task_index)
-                        return [TextContent(type="text", text=f"Task {task_index} deleted successfully!")]
-                    except (IndexError, ValueError) as e:
-                        return [TextContent(type="text", text=f"Error: {str(e)}")]
+                elif name in ("jarvis_schedule_task", "jarvis_get_tasks", "jarvis_complete_task", "jarvis_delete_task"):
+                    return [TextContent(
+                        type="text",
+                        text=(
+                            "These task tools are deprecated in Jarvis. "
+                            "Use the 'system' server instead:\n"
+                            "- system.create_task\n"
+                            "- system.list_tasks\n"
+                            "- system.complete_task\n"
+                            "- system.set_task_completed"
+                        ),
+                    )]
                 
                 elif name == "jarvis_get_status":
                     # Capture the status output
@@ -640,20 +586,24 @@ class JarvisMCPServer:
                     return [TextContent(type="text", text=settings_text)]
                 
                 elif name == "jarvis_web_search":
-                    query = arguments.get("query", "")
+                    query = (arguments or {}).get("query", "")
                     if not query:
                         return [TextContent(type="text", text="Error: No search query provided")]
-                    
-                    # Use the web search tool if available
-                    if hasattr(self.jarvis, 'tool_manager') and 'web_search' in self.jarvis.tool_manager.tools:
-                        try:
-                            web_search_tool = self.jarvis.tool_manager.tools['web_search']
-                            results = web_search_tool.search(query)
-                            return [TextContent(type="text", text=results)]
-                        except Exception as e:
-                            return [TextContent(type="text", text=f"Web search error: {str(e)}")]
-                    else:
-                        return [TextContent(type="text", text="Web search tool not available")]
+
+                    if not self._is_external_server_connected("search"):
+                        return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
+
+                    params = self._load_saved_server_command("search")
+                    if params is None:
+                        return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+
+                    try:
+                        response = await self._invoke_external_tool(params, "web.search", {"query": query})
+                        text = self._extract_text_content(response)
+                        return [TextContent(type="text", text=text)]
+                    except Exception as e:
+                        logger.error("Proxy search failed: %s", e)
+                        return [TextContent(type="text", text=f"Search proxy failed: {e}")]
                 
                 elif name == "jarvis_calculate":
                     expression = arguments.get("expression", "")
