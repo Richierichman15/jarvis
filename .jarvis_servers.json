@@ -8,16 +8,17 @@
   },
   "search": {
     "args": [
-      "search/mcp_server.py"
+      "E:/Richie/github/jarvis/search/mcp_server.py"
     ],
-    "command": "python3"
+    "command": "python",
+    "cwd": "E:/Richie/github/jarvis"
   },
   "system": {
     "args": [
-      "-u",
-      "/Users/gitonga-nyaga/github/system/system_server.py"
+      "E:/Richie/github/system/system_server.py"
     ],
-    "command": "python3"
+    "command": "python",
+    "cwd": "E:/Richie/github/system"
   },
   "trading": {
     "args": [

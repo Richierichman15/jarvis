@@ -1,7 +1,4 @@
 {
-  "budget": {
-    "connected": true
-  },
   "jarvis": {
     "connected": true
   },
@@ -9,9 +6,6 @@
     "connected": true
   },
   "system": {
-    "connected": true
-  },
-  "trading": {
     "connected": true
   }
 }

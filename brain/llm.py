@@ -32,7 +32,7 @@ def _generate_ollama(system_prompt: str, user_prompt: str) -> str:
     prompt = f"{system_prompt}\n\nUser: {user_prompt}\nAssistant:"
 
     try:
-        with httpx.Client(timeout=60) as client:
+        with httpx.Client(timeout=120) as client:
             # First try /api/generate
             resp = client.post(
                 url,
@@ -100,7 +100,7 @@ def _generate_openai(system_prompt: str, user_prompt: str) -> str:
             "messages": messages,
             "temperature": 0.3,
         }
-        with httpx.Client(timeout=60) as client:
+        with httpx.Client(timeout=120) as client:
             resp = client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()

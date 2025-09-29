@@ -46,3 +46,8 @@ jarvis/debug_logs/
 *.log
 
 node_modules/
+.jarvis_servers.json
+data
+.jarvis_active_sessions.json
+.jarvis_history
+brain.env
