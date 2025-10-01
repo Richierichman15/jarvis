@@ -24,11 +24,65 @@ import argparse
 import logging
 from tabulate import tabulate
 
+
+def format_output(data: Any, output_format: str = "text") -> str:
+    """
+    Format tool responses in a consistent way.
+    - text: human-readable plain/Markdown
+    - table: tabular data if it's a list of dicts
+    - json: raw JSON
+    """
+    if output_format == "json":
+        return json.dumps(data, indent=2, ensure_ascii=False)
+
+    # If it's already a string, just return it
+    if isinstance(data, str):
+        return data
+
+    # If it's a list of dicts → tabular
+    if isinstance(data, list) and all(isinstance(row, dict) for row in data):
+        if not data:
+            return "No data available"
+        headers = data[0].keys()
+        rows = [list(row.values()) for row in data]
+        return tabulate(rows, headers=headers, tablefmt="grid")
+
+    # If it's a dict → key/value table
+    if isinstance(data, dict):
+        if not data:
+            return "No data available"
+        return tabulate(data.items(), headers=["Key", "Value"], tablefmt="grid")
+
+    # If it's a list of lists (table data) → tabular
+    if isinstance(data, list) and all(isinstance(row, list) for row in data):
+        if not data:
+            return "No data available"
+        # Assume first row is headers if all items are strings
+        if all(isinstance(item, str) for item in data[0]):
+            headers = data[0]
+            rows = data[1:]
+            return tabulate(rows, headers=headers, tablefmt="grid")
+        else:
+            # No headers, just data
+            return tabulate(data, tablefmt="grid")
+
+    # Fallback
+    return str(data)
+
 # Create Typer app
 app = typer.Typer(help="Jarvis AI Assistant")
 
 # Create console for rich output
 console = Console()
+
+
+@app.callback()
+def main(
+    ctx: typer.Context,
+    output_format: str = typer.Option("text", "--format", "-f", help="Output format: text/table/json")
+):
+    """Jarvis AI Assistant - Your intelligent companion."""
+    ctx.obj = {"output_format": output_format}
 
 # Styles
 user_style = Style(color="blue", bold=True)
@@ -54,6 +108,7 @@ def display_startup_message():
 
 @app.command()
 def chat(
+    ctx: typer.Context,
     name: str = typer.Option("Boss", help="How Jarvis should address you"),
     openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
 ):
@@ -73,6 +128,9 @@ def chat(
     console.print(f"\nJARVIS: ", style=assistant_style, end="")
     console.print("Welcome! I'm ready to assist you. Type 'help' for available commands.")
     
+    # Get format from context
+    fmt = ctx.obj.get("output_format", "text")
+    
     # Main interaction loop
     try:
         while True:
@@ -88,9 +146,9 @@ def chat(
                 # Process query
                 response = jarvis.chat(user_input)
                 
-            # Display response
+            # Display response using formatter
             console.print(f"\nJARVIS: ", style=assistant_style, end="")
-            console.print(response)
+            console.print(format_output(response, fmt))
             
     except KeyboardInterrupt:
         console.print("\n\nJARVIS: Shutting down. Goodbye!", style=assistant_style)
@@ -103,6 +161,7 @@ def chat(
 
 @app.command()
 def query(
+    ctx: typer.Context,
     question: str = typer.Argument(..., help="Question to ask Jarvis"),
     name: str = typer.Option("Boss", help="How Jarvis should address you"),
     openai_key: Optional[str] = typer.Option(None, help="OpenAI API key (or set OPENAI_API_KEY env var)")
@@ -120,9 +179,10 @@ def query(
         # Process query
         response = jarvis.chat(question)
         
-    # Display response
+    # Display response using formatter
+    fmt = ctx.obj.get("output_format", "text")
     console.print(f"JARVIS: ", style=assistant_style, end="")
-    console.print(response)
+    console.print(format_output(response, fmt))
     
     return 0
 
@@ -449,6 +509,62 @@ def mcp_http_server(
         return 1
 
 
+@app.command()
+def plugins(
+    ctx: typer.Context,
+    name: str = typer.Option("Boss", help="How Jarvis should address you")
+):
+    """List available plugins."""
+    jarvis = Jarvis(user_name=name)
+    plugins = jarvis.discover_plugins()
+    
+    fmt = ctx.obj.get("output_format", "text")
+    console.print(format_output(plugins, fmt))
+
+
+@app.command()
+def settings(
+    ctx: typer.Context,
+    plugin_name: str = typer.Argument(..., help="Plugin name to get settings for"),
+    name: str = typer.Option("Boss", help="How Jarvis should address you")
+):
+    """Get plugin settings."""
+    jarvis = Jarvis(user_name=name)
+    settings = jarvis.get_plugin_settings(plugin_name)
+    
+    if settings is None:
+        console.print(f"No settings found for plugin: {plugin_name}")
+        return
+    
+    fmt = ctx.obj.get("output_format", "text")
+    console.print(f"Settings for plugin: {plugin_name}")
+    console.print(format_output(settings, fmt))
+
+
+@app.command()
+def status(
+    ctx: typer.Context,
+    name: str = typer.Option("Boss", help="How Jarvis should address you")
+):
+    """Get Jarvis system status and information."""
+    jarvis = Jarvis(user_name=name)
+    
+    # Get system information
+    status_info = {
+        "user": name,
+        "version": jarvis.version,
+        "personality": jarvis.personality,
+        "pending_tasks": len([t for t in jarvis.tasks if t.status == "pending"]),
+        "completed_tasks": len([t for t in jarvis.tasks if t.status == "completed"]),
+        "conversation_history": len(jarvis.conversation_history),
+        "system_info": jarvis.system_info,
+        "preferences": jarvis.preferences
+    }
+    
+    fmt = ctx.obj.get("output_format", "text")
+    console.print(format_output(status_info, fmt))
+
+
 # @app.command()
 # def dual_chat(
 #     name: str = typer.Option("Boss", help="How Jarvis should address you"),
@@ -531,25 +647,7 @@ def handle_plugin_command(args, jarvis):
     """Handle plugin-related commands."""
     if args.plugin_command == 'list':
         plugins = jarvis.discover_plugins()
-        if args.format == 'json':
-            print(json.dumps(plugins, indent=2))
-        else:
-            if not plugins:
-                print("No plugins available")
-                return
-            
-            table_data = []
-            for plugin in plugins:
-                table_data.append([
-                    plugin['name'],
-                    plugin['version'],
-                    plugin['type'],
-                    "Yes" if plugin['enabled'] else "No",
-                    plugin['description']
-                ])
-            
-            headers = ["Name", "Version", "Type", "Enabled", "Description"]
-            print(tabulate(table_data, headers=headers, tablefmt="grid"))
+        console.print(format_output(plugins, args.format))
     
     elif args.plugin_command == 'load':
         if jarvis.load_plugin(args.module_name, args.class_name):
@@ -566,19 +664,11 @@ def handle_plugin_command(args, jarvis):
     elif args.plugin_command == 'get-settings':
         settings = jarvis.get_plugin_settings(args.plugin_name)
         if settings is None:
-            print(f"No settings found for plugin: {args.plugin_name}")
+            console.print(f"No settings found for plugin: {args.plugin_name}")
             return
         
-        if args.format == 'json':
-            print(json.dumps(settings, indent=2))
-        else:
-            table_data = []
-            for key, value in settings.items():
-                table_data.append([key, str(value)])
-            
-            headers = ["Setting", "Value"]
-            print(f"Settings for plugin: {args.plugin_name}")
-            print(tabulate(table_data, headers=headers, tablefmt="grid"))
+        console.print(f"Settings for plugin: {args.plugin_name}")
+        console.print(format_output(settings, args.format))
     
     elif args.plugin_command == 'update-settings':
         try:

@@ -7,8 +7,9 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 from datetime import datetime
+import os
 
 # MCP imports
 try:
@@ -54,7 +55,116 @@ class JarvisMCPServer:
             
         self.jarvis = Jarvis(user_name=user_name)
         self.server = Server("jarvis-mcp-server")
+        
+        # Initialize optional external MCP session manager so this server can act as a client
+        # to other MCP servers (e.g., system, finance) and aggregate their tools.
+        self._session_manager = None
+        self._external_initialized = False
+        self._namespace_remote = os.environ.get("NAMESPACE_REMOTE_TOOLS", "true").lower() in ("1", "true", "yes", "on")
+        # tool name -> (alias, remote_tool_name)
+        self._remote_tool_index: Dict[str, Tuple[str, str]] = {}
+        try:
+            # Lazy import to avoid a hard dependency for users not using multi-server mode
+            from client.api import SessionManager  # type: ignore
+            # Build a dummy default parameter (not used to start Jarvis here) and pass saved servers
+            default_path = PROJECT_ROOT / "run_mcp_server.py"
+            default_params = StdioServerParameters(command=sys.executable, args=["-u", str(default_path), user_name])
+            self._session_manager = SessionManager(default_params, saved_servers=self._load_saved_external_servers())
+        except Exception as e:
+            logger.info("Multi-server session manager unavailable: %s", e)
         self._register_tools()
+
+    # -------- External servers management --------
+    def _load_saved_external_servers(self) -> Dict[str, Dict[str, Any]]:
+        """Load external MCP servers from env or saved client storage.
+
+        Supports env var MCP_EXTERNAL_SERVERS as JSON array of entries:
+        [{"alias": "system", "command": "python", "args": ["path/to/server.py"]}, ...]
+        """
+        # Highest priority: env configuration
+        raw = os.environ.get("MCP_EXTERNAL_SERVERS")
+        if raw:
+            try:
+                data = json.loads(raw)
+                out: Dict[str, Dict[str, Any]] = {}
+                if isinstance(data, list):
+                    for entry in data:
+                        if not isinstance(entry, dict):
+                            continue
+                        alias = str(entry.get("alias") or "").strip()
+                        command = str(entry.get("command") or "").strip()
+                        if not alias or not command:
+                            continue
+                        rec: Dict[str, Any] = {"command": command, "args": list(entry.get("args") or [])}
+                        if entry.get("cwd"):
+                            rec["cwd"] = entry.get("cwd")
+                        if entry.get("env"):
+                            rec["env"] = entry.get("env")
+                        out[alias] = rec
+                if out:
+                    return out
+            except Exception as e:
+                logger.warning("Failed to parse MCP_EXTERNAL_SERVERS: %s", e)
+
+        # Fallback: use saved servers from client.storage if present
+        try:
+            from client.storage import load_servers as _load_servers  # type: ignore
+            saved = _load_servers()
+            if isinstance(saved, dict):
+                saved.pop("jarvis", None)  # never include default jarvis here
+                return saved
+        except Exception:
+            pass
+        return {}
+
+    async def _ensure_external_sessions(self) -> None:
+        if self._external_initialized or not self._session_manager:
+            return
+        try:
+            # Connect all known servers from saved configuration
+            for alias, entry in (self._session_manager.saved_servers or {}).items():
+                if not isinstance(entry, dict) or not entry.get("command"):
+                    continue
+                try:
+                    await self._session_manager.connect_server(
+                        alias=alias,
+                        command=entry.get("command"),
+                        args=entry.get("args") or [],
+                        save=False,
+                        cwd=entry.get("cwd"),
+                        env=entry.get("env"),
+                    )
+                    logger.info("Connected external MCP server '%s'", alias)
+                except Exception as exc:
+                    logger.warning("Failed to connect external server '%s': %s", alias, exc)
+            self._external_initialized = True
+        except Exception as e:
+            logger.warning("External session init failed: %s", e)
+
+    async def _index_remote_tools(self) -> None:
+        if not self._session_manager:
+            return
+        await self._ensure_external_sessions()
+        index: Dict[str, Tuple[str, str]] = {}
+        try:
+            aliases = [a for a in self._session_manager.list_aliases() if a != getattr(self._session_manager, "default_alias", "jarvis")]
+        except Exception:
+            aliases = []
+        for alias in aliases:
+            try:
+                tools = await self._session_manager.list_tools_cached(alias)
+            except Exception:
+                continue
+            for t in tools or []:
+                rname = getattr(t, "name", None) or (t.get("name") if isinstance(t, dict) else None)
+                if not rname:
+                    continue
+                exposed = f"{alias}.{rname}" if self._namespace_remote else rname
+                if exposed not in index:
+                    index[exposed] = (alias, rname)
+                if self._namespace_remote and rname not in index:
+                    index[rname] = (alias, rname)
+        self._remote_tool_index = index
 
     @staticmethod
     def _as_text(value: Any) -> str:
@@ -311,8 +421,8 @@ class JarvisMCPServer:
 
         @self.server.list_tools()
         async def list_tools() -> List[Tool]:
-            """List all available Jarvis tools."""
-            return [
+            """List all available Jarvis tools aggregated with connected servers."""
+            local_tools: List[Tool] = [
                 Tool(
                     name="jarvis_chat",
                     description="Chat with Jarvis AI assistant. Send a message and get an intelligent response.",
@@ -459,6 +569,36 @@ class JarvisMCPServer:
                     }
                 )
             ]
+
+            # Append remote tools if any external servers are connected
+            try:
+                if self._session_manager is not None:
+                    await self._index_remote_tools()
+                    aggregated: List[Tool] = list(local_tools)
+                    aliases = [a for a in self._session_manager.list_aliases() if a != getattr(self._session_manager, "default_alias", "jarvis")]
+                    for alias in aliases:
+                        try:
+                            remote_tools = await self._session_manager.list_tools_cached(alias)
+                        except Exception:
+                            continue
+                        for rt in remote_tools or []:
+                            rname = getattr(rt, "name", None) or (rt.get("name") if isinstance(rt, dict) else None)
+                            if not rname:
+                                continue
+                            desc = getattr(rt, "description", None) or (rt.get("description") if isinstance(rt, dict) else None) or ""
+                            schema = getattr(rt, "inputSchema", None) or (rt.get("inputSchema") if isinstance(rt, dict) else None) or {"type": "object", "properties": {}}
+                            exposed_name = f"{alias}.{rname}" if self._namespace_remote else rname
+                            if any(t.name == exposed_name for t in aggregated):
+                                continue
+                            try:
+                                aggregated.append(Tool(name=exposed_name, description=desc, inputSchema=schema))
+                            except Exception:
+                                aggregated.append(Tool(name=exposed_name, description=desc, inputSchema={"type": "object", "properties": {}}))
+                    return aggregated
+            except Exception as e:
+                logger.warning("Remote tool aggregation failed: %s", e)
+
+            return local_tools
         
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Dict[str, Any]) -> List[Union[TextContent, ImageContent, EmbeddedResource]]:
@@ -669,6 +809,26 @@ class JarvisMCPServer:
                     return [TextContent(type="text", text=_json.dumps(payload, indent=2))]
                 
                 else:
+                    # Attempt to route unknown tools to connected external servers
+                    if self._session_manager is not None:
+                        await self._index_remote_tools()
+                        alias: Optional[str] = None
+                        remote_tool: Optional[str] = None
+                        if "." in name:
+                            prefix, _, tool_part = name.partition(".")
+                            if prefix and tool_part:
+                                alias, remote_tool = prefix, tool_part
+                        if alias is None or remote_tool is None:
+                            mapped = self._remote_tool_index.get(name)
+                            if mapped:
+                                alias, remote_tool = mapped
+                        if alias and remote_tool:
+                            try:
+                                result = await self._session_manager.call_tool(alias, remote_tool, arguments or {})
+                                text = self._extract_text_content(result)
+                                return [TextContent(type="text", text=text)]
+                            except Exception as e:
+                                return [TextContent(type="text", text=f"Error routing to {alias}.{remote_tool}: {e}")]
                     return [TextContent(type="text", text=f"Unknown tool: {name}")]
                     
             except Exception as e:
@@ -678,6 +838,11 @@ class JarvisMCPServer:
     async def run(self):
         """Run the MCP server."""
         logger.info("Starting Jarvis MCP Server...")
+        # Proactively connect external MCP servers before accepting requests
+        try:
+            await self._ensure_external_sessions()
+        except Exception as e:
+            logger.warning("External servers pre-connect failed: %s", e)
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
                 read_stream,
