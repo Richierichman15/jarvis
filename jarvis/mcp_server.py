@@ -382,7 +382,35 @@ class JarvisMCPServer:
             try:
                 response = await self._invoke_external_tool(params, "web.search", {"query": query})
                 text = self._extract_text_content(response)
-                return [TextContent(type="text", text=text)]
+                
+                # Parse JSON results
+                try:
+                    results = json.loads(text)
+                    if not isinstance(results, list):
+                        results = []
+                except (json.JSONDecodeError, TypeError):
+                    results = []
+                
+                # Format top 5 results into readable context
+                context_parts = []
+                for i, result in enumerate(results[:5], 1):
+                    if isinstance(result, dict):
+                        title = result.get("title", "No title")
+                        url = result.get("url", "No URL")
+                        snippet = result.get("snippet", "No snippet")
+                        context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
+                
+                if context_parts:
+                    context = "\n\n".join(context_parts)
+                    prompt = f"Based on these search results for '{query}':\n\n{context}\n\nPlease provide a helpful summary and analysis."
+                else:
+                    prompt = f"I searched for '{query}' but didn't find any structured results. The raw response was: {text[:500]}..."
+                
+                # Send to jarvis_chat tool
+                chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
+                chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
+                
+                return [TextContent(type="text", text=f"🔎 Results for '{query}':\n\n{chat_text}")]
             except Exception as e:
                 logger.error("Proxy search failed: %s", e)
                 return [TextContent(type="text", text=f"Search proxy failed: {e}")]
@@ -740,7 +768,35 @@ class JarvisMCPServer:
                     try:
                         response = await self._invoke_external_tool(params, "web.search", {"query": query})
                         text = self._extract_text_content(response)
-                        return [TextContent(type="text", text=text)]
+                        
+                        # Parse JSON results
+                        try:
+                            results = json.loads(text)
+                            if not isinstance(results, list):
+                                results = []
+                        except (json.JSONDecodeError, TypeError):
+                            results = []
+                        
+                        # Format top 5 results into readable context
+                        context_parts = []
+                        for i, result in enumerate(results[:5], 1):
+                            if isinstance(result, dict):
+                                title = result.get("title", "No title")
+                                url = result.get("url", "No URL")
+                                snippet = result.get("snippet", "No snippet")
+                                context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
+                        
+                        if context_parts:
+                            context = "\n\n".join(context_parts)
+                            prompt = f"Based on these search results for '{query}':\n\n{context}\n\nPlease provide a helpful summary and analysis."
+                        else:
+                            prompt = f"I searched for '{query}' but didn't find any structured results. The raw response was: {text[:500]}..."
+                        
+                        # Send to jarvis_chat tool
+                        chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
+                        chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
+                        
+                        return [TextContent(type="text", text=f"🔎 Results for '{query}':\n\n{chat_text}")]
                     except Exception as e:
                         logger.error("Proxy search failed: %s", e)
                         return [TextContent(type="text", text=f"Search proxy failed: {e}")]
