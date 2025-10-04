@@ -415,6 +415,60 @@ class JarvisMCPServer:
                 logger.error("Proxy search failed: %s", e)
                 return [TextContent(type="text", text=f"Search proxy failed: {e}")]
 
+        if name == "jarvis_scan_news":
+            topics = ["AI", "Crypto and Web3", "Finance and Trading Tech", "Automation", "Emerging Tech", "Economics"]
+            
+            if not self._is_external_server_connected("search"):
+                return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
+            
+            params = self._load_saved_server_command("search")
+            if params is None:
+                return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+            
+            all_summaries = []
+            
+            for topic in topics:
+                try:
+                    # Search for news on this topic
+                    response = await self._invoke_external_tool(params, "web.search", {"query": f"{topic} news"})
+                    text = self._extract_text_content(response)
+                    
+                    # Parse JSON results
+                    try:
+                        data = json.loads(text)
+                        results = data.get("results", []) if isinstance(data, dict) else []
+                    except (json.JSONDecodeError, TypeError):
+                        results = []
+                    
+                    # Format top 5 results into readable context
+                    context_parts = []
+                    for i, result in enumerate(results[:5], 1):
+                        if isinstance(result, dict):
+                            title = result.get("title", "No title")
+                            url = result.get("url", "No URL")
+                            snippet = result.get("snippet", "No snippet")
+                            context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
+                    
+                    if context_parts:
+                        context = "\n\n".join(context_parts)
+                        prompt = f"Based on these recent news articles about {topic}:\n\n{context}\n\nPlease provide a concise summary of the key developments and trends in this area."
+                    else:
+                        prompt = f"I searched for recent {topic} news but didn't find any structured results. The raw response was: {text[:300]}..."
+                    
+                    # Send to jarvis_chat tool
+                    chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
+                    chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
+                    
+                    all_summaries.append(f"## {topic}\n\n{chat_text}")
+                    
+                except Exception as e:
+                    logger.error(f"News scan failed for topic '{topic}': {e}")
+                    all_summaries.append(f"## {topic}\n\nError scanning news for this topic: {str(e)}")
+            
+            # Combine all summaries
+            combined_summary = "\n\n".join(all_summaries)
+            return [TextContent(type="text", text=f"📰 **Daily Tech News Scan**\n\n{combined_summary}")]
+
         if name == "jarvis_calculate":
             expression = arguments.get("expression", "")
             if not expression:
@@ -550,6 +604,14 @@ class JarvisMCPServer:
                                 "default": 10
                             }
                         }
+                    }
+                ),
+                Tool(
+                    name="jarvis_scan_news",
+                    description="Scan news across multiple tech topics (AI, Crypto, Finance, Automation, Emerging Tech, Economics) and provide AI-powered summaries.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {}
                     }
                 ),
                 Tool(
@@ -801,6 +863,60 @@ class JarvisMCPServer:
                         logger.error("Proxy search failed: %s", e)
                         return [TextContent(type="text", text=f"Search proxy failed: {e}")]
                 
+                elif name == "jarvis_scan_news":
+                    topics = ["AI", "Crypto and Web3", "Finance and Trading Tech", "Automation", "Emerging Tech", "Economics"]
+                    
+                    if not self._is_external_server_connected("search"):
+                        return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
+                    
+                    params = self._load_saved_server_command("search")
+                    if params is None:
+                        return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+                    
+                    all_summaries = []
+                    
+                    for topic in topics:
+                        try:
+                            # Search for news on this topic
+                            response = await self._invoke_external_tool(params, "web.search", {"query": f"{topic} news"})
+                            text = self._extract_text_content(response)
+                            
+                            # Parse JSON results
+                            try:
+                                data = json.loads(text)
+                                results = data.get("results", []) if isinstance(data, dict) else []
+                            except (json.JSONDecodeError, TypeError):
+                                results = []
+                            
+                            # Format top 5 results into readable context
+                            context_parts = []
+                            for i, result in enumerate(results[:5], 1):
+                                if isinstance(result, dict):
+                                    title = result.get("title", "No title")
+                                    url = result.get("url", "No URL")
+                                    snippet = result.get("snippet", "No snippet")
+                                    context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
+                            
+                            if context_parts:
+                                context = "\n\n".join(context_parts)
+                                prompt = f"Based on these recent news articles about {topic}:\n\n{context}\n\nPlease provide a concise summary of the key developments and trends in this area."
+                            else:
+                                prompt = f"I searched for recent {topic} news but didn't find any structured results. The raw response was: {text[:300]}..."
+                            
+                            # Send to jarvis_chat tool
+                            chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
+                            chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
+                            
+                            all_summaries.append(f"## {topic}\n\n{chat_text}")
+                            
+                        except Exception as e:
+                            logger.error(f"News scan failed for topic '{topic}': {e}")
+                            all_summaries.append(f"## {topic}\n\nError scanning news for this topic: {str(e)}")
+                    
+                    # Combine all summaries
+                    combined_summary = "\n\n".join(all_summaries)
+                    return [TextContent(type="text", text=f"📰 **Daily Tech News Scan**\n\n{combined_summary}")]
+
                 elif name == "jarvis_calculate":
                     expression = arguments.get("expression", "")
                     if not expression:
