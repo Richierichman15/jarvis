@@ -11,6 +11,14 @@ from typing import Any, Dict, List, Optional, Union, Tuple
 from datetime import datetime
 import os
 
+# HTTP client import
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
+    print("Warning: aiohttp library not available. Install with: pip install aiohttp")
+
 # MCP imports
 try:
     from mcp.server import Server
@@ -233,6 +241,48 @@ class JarvisMCPServer:
                     texts.append(str(content.get("text") or ""))
             return "\n".join(t for t in texts if t)
         return str(result)
+
+    async def send_to_discord(self, message: str) -> Optional[TextContent]:
+        """Send a message to Discord via webhook.
+        
+        Args:
+            message: The message content to send to Discord
+            
+        Returns:
+            TextContent with success/failure status, or None if successful
+        """
+        if not AIOHTTP_AVAILABLE:
+            logger.error("aiohttp not available for Discord webhook")
+            return TextContent(type="text", text="Error: aiohttp library not available for Discord webhook")
+        
+        # Get webhook URL from environment variable or use hardcoded fallback
+        webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+        if not webhook_url:
+            # You can set a hardcoded URL here if needed
+            logger.error("DISCORD_WEBHOOK_URL environment variable not set")
+            return TextContent(type="text", text="Error: DISCORD_WEBHOOK_URL environment variable not set")
+        
+        payload = {"content": message}
+        
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.post(webhook_url, json=payload) as response:
+                    if response.status == 204:
+                        logger.info("Message sent to Discord successfully")
+                        return None  # Success, no need to return anything
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Discord webhook returned status {response.status}: {error_text}")
+                        return TextContent(type="text", text=f"Discord webhook error (status {response.status}): {error_text}")
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"Connection error sending to Discord: {e}")
+            return TextContent(type="text", text=f"Connection error: Could not connect to Discord webhook. Error: {str(e)}")
+        except aiohttp.ClientTimeout as e:
+            logger.error(f"Timeout error sending to Discord: {e}")
+            return TextContent(type="text", text=f"Timeout error: Discord webhook request timed out. Error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error sending to Discord: {e}")
+            return TextContent(type="text", text=f"Error sending to Discord: {str(e)}")
 
     async def _dispatch_tool(self, name: str, arguments: Dict[str, Any]) -> List[Union[TextContent, ImageContent, EmbeddedResource]]:
         """Internal dispatcher to invoke a tool by name.
@@ -469,6 +519,36 @@ class JarvisMCPServer:
             combined_summary = "\n\n".join(all_summaries)
             return [TextContent(type="text", text=f"📰 **Daily Tech News Scan**\n\n{combined_summary}")]
 
+        if name == "jarvis_trigger_n8n":
+            if not AIOHTTP_AVAILABLE:
+                return [TextContent(type="text", text="Error: aiohttp library not available. Install with: pip install aiohttp")]
+            
+            url = "http://localhost:5678/webhook/jarvis-news"
+            payload = {"trigger": "jarvis_scan_news"}
+            
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                    async with session.post(url, json=payload) as response:
+                        if response.status == 200:
+                            try:
+                                response_data = await response.json()
+                                if isinstance(response_data, dict) and "message" in response_data:
+                                    return [TextContent(type="text", text=response_data["message"])]
+                                else:
+                                    return [TextContent(type="text", text=f"n8n workflow triggered successfully. Response: {json.dumps(response_data)}")]
+                            except (json.JSONDecodeError, aiohttp.ContentTypeError):
+                                text_response = await response.text()
+                                return [TextContent(type="text", text=f"n8n workflow triggered successfully. Response: {text_response}")]
+                        else:
+                            error_text = await response.text()
+                            return [TextContent(type="text", text=f"n8n webhook returned status {response.status}: {error_text}")]
+            except aiohttp.ClientConnectorError as e:
+                return [TextContent(type="text", text=f"Connection error: Could not connect to n8n webhook at {url}. Error: {str(e)}")]
+            except aiohttp.ClientTimeout as e:
+                return [TextContent(type="text", text=f"Timeout error: n8n webhook request timed out. Error: {str(e)}")]
+            except Exception as e:
+                return [TextContent(type="text", text=f"Error triggering n8n workflow: {str(e)}")]
+
         if name == "jarvis_calculate":
             expression = arguments.get("expression", "")
             if not expression:
@@ -609,6 +689,14 @@ class JarvisMCPServer:
                 Tool(
                     name="jarvis_scan_news",
                     description="Scan news across multiple tech topics (AI, Crypto, Finance, Automation, Emerging Tech, Economics) and provide AI-powered summaries.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {}
+                    }
+                ),
+                Tool(
+                    name="jarvis_trigger_n8n",
+                    description="Trigger an n8n workflow by sending a webhook to localhost:5678/webhook/jarvis-news.",
                     inputSchema={
                         "type": "object",
                         "properties": {}
@@ -916,6 +1004,36 @@ class JarvisMCPServer:
                     # Combine all summaries
                     combined_summary = "\n\n".join(all_summaries)
                     return [TextContent(type="text", text=f"📰 **Daily Tech News Scan**\n\n{combined_summary}")]
+
+                elif name == "jarvis_trigger_n8n":
+                    if not AIOHTTP_AVAILABLE:
+                        return [TextContent(type="text", text="Error: aiohttp library not available. Install with: pip install aiohttp")]
+                    
+                    url = "http://localhost:5678/webhook/jarvis-news"
+                    payload = {"trigger": "jarvis_scan_news"}
+                    
+                    try:
+                        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                            async with session.post(url, json=payload) as response:
+                                if response.status == 200:
+                                    try:
+                                        response_data = await response.json()
+                                        if isinstance(response_data, dict) and "message" in response_data:
+                                            return [TextContent(type="text", text=response_data["message"])]
+                                        else:
+                                            return [TextContent(type="text", text=f"n8n workflow triggered successfully. Response: {json.dumps(response_data)}")]
+                                    except (json.JSONDecodeError, aiohttp.ContentTypeError):
+                                        text_response = await response.text()
+                                        return [TextContent(type="text", text=f"n8n workflow triggered successfully. Response: {text_response}")]
+                                else:
+                                    error_text = await response.text()
+                                    return [TextContent(type="text", text=f"n8n webhook returned status {response.status}: {error_text}")]
+                    except aiohttp.ClientConnectorError as e:
+                        return [TextContent(type="text", text=f"Connection error: Could not connect to n8n webhook at {url}. Error: {str(e)}")]
+                    except aiohttp.ClientTimeout as e:
+                        return [TextContent(type="text", text=f"Timeout error: n8n webhook request timed out. Error: {str(e)}")]
+                    except Exception as e:
+                        return [TextContent(type="text", text=f"Error triggering n8n workflow: {str(e)}")]
 
                 elif name == "jarvis_calculate":
                     expression = arguments.get("expression", "")
