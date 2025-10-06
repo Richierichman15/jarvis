@@ -523,7 +523,7 @@ class JarvisMCPServer:
             if not AIOHTTP_AVAILABLE:
                 return [TextContent(type="text", text="Error: aiohttp library not available. Install with: pip install aiohttp")]
             
-            url = "http://localhost:5678/webhook/jarvis-news"
+            url = "http://localhost:5678/webhook/d3a372f9-f7c5-41aa-b217-8e1f961f4e7d"
             payload = {"trigger": "jarvis_scan_news"}
             
             try:
@@ -1009,7 +1009,7 @@ class JarvisMCPServer:
                     if not AIOHTTP_AVAILABLE:
                         return [TextContent(type="text", text="Error: aiohttp library not available. Install with: pip install aiohttp")]
                     
-                    url = "http://localhost:5678/webhook/jarvis-news"
+                    url = "http://localhost:5678/webhook/d3a372f9-f7c5-41aa-b217-8e1f961f4e7d"
                     payload = {"trigger": "jarvis_scan_news"}
                     
                     try:

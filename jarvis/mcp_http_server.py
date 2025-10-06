@@ -90,6 +90,10 @@ class JarvisHTTPMCPServer:
         self.app.router.add_get('/mcp/tools/call', self.call_tool_get)  # Support GET requests
         self.app.router.add_get('/mcp/status', self.get_status)
         
+        # n8n integration endpoints
+        self.app.router.add_post('/tool/jarvis_scan_news', self.n8n_scan_news)
+        self.app.router.add_post('/tool/jarvis_trigger_n8n', self.n8n_trigger_n8n)
+        
         # WebSocket endpoint for real-time MCP communication
         self.app.router.add_get('/mcp/ws', self.websocket_handler)
         
@@ -100,6 +104,8 @@ class JarvisHTTPMCPServer:
         # Add OPTIONS handlers for CORS preflight
         self.app.router.add_options('/mcp/tools/call', self.options_handler)
         self.app.router.add_options('/mcp/tools', self.options_handler)
+        self.app.router.add_options('/tool/jarvis_scan_news', self.options_handler)
+        self.app.router.add_options('/tool/jarvis_trigger_n8n', self.options_handler)
     
     async def health_check(self, request):
         """Health check endpoint."""
@@ -316,6 +322,22 @@ class JarvisHTTPMCPServer:
                             "default": 10
                         }
                     }
+                }
+            },
+            {
+                "name": "jarvis_scan_news",
+                "description": "Scan news across multiple tech topics (AI, Crypto, Finance, Automation, Emerging Tech, Economics) and provide AI-powered summaries.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
+            },
+            {
+                "name": "jarvis_trigger_n8n",
+                "description": "Trigger an n8n workflow by sending a webhook to localhost:5678/webhook/d3a372f9-f7c5-41aa-b217-8e1f961f4e7d.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
                 }
             }
         ]
@@ -547,6 +569,36 @@ class JarvisHTTPMCPServer:
                 
                 return {"conversations": conversations, "count": len(conversations)}
             
+            elif name == "jarvis_scan_news":
+                # Import the MCP server to use its dispatch functionality
+                from .mcp_server import JarvisMCPServer
+                mcp_server = JarvisMCPServer(user_name=self.jarvis.user_name)
+                
+                try:
+                    result = await mcp_server._dispatch_tool("jarvis_scan_news", {})
+                    if result and len(result) > 0:
+                        return {"result": result[0].text, "status": "success"}
+                    else:
+                        return {"error": "No result from news scan", "status": "error"}
+                except Exception as e:
+                    logger.error(f"News scan failed: {e}")
+                    return {"error": f"News scan failed: {str(e)}", "status": "error"}
+            
+            elif name == "jarvis_trigger_n8n":
+                # Import the MCP server to use its dispatch functionality
+                from .mcp_server import JarvisMCPServer
+                mcp_server = JarvisMCPServer(user_name=self.jarvis.user_name)
+                
+                try:
+                    result = await mcp_server._dispatch_tool("jarvis_trigger_n8n", {})
+                    if result and len(result) > 0:
+                        return {"result": result[0].text, "status": "success"}
+                    else:
+                        return {"error": "No result from n8n trigger", "status": "error"}
+                except Exception as e:
+                    logger.error(f"n8n trigger failed: {e}")
+                    return {"error": f"n8n trigger failed: {str(e)}", "status": "error"}
+            
             else:
                 return {"error": f"Unknown tool: {name}"}
                 
@@ -564,6 +616,52 @@ class JarvisHTTPMCPServer:
             "status": "running",
             "timestamp": datetime.now().isoformat()
         })
+    
+    async def n8n_scan_news(self, request):
+        """Dedicated endpoint for n8n to trigger news scanning."""
+        try:
+            # Execute the news scan tool
+            result = await self.execute_tool("jarvis_scan_news", {})
+            
+            # Return the result in a format that n8n can easily process
+            return web.json_response({
+                "success": result.get("status") == "success",
+                "data": result.get("result", result.get("error", "Unknown error")),
+                "timestamp": datetime.now().isoformat(),
+                "tool": "jarvis_scan_news"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in n8n_scan_news endpoint: {e}")
+            return web.json_response({
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "tool": "jarvis_scan_news"
+            }, status=500)
+    
+    async def n8n_trigger_n8n(self, request):
+        """Dedicated endpoint for n8n to trigger itself (for testing/loops)."""
+        try:
+            # Execute the n8n trigger tool
+            result = await self.execute_tool("jarvis_trigger_n8n", {})
+            
+            # Return the result in a format that n8n can easily process
+            return web.json_response({
+                "success": result.get("status") == "success",
+                "data": result.get("result", result.get("error", "Unknown error")),
+                "timestamp": datetime.now().isoformat(),
+                "tool": "jarvis_trigger_n8n"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in n8n_trigger_n8n endpoint: {e}")
+            return web.json_response({
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "tool": "jarvis_trigger_n8n"
+            }, status=500)
     
     async def websocket_handler(self, request):
         """Handle WebSocket connections for real-time MCP communication."""
