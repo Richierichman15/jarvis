@@ -65,7 +65,7 @@ class JarvisClientMCPClient:
     def __init__(self, base_url: str, session: aiohttp.ClientSession):
         self.base_url = base_url
         self.session = session
-        self.timeout = aiohttp.ClientTimeout(total=15)
+        self.timeout = aiohttp.ClientTimeout(total=60)  # Increased to 60 seconds for news scanning
         self.available_tools: Dict[str, Any] = {}
     
     async def get_available_tools(self) -> Dict[str, Any]:
@@ -121,10 +121,13 @@ class JarvisClientMCPClient:
             
             logger.info(f"Calling tool: {tool_name} on server: {server or 'default'} with args: {arguments}")
             
+            # Use longer timeout for news scanning
+            timeout = aiohttp.ClientTimeout(total=120) if tool_name == "jarvis_scan_news" else self.timeout
+            
             async with self.session.post(
                 f"{self.base_url}/run-tool",
                 json=payload,
-                timeout=self.timeout,
+                timeout=timeout,
                 headers={'Content-Type': 'application/json'}
             ) as response:
                 
@@ -271,12 +274,25 @@ class DiscordCommandRouter:
         """
         tool_name, arguments, server = self.parse_command(message.content)
         
+        # Send progress message for long-running operations
+        if tool_name == "jarvis_scan_news":
+            progress_msg = await message.reply("🔍 Scanning news sources... This may take up to 2 minutes.")
+        
         if tool_name == "natural_language":
             # Use natural language processing
-            return await self.jarvis_client.natural_language_query(arguments["query"])
+            result = await self.jarvis_client.natural_language_query(arguments["query"])
         else:
             # Call specific tool
-            return await self.jarvis_client.call_tool(tool_name, arguments, server)
+            result = await self.jarvis_client.call_tool(tool_name, arguments, server)
+        
+        # Delete progress message if it was sent
+        if tool_name == "jarvis_scan_news" and 'progress_msg' in locals():
+            try:
+                await progress_msg.delete()
+            except:
+                pass  # Ignore if message can't be deleted
+        
+        return result
 
 
 # Global instances
