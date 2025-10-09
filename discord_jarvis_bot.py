@@ -64,7 +64,7 @@ class JarvisMCPClient:
     def __init__(self, base_url: str, session: aiohttp.ClientSession):
         self.base_url = base_url
         self.session = session
-        self.timeout = aiohttp.ClientTimeout(total=30)
+        self.timeout = aiohttp.ClientTimeout(total=15)
     
     async def query_jarvis(self, tool_name: str, arguments: dict = None) -> str:
         """
@@ -103,19 +103,35 @@ class JarvisMCPClient:
                         if 'result' in data and isinstance(data['result'], dict):
                             # Extract response from result object
                             result_data = data['result']
-                            if 'response' in result_data:
+                            if 'response' in result_data and result_data['response'] is not None:
                                 result = result_data['response']
-                            elif 'content' in result_data:
+                            elif 'content' in result_data and result_data['content'] is not None:
                                 result = result_data['content']
-                            elif 'message' in result_data:
+                            elif 'message' in result_data and result_data['message'] is not None:
                                 result = result_data['message']
+                            elif 'status' in result_data and result_data['status'] is not None:
+                                result = result_data['status']
+                            elif 'tasks' in result_data and result_data['tasks'] is not None:
+                                result = str(result_data['tasks'])
+                            elif 'conversations' in result_data and result_data['conversations'] is not None:
+                                result = str(result_data['conversations'])
+                            elif 'error' in result_data and result_data['error'] is not None:
+                                # Handle error responses
+                                error_msg = result_data['error']
+                                if 'search server not connected' in error_msg.lower():
+                                    result = "🔍 **News Search Unavailable**\n\nThe search server is not connected. To enable news scanning, the search MCP server needs to be connected to Jarvis.\n\n**Available commands:**\n- `/status` - System status\n- `/memory` - Conversation history\n- `/tasks` - Task management"
+                                elif 'web search tool not available' in error_msg.lower():
+                                    result = "🌐 **Web Search Unavailable**\n\nWeb search functionality is not currently available.\n\n**Available commands:**\n- `/status` - System status\n- `/memory` - Conversation history\n- `/tasks` - Task management"
+                                else:
+                                    result = f"❌ **Error:** {error_msg}"
                             else:
-                                result = str(result_data)
-                        elif 'response' in data:
+                                # Handle null/empty responses
+                                result = "No response received from Jarvis. The tool may not be properly configured."
+                        elif 'response' in data and data['response'] is not None:
                             result = data['response']
-                        elif 'content' in data:
+                        elif 'content' in data and data['content'] is not None:
                             result = data['content']
-                        elif 'message' in data:
+                        elif 'message' in data and data['message'] is not None:
                             result = data['message']
                         else:
                             # If no standard field, try to extract meaningful content

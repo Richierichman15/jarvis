@@ -112,8 +112,10 @@ class Jarvis:
         self.llm = None
         if LANGCHAIN_AVAILABLE:
             try:
+                # Use model from brain.env if available, otherwise fallback to default
+                model_name = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q8_0")
                 self.llm = OllamaLLM(
-                    model="mistral:7b-instruct-v0.2-q4_0",
+                    model=model_name,
                     callbacks=[StreamingStdOutCallbackHandler()],
                     temperature=0.7
                 )

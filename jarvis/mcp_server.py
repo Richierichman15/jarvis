@@ -39,6 +39,10 @@ except ImportError:
 
 from .jarvis import Jarvis
 from .config import PROJECT_ROOT
+from dotenv import load_dotenv
+
+# Load brain.env file for model configuration
+load_dotenv("brain.env")
 from .tools.fitness import list_workouts as fitness_list_workouts, search_workouts as fitness_search_workouts
 try:
     # Use the new brain package for memory + LLM

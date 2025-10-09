@@ -14,6 +14,18 @@ import uuid
 
 from .jarvis import Jarvis
 from .config import PROJECT_ROOT
+from dotenv import load_dotenv
+
+# Load brain.env file for model configuration
+load_dotenv("brain.env")
+
+# Import brain package for chat functionality
+try:
+    from brain import memory as brain_memory
+    from brain.llm import generate as brain_generate
+    BRAIN_AVAILABLE = True
+except Exception:
+    BRAIN_AVAILABLE = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -417,8 +429,40 @@ class JarvisHTTPMCPServer:
                 if not message:
                     return {"error": "No message provided"}
                 
-                response = self.jarvis.chat(message)
-                return {"response": response}
+                # Use brain package for chat if available
+                if BRAIN_AVAILABLE:
+                    try:
+                        # Save user message
+                        brain_memory.save_message("user", message)
+                        
+                        # Retrieve relevant memories
+                        mems = brain_memory.search_memories(message, limit=5)
+                        used_memories = [m[2] for m in mems]
+                        
+                        # Build system prompt
+                        base = (
+                            "You are Jarvis, a concise, helpful AI assistant. "
+                            "Use short sentences and helpful bullet points when useful."
+                        )
+                        if used_memories:
+                            joined = "\n- ".join(used_memories)
+                            system_prompt = base + f"\n\nRelevant memories:\n- {joined}"
+                        else:
+                            system_prompt = base
+                        
+                        reply = brain_generate(system_prompt, message)
+                        if not reply or reply.startswith("[LLM unavailable"):
+                            reply = "I registered your message. I'll remember key details and respond succinctly."
+                        
+                        brain_memory.save_message("assistant", reply)
+                        return {"response": reply}
+                    except Exception as e:
+                        logger.error(f"Brain chat error: {e}")
+                        return {"error": f"Chat error: {str(e)}"}
+                else:
+                    # Fallback to old Jarvis chat method
+                    response = self.jarvis.chat(message)
+                    return {"response": response}
             
             elif name == "jarvis_schedule_task":
                 description = arguments.get("description", "")
