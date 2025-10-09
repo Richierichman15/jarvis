@@ -225,15 +225,15 @@ class DiscordCommandRouter:
         """
         content = message_content.lower().strip()
         
-        # Command routing with full server access
+        # Command routing - all tools are on the jarvis server
         if content.startswith('/news') or 'scan news' in content:
             return "jarvis_scan_news", {}, "jarvis"
         elif content.startswith('/portfolio') or 'get portfolio' in content:
-            return "trading.portfolio.get_overview", {}, "trading"
+            return "trading.portfolio.get_overview", {}, "jarvis"
         elif content.startswith('/balance') or 'get balance' in content:
-            return "trading.trading.get_balance", {}, "trading"
+            return "trading.trading.get_balance", {}, "jarvis"
         elif content.startswith('/positions') or 'get positions' in content:
-            return "trading.portfolio.get_positions", {}, "trading"
+            return "trading.portfolio.get_positions", {}, "jarvis"
         elif content.startswith('/status') or 'get status' in content:
             return "jarvis_get_status", {}, "jarvis"
         elif content.startswith('/memory') or 'get memory' in content:
@@ -241,17 +241,20 @@ class DiscordCommandRouter:
         elif content.startswith('/tasks') or 'get tasks' in content:
             return "jarvis_get_tasks", {"status": "all"}, "jarvis"
         elif content.startswith('/quests') or 'get quests' in content:
-            return "system.system.list_quests", {}, "system"
+            return "system.system.list_quests", {}, "jarvis"
         elif content.startswith('/system') or 'system status' in content:
-            return "system.system.get_status", {}, "system"
+            return "system.system.get_status", {}, "jarvis"
         elif content.startswith('/search') or 'web search' in content:
             # Extract search query
             query = message_content.replace('/search', '').replace('web search', '').strip()
             if not query:
                 query = "latest technology news"
-            return "search.web.search", {"query": query}, "search"
+            return "search.web.search", {"query": query}, "jarvis"
         elif content.startswith('/help') or 'help' in content:
             return "jarvis_chat", {"message": "show available commands and help"}, "jarvis"
+        elif any(word in content for word in ['date', 'time', 'today', 'what day', 'what time']):
+            # Handle date/time questions directly with jarvis_chat
+            return "jarvis_chat", {"message": message_content}, "jarvis"
         else:
             # For any other message, use natural language processing
             return "natural_language", {"query": message_content}, None

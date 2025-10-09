@@ -44,18 +44,18 @@ async def test_tool_calls():
         jarvis_client = JarvisClientMCPClient("http://localhost:3012", session)
         router = DiscordCommandRouter(jarvis_client)
         
-        # Test commands
+        # Test commands - all tools are on the jarvis server
         test_commands = [
             ("/status", "jarvis_get_status", "jarvis"),
-            ("/portfolio", "trading.portfolio.get_overview", "trading"),
-            ("/balance", "trading.trading.get_balance", "trading"),
-            ("/positions", "trading.portfolio.get_positions", "trading"),
-            ("/quests", "system.system.list_quests", "system"),
-            ("/system", "system.system.get_status", "system"),
+            ("/portfolio", "trading.portfolio.get_overview", "jarvis"),
+            ("/balance", "trading.trading.get_balance", "jarvis"),
+            ("/positions", "trading.portfolio.get_positions", "jarvis"),
+            ("/quests", "system.system.list_quests", "jarvis"),
+            ("/system", "system.system.get_status", "jarvis"),
             ("/news", "jarvis_scan_news", "jarvis"),
             ("/memory", "jarvis_get_memory", "jarvis"),
             ("/tasks", "jarvis_get_tasks", "jarvis"),
-            ("/search latest AI news", "search.web.search", "search"),
+            ("/search latest AI news", "search.web.search", "jarvis"),
             ("Hello Jarvis", "natural_language", None),
         ]
         
