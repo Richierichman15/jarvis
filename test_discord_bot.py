@@ -16,11 +16,11 @@ async def test_jarvis_connection():
     print("Testing Jarvis MCP connection...")
     
     async with aiohttp.ClientSession() as session:
-        jarvis_client = JarvisMCPClient("http://localhost:3010/nl", session)
+        jarvis_client = JarvisMCPClient("http://localhost:3010/mcp/tools/call", session)
         
         try:
             # Test basic connection
-            response = await jarvis_client.query_jarvis("test connection")
+            response = await jarvis_client.query_jarvis("jarvis_get_status", {})
             print(f"✅ Jarvis connection successful: {response[:100]}...")
             return True
         except Exception as e:
@@ -33,7 +33,7 @@ async def test_command_router():
     print("\nTesting command router...")
     
     async with aiohttp.ClientSession() as session:
-        jarvis_client = JarvisMCPClient("http://localhost:3010/nl", session)
+        jarvis_client = JarvisMCPClient("http://localhost:3010/mcp/tools/call", session)
         router = DiscordCommandRouter(jarvis_client)
         
         # Test command parsing
@@ -52,8 +52,8 @@ async def test_command_router():
         ]
         
         for cmd in test_commands:
-            parsed = router.parse_command(cmd)
-            print(f"  '{cmd}' → '{parsed}'")
+            tool_name, args = router.parse_command(cmd)
+            print(f"  '{cmd}' → '{tool_name}' with args: {args}")
         
         print("✅ Command router test completed")
 

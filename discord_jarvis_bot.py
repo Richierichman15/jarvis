@@ -40,7 +40,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-JARVIS_URL = "http://localhost:3010/nl"  # Jarvis MCP HTTP server endpoint
+JARVIS_URL = "http://localhost:3010/mcp/tools/call"  # Jarvis MCP HTTP server endpoint
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', 'YOUR_DISCORD_BOT_TOKEN_HERE')
 DISCORD_CLIENT_ID = os.getenv('DISCORD_CLIENT_ID', 'YOUR_DISCORD_CLIENT_ID_HERE')
 DISCORD_CLIENT_SERVER = os.getenv('DISCORD_CLIENT_SERVER', 'YOUR_DISCORD_SERVER_ID_HERE')
@@ -66,20 +66,27 @@ class JarvisMCPClient:
         self.session = session
         self.timeout = aiohttp.ClientTimeout(total=30)
     
-    async def query_jarvis(self, query: str) -> str:
+    async def query_jarvis(self, tool_name: str, arguments: dict = None) -> str:
         """
         Send a query to Jarvis MCP server and return the response.
         
         Args:
-            query: The query string to send to Jarvis
+            tool_name: The name of the Jarvis tool to call
+            arguments: The arguments for the tool
             
         Returns:
             Response from Jarvis or error message
         """
         try:
-            payload = {"query": query}
+            if arguments is None:
+                arguments = {}
+                
+            payload = {
+                "name": tool_name,
+                "arguments": arguments
+            }
             
-            logger.info(f"Sending query to Jarvis: {query}")
+            logger.info(f"Sending query to Jarvis: {tool_name} with args: {arguments}")
             
             async with self.session.post(
                 self.base_url,
@@ -91,9 +98,20 @@ class JarvisMCPClient:
                 if response.status == 200:
                     data = await response.json()
                     
-                    # Handle different response formats
+                    # Handle Jarvis MCP response format
                     if isinstance(data, dict):
-                        if 'response' in data:
+                        if 'result' in data and isinstance(data['result'], dict):
+                            # Extract response from result object
+                            result_data = data['result']
+                            if 'response' in result_data:
+                                result = result_data['response']
+                            elif 'content' in result_data:
+                                result = result_data['content']
+                            elif 'message' in result_data:
+                                result = result_data['message']
+                            else:
+                                result = str(result_data)
+                        elif 'response' in data:
                             result = data['response']
                         elif 'content' in data:
                             result = data['content']
@@ -132,32 +150,34 @@ class DiscordCommandRouter:
     def __init__(self, jarvis_client: JarvisMCPClient):
         self.jarvis_client = jarvis_client
     
-    def parse_command(self, message_content: str) -> str:
+    def parse_command(self, message_content: str) -> tuple[str, dict]:
         """
-        Parse Discord message and return appropriate Jarvis query.
+        Parse Discord message and return appropriate Jarvis tool and arguments.
         
         Args:
             message_content: The Discord message content
             
         Returns:
-            Query string to send to Jarvis
+            Tuple of (tool_name, arguments)
         """
         content = message_content.lower().strip()
         
         # Command routing
         if content.startswith('/news') or 'scan news' in content:
-            return "scan latest crypto and AI news"
+            return "jarvis_scan_news", {}
         elif content.startswith('/portfolio') or 'get portfolio' in content:
-            return "get trading portfolio"
+            return "jarvis_chat", {"message": "get trading portfolio"}
         elif content.startswith('/status') or 'get status' in content:
-            return "get system status"
+            return "jarvis_get_status", {}
         elif content.startswith('/memory') or 'get memory' in content:
-            return "get recent conversation memory"
+            return "jarvis_get_memory", {"limit": 10}
+        elif content.startswith('/tasks') or 'get tasks' in content:
+            return "jarvis_get_tasks", {"status": "all"}
         elif content.startswith('/help') or 'help' in content:
-            return "show available commands and help"
+            return "jarvis_chat", {"message": "show available commands and help"}
         else:
-            # For any other message, send it directly to Jarvis
-            return message_content
+            # For any other message, try jarvis_chat
+            return "jarvis_chat", {"message": message_content}
     
     async def handle_message(self, message: discord.Message) -> str:
         """
@@ -169,8 +189,8 @@ class DiscordCommandRouter:
         Returns:
             Response from Jarvis
         """
-        query = self.parse_command(message.content)
-        return await self.jarvis_client.query_jarvis(query)
+        tool_name, arguments = self.parse_command(message.content)
+        return await self.jarvis_client.query_jarvis(tool_name, arguments)
 
 
 # Global instances
@@ -195,7 +215,7 @@ async def on_ready():
     
     # Test connection to Jarvis
     try:
-        test_response = await jarvis_client.query_jarvis("test connection")
+        test_response = await jarvis_client.query_jarvis("jarvis_get_status", {})
         logger.info(f"Jarvis connection test: {test_response[:100]}...")
     except Exception as e:
         logger.error(f"Failed to connect to Jarvis: {e}")
