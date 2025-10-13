@@ -26,6 +26,15 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Import Jarvis AI model and formatter
+try:
+    from jarvis.models.model_manager import ModelManager
+    from formatter import format_response
+    MODEL_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import Jarvis model or formatter: {e}")
+    MODEL_AVAILABLE = False
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -340,12 +349,13 @@ class DiscordCommandRouter:
 # Global instances
 jarvis_client: Optional[JarvisClientMCPClient] = None
 command_router: Optional[DiscordCommandRouter] = None
+model_manager: Optional['ModelManager'] = None  # For AI-powered response formatting
 
 
 @client.event
 async def on_ready():
     """Event handler for when the bot is ready."""
-    global session, jarvis_client, command_router
+    global session, jarvis_client, command_router, model_manager
     
     logger.info(f'{client.user} has connected to Discord!')
     logger.info(f'Bot is in {len(client.guilds)} guilds')
@@ -356,6 +366,19 @@ async def on_ready():
     # Initialize Jarvis client and command router
     jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
     command_router = DiscordCommandRouter(jarvis_client)
+    
+    # Initialize AI model for response formatting
+    if MODEL_AVAILABLE:
+        try:
+            model_manager = ModelManager()
+            logger.info("✅ AI model initialized for response formatting")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize AI model for formatting: {e}")
+            logger.warning("Responses will be sent without AI formatting")
+            model_manager = None
+    else:
+        logger.warning("⚠️ Model manager not available - responses will be sent raw")
+        model_manager = None
     
     # Get available tools
     try:
@@ -373,7 +396,7 @@ async def on_ready():
 @client.event
 async def on_message(message):
     """Event handler for incoming Discord messages."""
-    global command_router
+    global command_router, model_manager
     
     # Ignore messages from the bot itself
     if message.author == client.user:
@@ -390,8 +413,30 @@ async def on_message(message):
     try:
         # Show typing indicator while processing
         async with message.channel.typing():
-            # Get response from Jarvis
-            response = await command_router.handle_message(message)
+            # Step 1: Get raw response from Jarvis tools
+            raw_response = await command_router.handle_message(message)
+            
+            # Step 2: Format the response using AI (if available)
+            if model_manager and MODEL_AVAILABLE:
+                try:
+                    # Get context about what command was run
+                    context = f"User asked: {message.content[:100]}"
+                    
+                    # Format the response using Jarvis AI
+                    formatted_response = await format_response(
+                        raw_response=raw_response,
+                        model_manager=model_manager,
+                        context=context
+                    )
+                    response = formatted_response
+                    logger.info("✨ Response formatted by AI")
+                except Exception as format_error:
+                    # If formatting fails, use raw response
+                    logger.warning(f"Formatting failed, using raw response: {format_error}")
+                    response = raw_response
+            else:
+                # No AI available, use raw response
+                response = raw_response
             
             # Handle empty or error responses
             if not response or response.strip() == "":
