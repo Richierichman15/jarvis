@@ -113,28 +113,50 @@ Loaded 25 tools from 4 servers
 
 ### **Core Jarvis Commands**
 - `/status` - System status and health
-- `/memory` - Recent conversation history  
+- `/memory` - Recent conversation history (last 10 entries)
 - `/tasks` - All Jarvis tasks
-- `/news` - Latest tech news (if search server connected)
-- `/help` - Show available commands
+- `/news` - Scan latest tech news sources (may take up to 2 minutes)
+- `/help` - Show available commands and help
 
-### **Trading Commands** (if trading server connected)
+### **Trading Commands**
 - `/portfolio` - Trading portfolio overview
 - `/balance` - Current trading balance
 - `/positions` - Active trading positions
+- `/trades` - Recent trade executions (last 20)
+- `/paper` - Paper trading portfolio balance
+- `/momentum` - Get momentum signals
+- `/price <symbol>` - Get current price for a symbol
+  - Example: `/price BTC`
+- `/ohlcv <symbol>` - Get OHLCV (Open, High, Low, Close, Volume) data
+  - Example: `/ohlcv ETH`
+- `/pairs <search>` - Search for trading pairs
+  - Example: `/pairs BTC`
+- `/doctor` - Run trading diagnostics
+- `/history` - View trade history
+- `/pnl` - Profit and loss summary
 
-### **System Commands** (if system server connected)
+### **Portfolio Tools (Paper Trading)**
+- `/performance` - Get portfolio performance metrics
+- `/exit` - Exit engine status
+- `/state` - Current trading state
+- `/export` - Export portfolio data
+
+### **System Commands**
 - `/quests` - List available quests
 - `/system` - System status and information
 
-### **Search Commands** (if search server connected)
+### **Search Commands**
 - `/search <query>` - Web search for any topic
-- Example: `/search latest AI developments`
+  - Example: `/search latest AI developments`
+  - If no query provided, defaults to "latest technology news"
 
 ### **Natural Language**
 - Any other message will be processed as natural language
 - The bot will automatically route to the appropriate tool
-- Example: "What's my portfolio balance?" → trading tools
+- Examples:
+  - "What's my portfolio balance?" → trading tools
+  - "What time is it?" → jarvis chat
+  - "Show me recent trades" → trading tools
 
 ## 🔧 **Server Architecture**
 

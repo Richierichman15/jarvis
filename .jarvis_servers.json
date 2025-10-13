@@ -1,30 +1,26 @@
 {
-  "budget": {
-    "args": [
-      "-lc",
-      "cd /Users/gitonga-nyaga/github/budget && node_modules/.bin/tsx backend/src/mcp/server.ts"
-    ],
-    "command": "bash"
-  },
   "search": {
     "args": [
+      "-u",
       "E:/Richie/github/jarvis/search/mcp_server.py"
     ],
-    "command": "python",
+    "command": "C:\\Program Files\\Python313\\python.exe",
     "cwd": "E:/Richie/github/jarvis"
   },
   "system": {
     "args": [
+      "-u",
       "E:/Richie/github/system/system_server.py"
     ],
-    "command": "python",
+    "command": "C:\\Program Files\\Python313\\python.exe",
     "cwd": "E:/Richie/github/system"
   },
   "trading": {
     "args": [
+      "-u",
       "E:/Richie/github/finance/trading_mcp_server.py"
     ],
-    "command": "python",
+    "command": "C:\\Program Files\\Python313\\python.exe",
     "cwd": "E:/Richie/github/finance"
   }
 }

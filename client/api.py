@@ -114,6 +114,9 @@ class SessionManager:
                 await self.ensure_session(alias)
             except Exception as exc:
                 logger.warning("Failed to auto-connect server '%s': %s", alias, exc)
+                # Log the full exception details for debugging
+                import traceback
+                logger.debug("Full traceback for server '%s':\n%s", alias, traceback.format_exc())
 
     async def shutdown(self) -> None:
         tasks = list(self.tasks.values())
@@ -188,6 +191,9 @@ class SessionManager:
                 if not ready.done():
                     ready.set_exception(exc)
                 logger.warning("Session '%s' stopped: %s", alias, exc)
+                # Log the full exception details for debugging
+                import traceback
+                logger.error("Full error for session '%s':\n%s", alias, traceback.format_exc())
             finally:
                 self.sessions.pop(alias, None)
                 self.tools_cache.pop(alias, None)
@@ -201,8 +207,24 @@ class SessionManager:
         return await self.ensure_session(alias)
 
     async def call_tool(self, alias: str, tool: str, args: Dict[str, Any]) -> Any:
-        session = await self.ensure_session(alias)
-        return await session.call_tool(tool, args or {})
+        # Try up to 2 times (original + 1 retry on session closed)
+        for attempt in range(2):
+            try:
+                session = await self.ensure_session(alias)
+                return await session.call_tool(tool, args or {})
+            except Exception as e:
+                error_msg = str(e).lower()
+                # Check if session is closed and we haven't retried yet
+                if ("closed" in error_msg or "connection" in error_msg) and attempt == 0:
+                    logger.warning(f"Session '{alias}' closed or disconnected, attempting to reconnect...")
+                    # Remove the closed session so ensure_session will create a new one
+                    self.sessions.pop(alias, None)
+                    self.tasks.pop(alias, None)
+                    self.tools_cache.pop(alias, None)
+                    await asyncio.sleep(0.5)  # Brief delay before retry
+                    continue
+                # If it's not a connection error or we already retried, re-raise
+                raise
 
     async def list_tools_cached(self, alias: str) -> List[Any]:
         await self.ensure_session(alias)

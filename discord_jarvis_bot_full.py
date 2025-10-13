@@ -232,53 +232,47 @@ class DiscordCommandRouter:
         if content.startswith('/news') or 'scan news' in content:
             return "jarvis_scan_news", {}, "jarvis"
         
-        # Trading Commands
-        elif content.startswith('/portfolio') or 'get portfolio' in content:
-            return "trading.portfolio.get_overview", {}, "jarvis"
+        # Trading Commands - using ACTUAL tool names with double namespace prefix
         elif content.startswith('/balance') or 'get balance' in content:
             return "trading.trading.get_balance", {}, "jarvis"
-        elif content.startswith('/positions') or 'get positions' in content:
-            return "trading.portfolio.get_positions", {}, "jarvis"
-        elif content.startswith('/trades') or 'get trades' in content or 'recent trades' in content:
-            return "trading.get_recent_executions", {"limit": 20}, "jarvis"
-        elif content.startswith('/paper') or 'paper trading' in content:
-            return "trading.get_portfolio_balance", {}, "jarvis"
-        elif content.startswith('/momentum') or 'momentum signals' in content:
-            return "trading.get_momentum_signals", {}, "jarvis"
         elif content.startswith('/price') or 'get price' in content:
             # Extract symbol from command
             symbol = message_content.replace('/price', '').replace('get price', '').strip()
             if not symbol:
                 return "jarvis_chat", {"message": "Please specify a symbol for price lookup. Example: /price BTC"}, "jarvis"
-            return "trading.get_price", {"symbol": symbol.upper()}, "jarvis"
+            return "trading.trading.get_price", {"symbol": symbol.upper()}, "jarvis"
         elif content.startswith('/ohlcv') or 'ohlcv data' in content:
             # Extract symbol from command
             symbol = message_content.replace('/ohlcv', '').replace('ohlcv data', '').strip()
             if not symbol:
                 return "jarvis_chat", {"message": "Please specify a symbol for OHLCV data. Example: /ohlcv BTC"}, "jarvis"
-            return "trading.get_ohlcv", {"symbol": symbol.upper()}, "jarvis"
-        elif content.startswith('/pairs') or 'search pairs' in content:
-            # Extract search term from command
-            search_term = message_content.replace('/pairs', '').replace('search pairs', '').strip()
-            if not search_term:
-                return "jarvis_chat", {"message": "Please specify a search term for trading pairs. Example: /pairs BTC"}, "jarvis"
-            return "trading.search_pairs", {"query": search_term.upper()}, "jarvis"
+            return "trading.trading.get_ohlcv", {"symbol": symbol.upper()}, "jarvis"
+        elif content.startswith('/momentum') or 'momentum signals' in content:
+            return "trading.trading.get_momentum_signals", {}, "jarvis"
         elif content.startswith('/doctor') or 'trading doctor' in content:
-            return "trading.doctor", {}, "jarvis"
+            return "trading.trading.doctor", {}, "jarvis"
         elif content.startswith('/history') or 'trade history' in content:
-            return "trading.get_trade_history", {}, "jarvis"
+            return "trading.trading.get_trade_history", {}, "jarvis"
         elif content.startswith('/pnl') or 'profit loss' in content:
-            return "trading.get_pnl_summary", {}, "jarvis"
+            return "trading.trading.get_pnl_summary", {}, "jarvis"
         
-        # Portfolio Tools (Paper Trading)
+        # Portfolio Commands (Paper Trading) - using ACTUAL tool names with trading.portfolio prefix
+        elif content.startswith('/portfolio') or 'get portfolio' in content:
+            return "trading.portfolio.get_overview", {}, "jarvis"
+        elif content.startswith('/positions') or 'get positions' in content:
+            return "trading.portfolio.get_positions", {}, "jarvis"
+        elif content.startswith('/trades') or 'get trades' in content or 'recent trades' in content:
+            return "trading.trading.get_recent_executions", {"limit": 20}, "jarvis"
+        elif content.startswith('/paper') or 'paper trading' in content:
+            return "trading.portfolio.get_overview", {}, "jarvis"
         elif content.startswith('/performance') or 'get performance' in content:
-            return "portfolio.get_performance", {}, "jarvis"
+            return "trading.portfolio.get_performance", {}, "jarvis"
         elif content.startswith('/exit') or 'exit engine' in content:
-            return "portfolio.get_exit_engine_status", {}, "jarvis"
+            return "trading.portfolio.get_exit_engine_status", {}, "jarvis"
         elif content.startswith('/state') or 'trading state' in content:
-            return "portfolio.get_trading_state", {}, "jarvis"
+            return "trading.portfolio.get_trading_state", {}, "jarvis"
         elif content.startswith('/export') or 'export data' in content:
-            return "portfolio.get_export_data", {}, "jarvis"
+            return "trading.portfolio.get_export_data", {}, "jarvis"
         
         # System Commands
         elif content.startswith('/status') or 'get status' in content:
