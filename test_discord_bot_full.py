@@ -46,17 +46,43 @@ async def test_tool_calls():
         
         # Test commands - all tools are on the jarvis server
         test_commands = [
+            # Core Commands
             ("/status", "jarvis_get_status", "jarvis"),
+            ("/memory", "jarvis_get_memory", "jarvis"),
+            ("/tasks", "jarvis_get_tasks", "jarvis"),
+            ("/help", "jarvis_chat", "jarvis"),
+            
+            # Trading Commands
             ("/portfolio", "trading.portfolio.get_overview", "jarvis"),
             ("/balance", "trading.trading.get_balance", "jarvis"),
             ("/positions", "trading.portfolio.get_positions", "jarvis"),
+            ("/trades", "trading.get_recent_executions", "jarvis"),
+            ("/paper", "trading.get_portfolio_balance", "jarvis"),
+            ("/momentum", "trading.get_momentum_signals", "jarvis"),
+            ("/price BTC", "trading.get_price", "jarvis"),
+            ("/ohlcv ETH", "trading.get_ohlcv", "jarvis"),
+            ("/pairs BTC", "trading.search_pairs", "jarvis"),
+            ("/doctor", "trading.doctor", "jarvis"),
+            ("/history", "trading.get_trade_history", "jarvis"),
+            ("/pnl", "trading.get_pnl_summary", "jarvis"),
+            
+            # Portfolio Tools
+            ("/performance", "portfolio.get_performance", "jarvis"),
+            ("/exit", "portfolio.get_exit_engine_status", "jarvis"),
+            ("/state", "portfolio.get_trading_state", "jarvis"),
+            ("/export", "portfolio.get_export_data", "jarvis"),
+            
+            # System Commands
             ("/quests", "system.system.list_quests", "jarvis"),
             ("/system", "system.system.get_status", "jarvis"),
+            
+            # Search Commands
             ("/news", "jarvis_scan_news", "jarvis"),
-            ("/memory", "jarvis_get_memory", "jarvis"),
-            ("/tasks", "jarvis_get_tasks", "jarvis"),
             ("/search latest AI news", "search.web.search", "jarvis"),
+            
+            # Natural Language
             ("Hello Jarvis", "natural_language", None),
+            ("What's today's date?", "jarvis_chat", "jarvis"),
         ]
         
         for command, expected_tool, expected_server in test_commands:
@@ -129,17 +155,38 @@ async def main():
         print("2. Set up your Discord bot token in .env file")
         print("3. Run: python discord_jarvis_bot_full.py")
         print("\nAvailable commands:")
+        print("📋 Core Commands:")
         print("  /status - System status")
+        print("  /memory - Conversation history")
+        print("  /tasks - Jarvis tasks")
+        print("  /help - Show help")
+        print("💰 Trading Commands:")
         print("  /portfolio - Trading portfolio overview")
         print("  /balance - Trading balance")
         print("  /positions - Trading positions")
+        print("  /trades - Recent trade executions")
+        print("  /paper - Paper trading balance")
+        print("  /momentum - Momentum signals")
+        print("  /price <symbol> - Get price (e.g., /price BTC)")
+        print("  /ohlcv <symbol> - Get OHLCV data")
+        print("  /pairs <query> - Search trading pairs")
+        print("  /doctor - Trading system diagnostics")
+        print("  /history - Trade history")
+        print("  /pnl - Profit/loss summary")
+        print("📊 Portfolio Tools:")
+        print("  /performance - Performance metrics")
+        print("  /exit - Exit engine status")
+        print("  /state - Trading system state")
+        print("  /export - Export data")
+        print("🎮 System Commands:")
         print("  /quests - System quests")
         print("  /system - System status")
+        print("📰 Search Commands:")
         print("  /news - Latest tech news")
-        print("  /memory - Conversation history")
-        print("  /tasks - Jarvis tasks")
         print("  /search <query> - Web search")
+        print("💬 Natural Language:")
         print("  Any other message - Natural language chat")
+        print("  Date/time questions - Special handling")
     else:
         print("❌ Some tests failed. Please check:")
         print("1. Jarvis Client HTTP Server is running on port 3011")
