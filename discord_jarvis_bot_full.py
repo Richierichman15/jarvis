@@ -35,6 +35,22 @@ except ImportError as e:
     logging.warning(f"Could not import Jarvis model or formatter: {e}")
     MODEL_AVAILABLE = False
 
+# Import event listener
+try:
+    from jarvis_event_listener import TradingEventListener
+    EVENT_LISTENER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import event listener: {e}")
+    EVENT_LISTENER_AVAILABLE = False
+
+# Import music player
+try:
+    from jarvis_music_player import MusicPlayer
+    MUSIC_PLAYER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import music player: {e}")
+    MUSIC_PLAYER_AVAILABLE = False
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -376,6 +392,173 @@ class DiscordCommandRouter:
         
         return True, None
     
+    async def _handle_local_command(self, tool_name: str, arguments: Dict[str, Any], message: discord.Message) -> str:
+        """Handle local commands (event management and music) that don't go through MCP."""
+        global event_listener, music_player
+        
+        # Handle music commands
+        if tool_name.startswith("music_"):
+            if not music_player:
+                return "❌ Music player is not initialized."
+            
+            return await self._handle_music_command(tool_name, arguments, message)
+        
+        # Handle event commands
+        if not event_listener:
+            return "❌ Event listener is not initialized. Set EVENT_NOTIFICATION_CHANNEL_ID in your .env file and restart the bot."
+        
+        try:
+            if tool_name == "events_start_monitoring":
+                success = await event_listener.start_monitoring()
+                if success:
+                    return "✅ Event monitoring started! You'll receive real-time trading notifications in this channel."
+                else:
+                    return "⚠️ Event monitoring is already running."
+            
+            elif tool_name == "events_stop_monitoring":
+                success = await event_listener.stop_monitoring()
+                if success:
+                    return "🛑 Event monitoring stopped. No more notifications will be sent."
+                else:
+                    return "⚠️ Event monitoring is not currently running."
+            
+            elif tool_name == "events_get_statistics":
+                stats = event_listener.get_statistics()
+                total = stats["total_events"]
+                by_type = stats["by_type"]
+                is_monitoring = stats["is_monitoring"]
+                
+                status_emoji = "🟢" if is_monitoring else "🔴"
+                response = f"📊 **Event Statistics**\n\n"
+                response += f"Status: {status_emoji} {'Monitoring' if is_monitoring else 'Stopped'}\n"
+                response += f"Total Events: **{total}**\n\n"
+                response += "**By Type:**\n"
+                
+                for event_type, count in by_type.items():
+                    if count > 0:
+                        response += f"• {event_type}: {count}\n"
+                
+                return response
+            
+            elif tool_name == "events_get_history":
+                limit = arguments.get("limit", 10)
+                history = event_listener.get_history(limit)
+                
+                if not history:
+                    return "📝 No events in history yet."
+                
+                response = f"📝 **Recent Events** (Last {len(history)})\n\n"
+                
+                for event in history:
+                    event_type = event.get("type", "unknown")
+                    symbol = event.get("symbol", "N/A")
+                    timestamp = event.get("received_at", "N/A")
+                    response += f"• **{event_type}** - {symbol} at {timestamp[:19]}\n"
+                
+                return response
+            
+            elif tool_name == "events_test_event":
+                event_type = arguments.get("type", "market_alert")
+                
+                # Create a test event
+                test_events = {
+                    "market_alert": {
+                        "type": "market_alert",
+                        "symbol": "BTC/USDT",
+                        "change_percent": 3.5,
+                        "price": 45200.00,
+                        "volume": 1200000,
+                        "timeframe": "1h"
+                    },
+                    "trade_executed": {
+                        "type": "trade_executed",
+                        "side": "BUY",
+                        "symbol": "ETH/USDT",
+                        "size": 2.5,
+                        "price": 2800.00,
+                        "pnl_percent": 2.3,
+                        "order_type": "MARKET"
+                    },
+                    "risk_limit_hit": {
+                        "type": "risk_limit_hit",
+                        "reason": "Daily loss limit reached",
+                        "impact": "All trading halted",
+                        "current_loss": 5.2,
+                        "limit": 5.0
+                    },
+                    "daily_summary": {
+                        "type": "daily_summary",
+                        "total_trades": 15,
+                        "win_rate": 66.7,
+                        "total_pnl": 450.00,
+                        "total_pnl_percent": 4.5,
+                        "best_trade": {"symbol": "BTC/USDT", "pnl_percent": 5.2},
+                        "worst_trade": {"symbol": "SOL/USDT", "pnl_percent": -1.8}
+                    }
+                }
+                
+                test_event = test_events.get(event_type)
+                if not test_event:
+                    return f"❌ Unknown test event type: {event_type}. Available: {', '.join(test_events.keys())}"
+                
+                # Send the test event
+                await event_listener.handle_event(test_event)
+                return f"✅ Test event sent: **{event_type}**\nCheck the notification channel for the message."
+            
+            elif tool_name == "events_check_markets":
+                # This would call the MCP tool to check markets
+                return "🔍 Manually triggering market price check... (This would call the MCP tool)"
+            
+            else:
+                return f"❌ Unknown event command: {tool_name}"
+        
+        except Exception as e:
+            logger.error(f"Error handling local command: {e}", exc_info=True)
+            return f"❌ Error: {str(e)}"
+    
+    async def _handle_music_command(self, tool_name: str, arguments: Dict[str, Any], message: discord.Message) -> str:
+        """Handle music commands routed to the music player."""
+        global music_player
+        
+        try:
+            if tool_name == "music_play":
+                song_name = arguments.get("song_name")
+                return await music_player.play_song(message.author, message.channel, song_name)
+            
+            elif tool_name == "music_pause":
+                return await music_player.pause(message.author, message.channel)
+            
+            elif tool_name == "music_resume":
+                return await music_player.resume(message.author, message.channel)
+            
+            elif tool_name == "music_stop":
+                return await music_player.stop(message.author, message.channel)
+            
+            elif tool_name == "music_skip":
+                return await music_player.skip(message.author, message.channel)
+            
+            elif tool_name == "music_queue_add":
+                song_name = arguments.get("song_name")
+                if not song_name:
+                    return "❌ Please specify a song name to add to queue"
+                return await music_player.add_to_queue(message.author, message.channel, song_name)
+            
+            elif tool_name == "music_queue_view":
+                return await music_player.show_queue(message.author, message.channel)
+            
+            elif tool_name == "music_now_playing":
+                return await music_player.now_playing(message.author, message.channel)
+            
+            elif tool_name == "music_leave":
+                return await music_player.leave(message.author, message.channel)
+            
+            else:
+                return f"❌ Unknown music command: {tool_name}"
+        
+        except Exception as e:
+            logger.error(f"Error handling music command: {e}", exc_info=True)
+            return f"❌ Error: {str(e)}"
+    
     async def auto_followup(self, initial_response: str, query: str) -> Optional[str]:
         """Execute intelligent follow-up search if initial response is poor."""
         query_lower = query.lower()
@@ -493,6 +676,62 @@ class DiscordCommandRouter:
         elif content.startswith('/system') or 'system status' in content:
             return "system.system.get_status", {}, "jarvis"
         
+        # Event Monitoring Commands
+        elif content.startswith('/events start') or content == '/events on':
+            return "events_start_monitoring", {}, "local"
+        elif content.startswith('/events stop') or content == '/events off':
+            return "events_stop_monitoring", {}, "local"
+        elif content.startswith('/events stats') or content == '/events statistics':
+            return "events_get_statistics", {}, "local"
+        elif content.startswith('/events history'):
+            # Extract limit if provided
+            import re
+            match = re.search(r'history\s+(\d+)', content)
+            limit = int(match.group(1)) if match else 10
+            return "events_get_history", {"limit": limit}, "local"
+        elif content.startswith('/events test'):
+            # Extract event type if provided
+            test_type = content.replace('/events test', '').strip()
+            return "events_test_event", {"type": test_type if test_type else "market_alert"}, "local"
+        elif content.startswith('/events check'):
+            return "events_check_markets", {}, "local"
+        
+        # Music Commands
+        elif content.startswith('/play'):
+            # Extract song name if provided
+            song_name = message_content.replace('/play', '').strip()
+            return "music_play", {"song_name": song_name if song_name else None}, "local"
+        elif content.startswith('/pause'):
+            return "music_pause", {}, "local"
+        elif content.startswith('/resume'):
+            return "music_resume", {}, "local"
+        elif content.startswith('/stop'):
+            return "music_stop", {}, "local"
+        elif content.startswith('/skip'):
+            return "music_skip", {}, "local"
+        elif content.startswith('/queue'):
+            # Check if adding to queue or viewing queue
+            rest = message_content.replace('/queue', '').strip()
+            if rest:
+                return "music_queue_add", {"song_name": rest}, "local"
+            else:
+                return "music_queue_view", {}, "local"
+        elif content.startswith('/nowplaying') or content.startswith('/np'):
+            return "music_now_playing", {}, "local"
+        elif content.startswith('/volume'):
+            # Extract volume level
+            import re
+            match = re.search(r'volume\s+(\d+)', content)
+            if match:
+                volume = int(match.group(1))
+                return "music_volume", {"volume": volume}, "local"
+            else:
+                return "music_volume", {}, "local"
+        elif content.startswith('/join'):
+            return "music_join", {}, "local"
+        elif content.startswith('/leave') or content.startswith('/disconnect'):
+            return "music_leave", {}, "local"
+        
         # Search Commands
         elif content.startswith('/search') or 'web search' in content:
             # Extract search query
@@ -528,6 +767,10 @@ class DiscordCommandRouter:
             Response from Jarvis
         """
         tool_name, arguments, server = self.parse_command(message.content)
+        
+        # Handle local commands (event management)
+        if server == "local":
+            return await self._handle_local_command(tool_name, arguments, message)
         
         # Send progress message for long-running operations
         progress_msg = None
@@ -602,12 +845,17 @@ jarvis_client: Optional[JarvisClientMCPClient] = None
 command_router: Optional[DiscordCommandRouter] = None
 model_manager: Optional['ModelManager'] = None  # For AI-powered response formatting
 conversation_context: Optional[ConversationContext] = None  # For tracking conversation history
+event_listener: Optional['TradingEventListener'] = None  # For trading event notifications
+music_player: Optional['MusicPlayer'] = None  # For music playback in voice channels
+
+# Event notification channel ID (configure in .env or here)
+EVENT_NOTIFICATION_CHANNEL_ID = os.getenv('EVENT_NOTIFICATION_CHANNEL_ID', None)
 
 
 @client.event
 async def on_ready():
     """Event handler for when the bot is ready."""
-    global session, jarvis_client, command_router, model_manager, conversation_context
+    global session, jarvis_client, command_router, model_manager, conversation_context, event_listener, music_player
     
     logger.info(f'{client.user} has connected to Discord!')
     logger.info(f'Bot is in {len(client.guilds)} guilds')
@@ -618,6 +866,13 @@ async def on_ready():
     # Initialize Jarvis client and command router
     jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
     command_router = DiscordCommandRouter(jarvis_client)
+    
+    # Initialize music player
+    if MUSIC_PLAYER_AVAILABLE:
+        music_player = MusicPlayer(jarvis_client)
+        logger.info("✅ Music player initialized")
+    else:
+        logger.info("ℹ️ Music player not available (module not loaded)")
     
     # Initialize conversation context for tracking user queries
     conversation_context = ConversationContext(max_history=5)
@@ -635,6 +890,25 @@ async def on_ready():
     else:
         logger.warning("⚠️ Model manager not available - responses will be sent raw")
         model_manager = None
+    
+    # Initialize event listener if channel is configured
+    if EVENT_LISTENER_AVAILABLE and EVENT_NOTIFICATION_CHANNEL_ID:
+        try:
+            channel_id = int(EVENT_NOTIFICATION_CHANNEL_ID)
+            notification_channel = client.get_channel(channel_id)
+            
+            if notification_channel:
+                event_listener = TradingEventListener(JARVIS_CLIENT_URL, notification_channel)
+                logger.info(f"✅ Event listener initialized for channel: {notification_channel.name}")
+            else:
+                logger.warning(f"⚠️ Could not find notification channel with ID: {channel_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize event listener: {e}")
+    else:
+        if not EVENT_LISTENER_AVAILABLE:
+            logger.info("ℹ️ Event listener not available (module not loaded)")
+        if not EVENT_NOTIFICATION_CHANNEL_ID:
+            logger.info("ℹ️ Event notifications disabled (EVENT_NOTIFICATION_CHANNEL_ID not set)")
     
     # Get available tools
     try:
@@ -862,7 +1136,23 @@ async def send_error_webhook(error_msg: str, original_message: str):
 
 async def cleanup():
     """Cleanup resources on shutdown."""
-    global session
+    global session, event_listener, music_player
+    
+    # Stop event monitoring if running
+    if event_listener:
+        try:
+            await event_listener.cleanup()
+            logger.info("Event listener cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up event listener: {e}")
+    
+    # Cleanup music player
+    if music_player:
+        try:
+            await music_player.cleanup()
+            logger.info("Music player cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up music player: {e}")
     
     if session:
         await session.close()
