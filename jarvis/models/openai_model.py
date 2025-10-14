@@ -16,7 +16,7 @@ class OpenAIModel:
             raise ValueError("OpenAI API key not found in environment (OPENAI_API_KEY or OPENAI_KEY)")
             
         self.client = openai.OpenAI(api_key=self.api_key)
-        self.model = "gpt-4-turbo-preview"  # Using the latest GPT-4 model
+        self.model = "gpt-4o-mini"  # Using GPT-4o-mini for faster, cost-effective responses
         
     def generate_response(
         self,

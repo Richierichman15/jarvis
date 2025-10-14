@@ -219,11 +219,198 @@ class JarvisClientMCPClient:
             return error_msg
 
 
+class ConversationContext:
+    """Track conversation context for follow-up questions."""
+    
+    def __init__(self, max_history: int = 5):
+        self.history: Dict[int, List[Dict]] = {}  # user_id -> messages
+        self.max_history = max_history
+    
+    def add_message(self, user_id: int, query: str, response: str, metadata: dict = None):
+        """Add a message to conversation history."""
+        if user_id not in self.history:
+            self.history[user_id] = []
+        
+        self.history[user_id].append({
+            "query": query,
+            "response": response,
+            "metadata": metadata or {},
+            "timestamp": datetime.now()
+        })
+        
+        # Trim to max history
+        if len(self.history[user_id]) > self.max_history:
+            self.history[user_id] = self.history[user_id][-self.max_history:]
+    
+    def get_context(self, user_id: int, last_n: int = 2) -> str:
+        """Get recent conversation context."""
+        if user_id not in self.history:
+            return ""
+        
+        recent = self.history[user_id][-last_n:]
+        context_parts = []
+        
+        for msg in recent:
+            context_parts.append(f"Previous: {msg['query'][:100]}")
+        
+        return "\n".join(context_parts)
+    
+    def extract_relevant_data(self, user_id: int, keyword: str) -> Optional[str]:
+        """Extract relevant data from previous responses."""
+        if user_id not in self.history:
+            return None
+        
+        # Search backwards through history
+        for msg in reversed(self.history[user_id]):
+            if keyword.lower() in msg['query'].lower():
+                return msg.get('metadata', {})
+        
+        return None
+
+
 class DiscordCommandRouter:
     """Routes Discord commands to appropriate Jarvis tools."""
     
     def __init__(self, jarvis_client: JarvisClientMCPClient):
         self.jarvis_client = jarvis_client
+    
+    def detect_query_intent(self, query: str) -> Dict[str, Any]:
+        """Detect the user's intent and extract key information."""
+        import re
+        query_lower = query.lower()
+        
+        intent_patterns = {
+            "specific_list": {
+                "pattern": r"list|top \d+|what are|show me|give me",
+                "expects_detailed_response": True,
+                "should_extract_items": True
+            },
+            "follow_up": {
+                "pattern": r"more about|details on|tell me more|explain|elaborate|more information",
+                "needs_context": True,
+                "expects_detailed_response": True
+            },
+            "comparison": {
+                "pattern": r"compare|versus|vs|difference between",
+                "expects_detailed_response": True,
+                "needs_multiple_sources": True
+            },
+            "current_events": {
+                "pattern": r"latest|recent|new|today|this week|breaking",
+                "prefers_news_source": True,
+                "time_sensitive": True
+            }
+        }
+        
+        detected = {
+            "intent_type": "general",
+            "confidence": 0.5,
+            "metadata": {}
+        }
+        
+        for intent_name, intent_spec in intent_patterns.items():
+            if re.search(intent_spec["pattern"], query_lower):
+                detected["intent_type"] = intent_name
+                detected["confidence"] = 0.8
+                detected["metadata"] = {k: v for k, v in intent_spec.items() if k != "pattern"}
+                break
+        
+        return detected
+    
+    def refine_search_query(self, query: str, intent: Dict[str, Any]) -> str:
+        """Refine search query based on intent and content."""
+        query_lower = query.lower()
+        
+        # For crypto/Web3 queries, filter out gambling sites
+        if any(word in query_lower for word in ['crypto', 'coin', 'token', 'blockchain', 'web3']):
+            # Add exclusion terms and specificity
+            return f"{query} cryptocurrency blockchain -casino -gambling -betting site:coinmarketcap.com OR site:coingecko.com OR site:decrypt.co"
+        
+        # For tariff/policy queries, add specificity
+        if any(word in query_lower for word in ['tariff', 'trade deal', 'policy', 'regulation']):
+            return f"{query} official announcement 2025 government"
+        
+        # For "top" or "best" queries, add ranking terms
+        if any(word in query_lower for word in ['top', 'best', 'leading']):
+            return f"{query} ranked list 2025"
+        
+        # For news queries, add time restriction
+        if intent.get("metadata", {}).get("time_sensitive"):
+            return f"{query} 2025"
+        
+        return query
+    
+    def validate_response_quality(self, response: str, query: str) -> tuple[bool, Optional[str]]:
+        """Check if response adequately answers the query."""
+        import re
+        query_lower = query.lower()
+        response_lower = response.lower()
+        
+        # Check 1: User asked for a list, did we provide one?
+        if "list" in query_lower or "top" in query_lower or "what are" in query_lower:
+            # Count bullet points, numbers, or line breaks
+            has_list_formatting = bool(re.search(r'(\n-|\n\d+\.|\n•|^\d+\.)', response, re.MULTILINE))
+            if not has_list_formatting and len(response) < 300:
+                return False, "Response should include a formatted list with details"
+        
+        # Check 2: User asked for specific data, did we provide it?
+        if any(word in query_lower for word in ['what are', 'which', 'details', 'explain']):
+            # Response should be reasonably long
+            if len(response) < 200:
+                return False, "Response too brief for detail query"
+        
+        # Check 3: Check for common error patterns
+        error_patterns = ['no results', 'session closed', 'error:', 'failed to']
+        if any(pattern in response_lower for pattern in error_patterns):
+            return False, "Response contains error indicators"
+        
+        # Check 4: Avoid vague responses
+        vague_phrases = ['let me know', 'would you like', 'i can provide', 'here are some']
+        if len(response) < 200 and any(phrase in response_lower for phrase in vague_phrases):
+            return False, "Response is too vague"
+        
+        # Check 5: For search queries, check for irrelevant results (e.g., casino for crypto)
+        if 'crypto' in query_lower or 'coin' in query_lower:
+            if 'casino' in response_lower or 'gambling' in response_lower:
+                return False, "Response contains irrelevant gambling/casino content"
+        
+        return True, None
+    
+    async def auto_followup(self, initial_response: str, query: str) -> Optional[str]:
+        """Execute intelligent follow-up search if initial response is poor."""
+        query_lower = query.lower()
+        
+        # If asking about Web3 coins and response is poor
+        if ('web3' in query_lower or 'crypto' in query_lower) and ('coin' in query_lower or 'token' in query_lower):
+            if 'list' in query_lower or 'top' in query_lower or 'what are' in query_lower:
+                # Try a more specific search
+                refined_query = "top 10 web3 cryptocurrencies 2025 by market cap coinmarketcap"
+                logger.info(f"Auto-followup: Searching for '{refined_query}'")
+                try:
+                    return await self.jarvis_client.call_tool(
+                        "jarvis_web_search",
+                        {"query": refined_query},
+                        "jarvis"
+                    )
+                except Exception as e:
+                    logger.warning(f"Auto-followup failed: {e}")
+                    return None
+        
+        # If asking about tariffs and response is too brief
+        if 'tariff' in query_lower and len(initial_response) < 300:
+            refined_query = "new tariffs imposed 2025 Trump administration details list"
+            logger.info(f"Auto-followup: Searching for '{refined_query}'")
+            try:
+                return await self.jarvis_client.call_tool(
+                    "jarvis_web_search",
+                    {"query": refined_query},
+                    "jarvis"
+                )
+            except Exception as e:
+                logger.warning(f"Auto-followup failed: {e}")
+                return None
+        
+        return None
     
     def parse_command(self, message_content: str) -> tuple[str, dict, str]:
         """
@@ -246,16 +433,27 @@ class DiscordCommandRouter:
             return "trading.trading.get_balance", {}, "jarvis"
         elif content.startswith('/price') or 'get price' in content:
             # Extract symbol from command
-            symbol = message_content.replace('/price', '').replace('get price', '').strip()
+            symbol = message_content.replace('/price', '').replace('get price', '').strip().upper()
             if not symbol:
                 return "jarvis_chat", {"message": "Please specify a symbol for price lookup. Example: /price BTC"}, "jarvis"
-            return "trading.trading.get_price", {"symbol": symbol.upper()}, "jarvis"
+            
+            # Auto-format symbol for Kraken (add /USD or /USDT if not present)
+            if '/' not in symbol:
+                # Try common quote currencies
+                symbol = f"{symbol}/USD"
+            
+            return "trading.trading.get_price", {"symbol": symbol}, "jarvis"
         elif content.startswith('/ohlcv') or 'ohlcv data' in content:
             # Extract symbol from command
-            symbol = message_content.replace('/ohlcv', '').replace('ohlcv data', '').strip()
+            symbol = message_content.replace('/ohlcv', '').replace('ohlcv data', '').strip().upper()
             if not symbol:
                 return "jarvis_chat", {"message": "Please specify a symbol for OHLCV data. Example: /ohlcv BTC"}, "jarvis"
-            return "trading.trading.get_ohlcv", {"symbol": symbol.upper()}, "jarvis"
+            
+            # Auto-format symbol for Kraken (add /USD or /USDT if not present)
+            if '/' not in symbol:
+                symbol = f"{symbol}/USD"
+            
+            return "trading.trading.get_ohlcv", {"symbol": symbol}, "jarvis"
         elif content.startswith('/momentum') or 'momentum signals' in content:
             return "trading.trading.get_momentum_signals", {}, "jarvis"
         elif content.startswith('/doctor') or 'trading doctor' in content:
@@ -301,7 +499,13 @@ class DiscordCommandRouter:
             query = message_content.replace('/search', '').replace('web search', '').strip()
             if not query:
                 query = "latest technology news"
-            return "search.web.search", {"query": query}, "jarvis"
+            
+            # Detect intent and refine query
+            intent = self.detect_query_intent(query)
+            refined_query = self.refine_search_query(query, intent)
+            
+            logger.info(f"Search query refined: '{query}' -> '{refined_query}'")
+            return "jarvis_web_search", {"query": refined_query}, "jarvis"
         
         # Help and Chat
         elif content.startswith('/help') or 'help' in content:
@@ -315,7 +519,7 @@ class DiscordCommandRouter:
     
     async def handle_message(self, message: discord.Message) -> str:
         """
-        Handle a Discord message and return Jarvis response.
+        Handle a Discord message and return Jarvis response with retry logic and validation.
         
         Args:
             message: The Discord message object
@@ -326,36 +530,84 @@ class DiscordCommandRouter:
         tool_name, arguments, server = self.parse_command(message.content)
         
         # Send progress message for long-running operations
+        progress_msg = None
         if tool_name == "jarvis_scan_news":
             progress_msg = await message.reply("🔍 Scanning news sources... This may take up to 2 minutes.")
         
-        if tool_name == "natural_language":
-            # Use natural language processing
-            result = await self.jarvis_client.natural_language_query(arguments["query"])
-        else:
-            # Call specific tool
-            result = await self.jarvis_client.call_tool(tool_name, arguments, server)
+        # Retry logic with exponential backoff
+        max_retries = 3
+        result = None
+        
+        for attempt in range(max_retries):
+            try:
+                if tool_name == "natural_language":
+                    # Use natural language processing
+                    result = await self.jarvis_client.natural_language_query(arguments["query"])
+                else:
+                    # Call specific tool
+                    result = await self.jarvis_client.call_tool(tool_name, arguments, server)
+                
+                # Successfully got a result, break the retry loop
+                break
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Check if it's a recoverable error
+                if any(keyword in error_msg for keyword in ['closed', 'session', 'connection', 'timeout']):
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                        logger.warning(f"Recoverable error on attempt {attempt + 1}/{max_retries}: {e}")
+                        logger.info(f"Retrying in {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        result = f"❌ Connection error after {max_retries} attempts. Please try again in a moment."
+                        break
+                else:
+                    # Non-recoverable error
+                    logger.error(f"Non-recoverable error: {e}")
+                    result = f"❌ Error: {str(e)}"
+                    break
         
         # Delete progress message if it was sent
-        if tool_name == "jarvis_scan_news" and 'progress_msg' in locals():
+        if progress_msg:
             try:
                 await progress_msg.delete()
             except:
                 pass  # Ignore if message can't be deleted
         
-        return result
+        # Validate response quality
+        if result and not result.startswith("❌"):
+            is_valid, reason = self.validate_response_quality(result, message.content)
+            
+            # If response is poor quality, try auto-followup
+            if not is_valid:
+                logger.info(f"Response validation failed: {reason}. Attempting auto-followup...")
+                followup_result = await self.auto_followup(result, message.content)
+                
+                if followup_result:
+                    # Append followup to original result
+                    result = f"{result}\n\n**📊 Additional Information:**\n{followup_result}"
+                    logger.info("Auto-followup successful")
+                else:
+                    # Just use the original result
+                    logger.info("Auto-followup didn't improve result, using original")
+        
+        return result or "No response received from Jarvis."
 
 
 # Global instances
 jarvis_client: Optional[JarvisClientMCPClient] = None
 command_router: Optional[DiscordCommandRouter] = None
 model_manager: Optional['ModelManager'] = None  # For AI-powered response formatting
+conversation_context: Optional[ConversationContext] = None  # For tracking conversation history
 
 
 @client.event
 async def on_ready():
     """Event handler for when the bot is ready."""
-    global session, jarvis_client, command_router, model_manager
+    global session, jarvis_client, command_router, model_manager, conversation_context
     
     logger.info(f'{client.user} has connected to Discord!')
     logger.info(f'Bot is in {len(client.guilds)} guilds')
@@ -366,6 +618,10 @@ async def on_ready():
     # Initialize Jarvis client and command router
     jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
     command_router = DiscordCommandRouter(jarvis_client)
+    
+    # Initialize conversation context for tracking user queries
+    conversation_context = ConversationContext(max_history=5)
+    logger.info("✅ Conversation context initialized")
     
     # Initialize AI model for response formatting
     if MODEL_AVAILABLE:
@@ -396,7 +652,7 @@ async def on_ready():
 @client.event
 async def on_message(message):
     """Event handler for incoming Discord messages."""
-    global command_router, model_manager
+    global command_router, model_manager, conversation_context
     
     # Ignore messages from the bot itself
     if message.author == client.user:
@@ -413,7 +669,14 @@ async def on_message(message):
     try:
         # Show typing indicator while processing
         async with message.channel.typing():
-            # Step 1: Get raw response from Jarvis tools
+            # Check for follow-up context
+            user_context = ""
+            if conversation_context:
+                user_context = conversation_context.get_context(message.author.id)
+                if user_context:
+                    logger.info(f"Using conversation context for {message.author.name}")
+            
+            # Step 1: Get raw response from Jarvis tools (with retry, validation, auto-followup)
             raw_response = await command_router.handle_message(message)
             
             # Step 2: Format the response using AI (if available)
@@ -421,6 +684,13 @@ async def on_message(message):
                 try:
                     # Get context about what command was run
                     context = f"User asked: {message.content[:100]}"
+                    if user_context:
+                        context += f"\nPrevious context: {user_context[:100]}"
+                    
+                    # Detect intent for better formatting
+                    intent = command_router.detect_query_intent(message.content)
+                    if intent.get("metadata", {}).get("expects_detailed_response"):
+                        context += "\nUser expects detailed response with specific data."
                     
                     # Format the response using Jarvis AI
                     formatted_response = await format_response(
@@ -446,6 +716,15 @@ async def on_message(message):
             
             # Send response
             await message.reply(response)
+            
+            # Store in conversation context
+            if conversation_context:
+                conversation_context.add_message(
+                    user_id=message.author.id,
+                    query=message.content,
+                    response=response,
+                    metadata={"timestamp": datetime.now().isoformat()}
+                )
             
             # Log response
             logger.info(f"Sent response to {message.author}: {response[:100]}...")

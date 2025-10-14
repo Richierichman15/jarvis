@@ -64,6 +64,29 @@ IMPORTANT:
         except Exception:
             return str(json_data)
     
+    def _determine_max_tokens(self, context: Optional[str], raw_response: str) -> int:
+        """Determine appropriate token limit based on content type."""
+        context_lower = (context or "").lower()
+        
+        # News scans and research need more space
+        if any(word in context_lower for word in ['news', 'scan', 'research', 'search']):
+            return 1000
+        
+        # Detailed queries need more space
+        if any(word in context_lower for word in ['list', 'detail', 'explain', 'what are', 'top']):
+            return 800
+        
+        # Complex data structures need more space
+        if len(raw_response) > 2000:
+            return 1200
+        
+        # If context says user expects detailed response
+        if 'expects detailed response' in context_lower:
+            return 1000
+        
+        # Default for simple queries
+        return 500
+    
     async def format_response(self, raw_response: str, context: Optional[str] = None) -> str:
         """
         Format a raw tool response into a natural, conversational message.
@@ -113,12 +136,16 @@ Improve readability while keeping all facts intact. Use Discord markdown where h
             if context:
                 prompt = f"Context: {context}\n\n{prompt}"
             
+            # Determine appropriate token limit based on content
+            max_tokens = self._determine_max_tokens(context, raw_response)
+            logger.info(f"Using {max_tokens} max tokens for response formatting")
+            
             # Call the AI model to format the response
             formatted = self.model_manager.generate(
                 prompt=prompt,
                 system_prompt=self.system_prompt,
                 temperature=0.7,
-                max_tokens=500
+                max_tokens=max_tokens
             )
             
             # Validate the formatted response
