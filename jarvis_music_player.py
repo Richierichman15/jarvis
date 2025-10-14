@@ -101,9 +101,9 @@ class MusicPlayer:
                 # Call MCP to get song info
                 try:
                     result = await self.jarvis_client.call_tool(
-                        "music.play_song",
+                        "play_song",
                         {"song_name": song_name} if song_name else {},
-                        "jarvis"
+                        "music"
                     )
                     
                     # Parse result
@@ -124,21 +124,50 @@ class MusicPlayer:
             logger.info(f"Requesting song from MCP: {song_name or 'random'}")
             
             result = await self.jarvis_client.call_tool(
-                "music.play_song",
+                "play_song",
                 {"song_name": song_name} if song_name else {},
-                "jarvis"
+                "music"
             )
             
             # Parse the result to get song path and name
+            logger.info(f"Raw MCP result: {result}")
             song_info = self._parse_song_result(result)
             
+            # If exact match failed and song_name was provided, try searching
+            if not song_info and song_name:
+                logger.info(f"Exact match failed, searching for: {song_name}")
+                try:
+                    search_result = await self.jarvis_client.call_tool(
+                        "search_song",
+                        {"keyword": song_name},
+                        "music"
+                    )
+                    
+                    # Parse search results
+                    song_info = self._parse_search_result(search_result)
+                    
+                    if song_info:
+                        logger.info(f"Found song via search: {song_info['name']}")
+                    else:
+                        # List available songs for user
+                        return await self._suggest_songs(song_name)
+                        
+                except Exception as e:
+                    logger.error(f"Search failed: {e}")
+                    return await self._suggest_songs(song_name)
+            
             if not song_info:
-                return "❌ Failed to get song information from Music MCP Server"
+                return await self._suggest_songs(song_name)
             
-            # Play the audio
-            await self._play_audio(guild_id, voice_client, song_info, text_channel)
+            # Play the audio (this will send message directly to channel)
+            success = await self._play_audio(guild_id, voice_client, song_info, text_channel)
             
-            return f"🎶 Now playing: **{song_info['name']}**"
+            logger.info(f"_play_audio returned: {success}")
+            
+            if success:
+                return f"🎶 Now playing: **{song_info['name']}**"
+            else:
+                return f"❌ Failed to play: **{song_info['name']}**"
             
         except Exception as e:
             logger.error(f"Error playing song: {e}")
@@ -149,6 +178,8 @@ class MusicPlayer:
         import json
         
         try:
+            logger.info(f"Parsing song result, type: {type(result)}, value: {result}")
+            
             # Try to parse as JSON
             if isinstance(result, str):
                 # Look for JSON in the result
@@ -162,10 +193,19 @@ class MusicPlayer:
             else:
                 data = result
             
+            logger.info(f"Parsed data: {data}")
+            
+            # Check if there's an error
+            if isinstance(data, dict) and data.get('error'):
+                logger.warning(f"Music server returned error: {data.get('error')}")
+                return None
+            
             # Extract song info
             if isinstance(data, dict):
-                song_name = data.get('song_name') or data.get('name') or data.get('title')
+                song_name = data.get('song_name') or data.get('song') or data.get('name') or data.get('title')
                 song_path = data.get('path') or data.get('file_path') or data.get('song_path')
+                
+                logger.info(f"Extracted - song_name: {song_name}, song_path: {song_path}")
                 
                 if song_name and song_path:
                     return {
@@ -181,30 +221,123 @@ class MusicPlayer:
             
         except Exception as e:
             logger.error(f"Error parsing song result: {e}")
+            logger.exception(e)
             return None
     
-    async def _play_audio(self, guild_id: int, voice_client: discord.VoiceClient, song_info: Dict[str, Any], text_channel: discord.TextChannel):
-        """Play audio file in voice channel."""
+    def _parse_search_result(self, result: str) -> Optional[Dict[str, Any]]:
+        """Parse search results and return the first match."""
+        import json
+        
+        try:
+            if isinstance(result, str):
+                data = json.loads(result)
+            else:
+                data = result
+            
+            # Check if it's a list of results
+            if isinstance(data, list) and len(data) > 0:
+                # Return first match
+                first_match = data[0]
+                return {
+                    'name': first_match.get('name') or first_match.get('title'),
+                    'path': first_match.get('path'),
+                    'duration': first_match.get('duration'),
+                    'artist': first_match.get('artist'),
+                    'album': first_match.get('album')
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error parsing search result: {e}")
+            return None
+    
+    async def _suggest_songs(self, failed_query: Optional[str] = None) -> str:
+        """List available songs when song not found."""
+        try:
+            # Get list of available songs
+            result = await self.jarvis_client.call_tool(
+                "list_songs",
+                {},
+                "music"
+            )
+            
+            import json
+            if isinstance(result, str):
+                data = json.loads(result)
+            else:
+                data = result
+            
+            if isinstance(data, list) and len(data) > 0:
+                # Show first 10 songs
+                song_list = "\n".join([f"• {song.get('name', 'Unknown')}" for song in data[:10]])
+                
+                response = f"❌ Song not found"
+                if failed_query:
+                    response += f": **{failed_query}**"
+                
+                response += f"\n\n📀 **Available songs:**\n{song_list}"
+                
+                if len(data) > 10:
+                    response += f"\n\n*...and {len(data) - 10} more songs*"
+                
+                response += f"\n\nTry: `/play <exact_song_name>`"
+                
+                return response
+            else:
+                return "❌ Song not found and could not retrieve song list"
+                
+        except Exception as e:
+            logger.error(f"Error suggesting songs: {e}")
+            return f"❌ Song not found: {failed_query or 'unknown'}"
+    
+    async def _play_audio(self, guild_id: int, voice_client: discord.VoiceClient, song_info: Dict[str, Any], text_channel: discord.TextChannel) -> bool:
+        """Play audio file in voice channel. Returns True if successful, False otherwise."""
         try:
             song_path = song_info['path']
+            
+            logger.info(f"Checking if file exists: {song_path}")
+            logger.info(f"Path object: {Path(song_path)}")
+            logger.info(f"Path exists: {Path(song_path).exists()}")
+            logger.info(f"Path is_file: {Path(song_path).is_file()}")
             
             # Verify file exists
             if not Path(song_path).exists():
                 await text_channel.send(f"❌ Audio file not found: {song_path}")
-                return
+                logger.error(f"File not found at: {song_path}")
+                return False
             
             # Create audio source
-            audio_source = discord.FFmpegPCMAudio(song_path)
+            try:
+                logger.info(f"Creating FFmpegPCMAudio for: {song_path}")
+                audio_source = discord.FFmpegPCMAudio(song_path)
+                logger.info(f"FFmpegPCMAudio created successfully")
+            except Exception as ffmpeg_error:
+                error_msg = str(ffmpeg_error)
+                logger.error(f"FFmpeg error: {error_msg}")
+                if "ffmpeg was not found" in error_msg or "ffmpeg" in error_msg.lower():
+                    await text_channel.send(
+                        "❌ **FFmpeg not found!**\n"
+                        "Please restart your Discord bot (close PowerShell and start again) "
+                        "so it picks up the newly installed FFmpeg."
+                    )
+                else:
+                    await text_channel.send(f"❌ Audio error: {error_msg}")
+                return False
             
             # Store current song info
             self.current_song[guild_id] = song_info
             self.is_playing[guild_id] = True
             self.is_paused[guild_id] = False
             
+            logger.info(f"About to play audio in voice client")
+            
             # Define what happens after song finishes
             def after_playing(error):
                 if error:
                     logger.error(f"Error during playback: {error}")
+                else:
+                    logger.info(f"Song finished playing: {song_info['name']}")
                 
                 # Mark as not playing
                 self.is_playing[guild_id] = False
@@ -219,14 +352,18 @@ class MusicPlayer:
                     )
             
             # Play the audio
+            logger.info(f"Calling voice_client.play()")
             voice_client.play(audio_source, after=after_playing)
+            logger.info(f"voice_client.play() called successfully")
             
             logger.info(f"Playing: {song_info['name']} in guild {guild_id}")
+            return True
             
         except Exception as e:
             logger.error(f"Error playing audio: {e}")
             await text_channel.send(f"❌ Error playing audio: {str(e)}")
             self.is_playing[guild_id] = False
+            return False
     
     async def _play_next_in_queue(self, guild_id: int, voice_client: discord.VoiceClient, song_info: Dict[str, Any], text_channel: discord.TextChannel):
         """Play the next song in the queue."""
@@ -333,9 +470,9 @@ class MusicPlayer:
         # Get song info from MCP
         try:
             result = await self.jarvis_client.call_tool(
-                "music.play_song",
+                "play_song",
                 {"song_name": song_name},
-                "jarvis"
+                "music"
             )
             
             song_info = self._parse_song_result(result)
@@ -428,6 +565,44 @@ class MusicPlayer:
         del self.voice_clients[guild_id]
         
         return "👋 Left voice channel"
+    
+    async def list_available_songs(self) -> str:
+        """List all available songs."""
+        try:
+            result = await self.jarvis_client.call_tool(
+                "list_songs",
+                {},
+                "music"
+            )
+            
+            import json
+            if isinstance(result, str):
+                data = json.loads(result)
+            else:
+                data = result
+            
+            if isinstance(data, list) and len(data) > 0:
+                # Group songs in batches of 15 for better readability
+                song_list = []
+                for i, song in enumerate(data[:20], 1):  # Limit to 20 to avoid message limits
+                    song_name = song.get('name') or song.get('title', 'Unknown')
+                    song_list.append(f"{i}. {song_name}")
+                
+                response = f"📀 **Available Songs** ({len(data)} total)\n\n"
+                response += "\n".join(song_list)
+                
+                if len(data) > 20:
+                    response += f"\n\n*...and {len(data) - 20} more songs*"
+                
+                response += f"\n\nUse `/play <song_name>` to play a song"
+                
+                return response
+            else:
+                return "📀 No songs available in the music library"
+                
+        except Exception as e:
+            logger.error(f"Error listing songs: {e}")
+            return f"❌ Error retrieving song list: {str(e)}"
     
     async def cleanup(self):
         """Cleanup all voice connections."""

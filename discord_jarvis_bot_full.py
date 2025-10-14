@@ -552,6 +552,9 @@ class DiscordCommandRouter:
             elif tool_name == "music_leave":
                 return await music_player.leave(message.author, message.channel)
             
+            elif tool_name == "music_list_songs":
+                return await music_player.list_available_songs()
+            
             else:
                 return f"❌ Unknown music command: {tool_name}"
         
@@ -718,6 +721,10 @@ class DiscordCommandRouter:
                 return "music_queue_view", {}, "local"
         elif content.startswith('/nowplaying') or content.startswith('/np'):
             return "music_now_playing", {}, "local"
+        elif content.startswith('/songs') or content.startswith('/list'):
+            return "music_list_songs", {}, "local"
+        elif content.startswith('/leave') or content.startswith('/disconnect'):
+            return "music_leave", {}, "local"
         elif content.startswith('/volume'):
             # Extract volume level
             import re

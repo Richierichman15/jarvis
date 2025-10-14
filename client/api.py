@@ -107,13 +107,16 @@ class SessionManager:
 
     async def start(self) -> None:
         await self.ensure_session(self.default_alias, force_default=True)
+        logger.info("✅ Connected server '%s'", self.default_alias)
+        
         for alias, entry in self.saved_servers.items():
             if alias == self.default_alias:
                 continue
             try:
                 await self.ensure_session(alias)
+                logger.info("✅ Connected server '%s'", alias)
             except Exception as exc:
-                logger.warning("Failed to auto-connect server '%s': %s", alias, exc)
+                logger.warning("❌ Failed to auto-connect server '%s': %s", alias, exc)
                 # Log the full exception details for debugging
                 import traceback
                 logger.debug("Full traceback for server '%s':\n%s", alias, traceback.format_exc())

@@ -1,4 +1,12 @@
 {
+  "music": {
+    "args": [
+      "-u",
+      "E:/Richie/github/music/music_server.py"
+    ],
+    "command": "C:\\Program Files\\Python313\\python.exe",
+    "cwd": "E:/Richie/github/music"
+  },
   "search": {
     "args": [
       "-u",

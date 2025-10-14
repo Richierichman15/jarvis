@@ -48,11 +48,8 @@ async def main():
     print(f"  - GET  /servers - List connected servers")
     print(f"  - POST /servers/connect - Connect to additional servers")
     print()
-    print("This server provides access to ALL MCP tools:")
-    print("  - jarvis.* (core Jarvis functionality)")
-    print("  - trading.* (portfolio and trading)")
-    print("  - system.* (quests and tasks)")
-    print("  - search.* (web search and news)")
+    print("Server will auto-connect to all MCP servers in .jarvis_servers.json")
+    print("Watch the logs below to see which servers connect successfully...")
     print()
     print("Press Ctrl+C to stop the server")
     
