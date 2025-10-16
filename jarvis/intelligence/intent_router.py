@@ -38,6 +38,13 @@ try:
 except ImportError:
     MODEL_MANAGER_AVAILABLE = False
 
+# Import agent system
+try:
+    from jarvis.agents import AgentManager, AgentCapability
+    AGENT_SYSTEM_AVAILABLE = True
+except ImportError:
+    AGENT_SYSTEM_AVAILABLE = False
+
 # Import memory system
 try:
     from brain import memory as brain_memory
@@ -188,10 +195,11 @@ class ContextRetriever:
 class IntentRouter:
     """Main intent router that uses LLM reasoning to route commands."""
     
-    def __init__(self):
+    def __init__(self, agent_manager=None):
         self.context_retriever = ContextRetriever()
         self.model_manager = None
         self.llm_available = False
+        self.agent_manager = agent_manager
         
         # Initialize LLM
         self._initialize_llm()
@@ -201,6 +209,9 @@ class IntentRouter:
         
         # Intent patterns for quick matching
         self.intent_patterns = self._build_intent_patterns()
+        
+        # Agent capability mapping
+        self.agent_capability_mapping = self._build_agent_capability_mapping()
         
         logger.info("🧠 IntentRouter initialized")
     
@@ -573,6 +584,18 @@ ANALYZE THE REQUEST:
         else:
             return {"tool": "jarvis_chat", "server": "jarvis", "arguments": {"message": text}}
     
+    def _build_agent_capability_mapping(self) -> Dict[IntentType, AgentCapability]:
+        """Build mapping from intent types to agent capabilities."""
+        return {
+            IntentType.TRADING: AgentCapability.TRADING,
+            IntentType.MUSIC: AgentCapability.MUSIC,
+            IntentType.FITNESS: AgentCapability.FITNESS,
+            IntentType.NEWS: AgentCapability.RESEARCH,
+            IntentType.SEARCH: AgentCapability.RESEARCH,
+            IntentType.SYSTEM: AgentCapability.SYSTEM,
+            IntentType.CHAT: AgentCapability.CHAT
+        }
+    
     async def _log_intent(self, text: str, result: IntentResult, context: IntentContext):
         """Log intent analysis results for debugging and improvement."""
         log_entry = {
@@ -650,6 +673,55 @@ ANALYZE THE REQUEST:
             
         except Exception as e:
             return {"error": f"Error calculating statistics: {e}"}
+    
+    async def route_to_agent(self, intent_result: IntentResult, user_id: str) -> str:
+        """Route an intent result to the appropriate agent."""
+        try:
+            if not self.agent_manager or not AGENT_SYSTEM_AVAILABLE:
+                logger.warning("Agent system not available, using fallback routing")
+                return await self._fallback_routing(intent_result)
+            
+            # Get the appropriate agent capability
+            capability = self.agent_capability_mapping.get(intent_result.intent_type)
+            if not capability:
+                logger.warning(f"No agent capability mapped for intent: {intent_result.intent_type}")
+                return await self._fallback_routing(intent_result)
+            
+            # Determine task type from tool name
+            task_type = self._extract_task_type(intent_result.tool_name)
+            
+            # Send task to agent
+            task_id = await self.agent_manager.send_task_to_agent(
+                capability=capability,
+                task_type=task_type,
+                parameters=intent_result.arguments,
+                priority=1,
+                timeout=30
+            )
+            
+            logger.info(f"📤 Routed task {task_id} to {capability.value} agent")
+            return task_id
+            
+        except Exception as e:
+            logger.error(f"Error routing to agent: {e}")
+            return await self._fallback_routing(intent_result)
+    
+    def _extract_task_type(self, tool_name: str) -> str:
+        """Extract task type from tool name."""
+        # Remove server prefix and convert to task format
+        if "." in tool_name:
+            parts = tool_name.split(".")
+            if len(parts) >= 2:
+                return parts[-1]  # Get the last part (task name)
+        
+        # Convert snake_case to task format
+        return tool_name.replace("_", " ").replace("jarvis ", "").replace("music ", "")
+    
+    async def _fallback_routing(self, intent_result: IntentResult) -> str:
+        """Fallback routing when agent system is not available."""
+        logger.info(f"Using fallback routing for {intent_result.tool_name}")
+        # This would integrate with the existing tool system
+        return f"fallback_{intent_result.tool_name}"
 
 
 # Global intent router instance
