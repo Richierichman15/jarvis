@@ -43,6 +43,14 @@ except ImportError as e:
     logging.warning(f"Could not import event listener: {e}")
     EVENT_LISTENER_AVAILABLE = False
 
+# Import intelligence core
+try:
+    from jarvis.intelligence import IntentRouter, IntentResult, IntentType
+    INTELLIGENCE_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import intelligence core: {e}")
+    INTELLIGENCE_AVAILABLE = False
+
 # Import music player
 try:
     from jarvis_music_player import MusicPlayer
@@ -77,8 +85,14 @@ intents = discord.Intents.default()
 intents.message_content = True  # This requires privileged intent
 intents.guilds = True
 
-# Create Discord client
-client = discord.Client(intents=intents)
+# Create Discord client with enhanced connection settings
+client = discord.Client(
+    intents=intents,
+    heartbeat_timeout=60.0,  # Increased heartbeat timeout
+    max_messages=1000,  # Limit message cache
+    chunk_guilds_at_startup=False,  # Don't chunk all guilds at startup
+    member_cache_flags=discord.MemberCacheFlags.none()  # Disable member caching to save memory
+)
 
 # Global aiohttp session for connection reuse
 session: Optional[aiohttp.ClientSession] = None
@@ -92,10 +106,41 @@ class JarvisClientMCPClient:
         self.session = session
         self.timeout = aiohttp.ClientTimeout(total=60)  # Increased to 60 seconds for news scanning
         self.available_tools: Dict[str, Any] = {}
+        self.connection_retries = 0
+        self.max_connection_retries = 5
+        self.last_health_check = 0
+        self.health_check_interval = 30  # Check every 30 seconds
     
+    async def health_check(self) -> bool:
+        """Check if the server is healthy and responsive."""
+        try:
+            import time
+            current_time = time.time()
+            if current_time - self.last_health_check < self.health_check_interval:
+                return True  # Skip if checked recently
+            
+            async with self.session.get(
+                f"{self.base_url}/servers",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                self.last_health_check = current_time
+                if response.status == 200:
+                    self.connection_retries = 0  # Reset retry counter on success
+                    return True
+                else:
+                    logger.warning(f"Health check failed: HTTP {response.status}")
+                    return False
+        except Exception as e:
+            logger.warning(f"Health check error: {e}")
+            return False
+
     async def get_available_tools(self) -> Dict[str, Any]:
         """Get all available tools from all connected servers."""
         try:
+            # Perform health check first
+            if not await self.health_check():
+                logger.warning("Server health check failed, but continuing with tools request")
+            
             async with self.session.get(
                 f"{self.base_url}/tools",
                 timeout=self.timeout
@@ -122,7 +167,7 @@ class JarvisClientMCPClient:
     
     async def call_tool(self, tool_name: str, arguments: dict = None, server: str = None) -> str:
         """
-        Call a tool on the Jarvis Client HTTP Server.
+        Call a tool on the Jarvis Client HTTP Server with enhanced error handling and retry logic.
         
         Args:
             tool_name: The name of the tool to call
@@ -132,72 +177,101 @@ class JarvisClientMCPClient:
         Returns:
             Response from the tool or error message
         """
-        try:
-            if arguments is None:
-                arguments = {}
+        if arguments is None:
+            arguments = {}
+            
+        payload = {
+            "tool": tool_name,
+            "args": arguments
+        }
+        
+        if server:
+            payload["server"] = server
+        
+        logger.info(f"Calling tool: {tool_name} on server: {server or 'default'} with args: {arguments}")
+        
+        # Enhanced retry logic with exponential backoff
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Check server health before making request
+                if attempt > 0:  # Only check health on retries
+                    if not await self.health_check():
+                        logger.warning(f"Server health check failed on attempt {attempt + 1}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            continue
                 
-            payload = {
-                "tool": tool_name,
-                "args": arguments
-            }
-            
-            if server:
-                payload["server"] = server
-            
-            logger.info(f"Calling tool: {tool_name} on server: {server or 'default'} with args: {arguments}")
-            
-            # Use longer timeout for news scanning
-            timeout = aiohttp.ClientTimeout(total=120) if tool_name == "jarvis_scan_news" else self.timeout
-            
-            async with self.session.post(
-                f"{self.base_url}/run-tool",
-                json=payload,
-                timeout=timeout,
-                headers={'Content-Type': 'application/json'}
-            ) as response:
+                # Use longer timeout for news scanning
+                timeout = aiohttp.ClientTimeout(total=120) if tool_name == "jarvis_scan_news" else self.timeout
                 
-                if response.status == 200:
-                    data = await response.json()
+                async with self.session.post(
+                    f"{self.base_url}/run-tool",
+                    json=payload,
+                    timeout=timeout,
+                    headers={'Content-Type': 'application/json'}
+                ) as response:
                     
-                    if data.get('ok'):
-                        result = data.get('result', {})
+                    if response.status == 200:
+                        data = await response.json()
                         
-                        # Handle different result formats
-                        if isinstance(result, dict):
-                            if 'text' in result:
-                                return result['text']
-                            elif 'items' in result:
-                                # Handle content list
-                                texts = []
-                                for item in result.get('items', []):
-                                    if item.get('type') == 'text' and item.get('text'):
-                                        texts.append(item['text'])
-                                return '\n'.join(texts) if texts else str(result)
+                        if data.get('ok'):
+                            result = data.get('result', {})
+                            
+                            # Handle different result formats
+                            if isinstance(result, dict):
+                                if 'text' in result:
+                                    return result['text']
+                                elif 'items' in result:
+                                    # Handle content list
+                                    texts = []
+                                    for item in result.get('items', []):
+                                        if item.get('type') == 'text' and item.get('text'):
+                                            texts.append(item['text'])
+                                    return '\n'.join(texts) if texts else str(result)
+                                else:
+                                    return str(result)
                             else:
                                 return str(result)
                         else:
-                            return str(result)
+                            error_msg = data.get('detail', 'Unknown error')
+                            logger.error(f"Tool call failed: {error_msg}")
+                            return f"Error: {error_msg}"
                     else:
-                        error_msg = data.get('detail', 'Unknown error')
-                        logger.error(f"Tool call failed: {error_msg}")
-                        return f"Error: {error_msg}"
-                else:
-                    error_msg = await response.text()
-                    logger.error(f"HTTP {response.status}: {error_msg}")
-                    return f"Error: HTTP {response.status} - {error_msg}"
-                    
-        except asyncio.TimeoutError:
-            error_msg = "Request timed out"
-            logger.error(error_msg)
-            return error_msg
-        except aiohttp.ClientError as e:
-            error_msg = f"Network error: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
+                        error_msg = await response.text()
+                        logger.error(f"HTTP {response.status}: {error_msg}")
+                        
+                        # Check if it's a recoverable error
+                        if response.status in [502, 503, 504] and attempt < max_retries - 1:
+                            logger.warning(f"Recoverable HTTP error {response.status}, retrying...")
+                            await asyncio.sleep(2 ** attempt)
+                            continue
+                        
+                        return f"Error: HTTP {response.status} - {error_msg}"
+                        
+            except asyncio.TimeoutError:
+                error_msg = f"Request timed out (attempt {attempt + 1}/{max_retries})"
+                logger.error(error_msg)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                return error_msg
+            except aiohttp.ClientError as e:
+                error_msg = f"Network error (attempt {attempt + 1}/{max_retries}): {str(e)}"
+                logger.error(error_msg)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                return error_msg
+            except Exception as e:
+                error_msg = f"Unexpected error (attempt {attempt + 1}/{max_retries}): {str(e)}"
+                logger.error(error_msg)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                return error_msg
+        
+        return f"Error: Failed to call tool after {max_retries} attempts"
     
     async def natural_language_query(self, query: str) -> str:
         """
@@ -899,6 +973,50 @@ class DiscordCommandRouter:
         return result or "No response received from Jarvis."
 
 
+async def execute_intelligent_tool(intent_result: 'IntentResult', message: discord.Message) -> str:
+    """Execute a tool based on intelligent intent analysis."""
+    global jarvis_client, command_router
+    
+    try:
+        tool_name = intent_result.tool_name
+        arguments = intent_result.arguments
+        server = "jarvis"  # Default server
+        
+        # Determine server based on tool name
+        if tool_name.startswith("music_"):
+            server = "local"
+        elif tool_name.startswith("events_"):
+            server = "local"
+        elif tool_name.startswith("trading."):
+            server = "jarvis"
+        elif tool_name.startswith("system."):
+            server = "jarvis"
+        elif tool_name.startswith("jarvis_"):
+            server = "jarvis"
+        elif tool_name.startswith("fitness."):
+            server = "jarvis"
+        
+        logger.info(f"🔧 Executing intelligent tool: {tool_name} on server: {server}")
+        logger.info(f"📝 Arguments: {arguments}")
+        
+        # Handle local commands (music, events)
+        if server == "local":
+            return await command_router._handle_local_command(tool_name, arguments, message)
+        
+        # Handle MCP tools
+        else:
+            if tool_name == "jarvis_chat":
+                # Use natural language processing
+                return await jarvis_client.natural_language_query(arguments.get("message", ""))
+            else:
+                # Call specific tool
+                return await jarvis_client.call_tool(tool_name, arguments, server)
+                
+    except Exception as e:
+        logger.error(f"Error executing intelligent tool: {e}")
+        return f"❌ Error executing tool: {str(e)}"
+
+
 # Global instances
 jarvis_client: Optional[JarvisClientMCPClient] = None
 command_router: Optional[DiscordCommandRouter] = None
@@ -906,6 +1024,7 @@ model_manager: Optional['ModelManager'] = None  # For AI-powered response format
 conversation_context: Optional[ConversationContext] = None  # For tracking conversation history
 event_listener: Optional['TradingEventListener'] = None  # For trading event notifications
 music_player: Optional['MusicPlayer'] = None  # For music playback in voice channels
+intent_router: Optional[IntentRouter] = None  # For intelligent command routing
 
 # Event notification channel ID (configure in .env or here)
 EVENT_NOTIFICATION_CHANNEL_ID = os.getenv('EVENT_NOTIFICATION_CHANNEL_ID', None)
@@ -914,7 +1033,7 @@ EVENT_NOTIFICATION_CHANNEL_ID = os.getenv('EVENT_NOTIFICATION_CHANNEL_ID', None)
 @client.event
 async def on_ready():
     """Event handler for when the bot is ready."""
-    global session, jarvis_client, command_router, model_manager, conversation_context, event_listener, music_player
+    global session, jarvis_client, command_router, model_manager, conversation_context, event_listener, music_player, intent_router
     
     logger.info(f'{client.user} has connected to Discord!')
     logger.info(f'Bot is in {len(client.guilds)} guilds')
@@ -925,6 +1044,18 @@ async def on_ready():
     # Initialize Jarvis client and command router
     jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
     command_router = DiscordCommandRouter(jarvis_client)
+    
+    # Initialize intelligence core
+    if INTELLIGENCE_AVAILABLE:
+        try:
+            intent_router = IntentRouter()
+            logger.info("🧠 Intelligence core initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize intelligence core: {e}")
+            intent_router = None
+    else:
+        logger.warning("⚠️ Intelligence core not available")
+        intent_router = None
     
     # Initialize music player
     if MUSIC_PLAYER_AVAILABLE:
@@ -984,8 +1115,8 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    """Event handler for incoming Discord messages."""
-    global command_router, model_manager, conversation_context
+    """Event handler for incoming Discord messages with intelligent routing."""
+    global command_router, model_manager, conversation_context, intent_router
     
     # Ignore messages from the bot itself
     if message.author == client.user:
@@ -1009,16 +1140,48 @@ async def on_message(message):
                 if user_context:
                     logger.info(f"Using conversation context for {message.author.name}")
             
-            # Step 1: Get raw response from Jarvis tools (with retry, validation, auto-followup)
-            raw_response = await command_router.handle_message(message)
+            # Step 1: Intelligent intent analysis (if available)
+            raw_response = None
+            intent_result = None
             
-            # Step 2: Format the response using AI (if available)
+            if intent_router and INTELLIGENCE_AVAILABLE:
+                try:
+                    # Use intelligent routing
+                    intent_result = await intent_router.analyze_intent(
+                        message.content, 
+                        str(message.author.id), 
+                        str(message.channel.id)
+                    )
+                    
+                    logger.info(f"🧠 Intent: {intent_result.intent_type.value} "
+                              f"(confidence: {intent_result.confidence:.2f})")
+                    logger.info(f"🔧 Tool: {intent_result.tool_name}")
+                    logger.info(f"💭 Reasoning: {intent_result.reasoning}")
+                    
+                    # Execute the determined tool
+                    raw_response = await execute_intelligent_tool(intent_result, message)
+                    
+                except Exception as e:
+                    logger.warning(f"Intelligent routing failed, falling back to command router: {e}")
+                    intent_result = None
+            
+            # Step 2: Fallback to traditional command router if intelligent routing failed
+            if raw_response is None:
+                raw_response = await command_router.handle_message(message)
+            
+            # Step 3: Format the response using AI (if available)
             if model_manager and MODEL_AVAILABLE:
                 try:
                     # Get context about what command was run
                     context = f"User asked: {message.content[:100]}"
                     if user_context:
                         context += f"\nPrevious context: {user_context[:100]}"
+                    
+                    # Add intent information if available
+                    if intent_result:
+                        context += f"\nIntent: {intent_result.intent_type.value} "
+                        context += f"(confidence: {intent_result.confidence:.2f})"
+                        context += f"\nReasoning: {intent_result.reasoning}"
                     
                     # Detect intent for better formatting
                     intent = command_router.detect_query_intent(message.content)
@@ -1048,13 +1211,22 @@ async def on_message(message):
             # Send response (automatically handles long messages by splitting)
             await send_long_message(message, response)
             
-            # Store in conversation context
+            # Store in conversation context with intent information
             if conversation_context:
+                metadata = {"timestamp": datetime.now().isoformat()}
+                if intent_result:
+                    metadata.update({
+                        "intent_type": intent_result.intent_type.value,
+                        "confidence": intent_result.confidence,
+                        "tool_used": intent_result.tool_name,
+                        "reasoning": intent_result.reasoning
+                    })
+                
                 conversation_context.add_message(
                     user_id=message.author.id,
                     query=message.content,
                     response=response,
-                    metadata={"timestamp": datetime.now().isoformat()}
+                    metadata=metadata
                 )
             
             # Log response
@@ -1222,11 +1394,50 @@ async def cleanup():
 async def on_disconnect():
     """Event handler for bot disconnection."""
     logger.info("Bot disconnected from Discord")
-    await cleanup()
+    # Don't cleanup immediately - let the bot try to reconnect
+    # await cleanup()
 
+@client.event
+async def on_resumed():
+    """Event handler for when the bot resumes connection."""
+    logger.info("Bot connection resumed successfully")
+
+@client.event
+async def on_error(event, *args, **kwargs):
+    """Event handler for Discord errors."""
+    logger.error(f"Discord error in event {event}: {args}, {kwargs}")
+
+@client.event
+async def on_socket_raw_receive(msg):
+    """Log raw socket messages for debugging."""
+    # Only log important events to avoid spam
+    if msg.get('t') in ['RESUMED', 'READY', 'GUILD_CREATE', 'GUILD_DELETE']:
+        logger.debug(f"Discord event: {msg.get('t')}")
+
+
+async def connection_monitor():
+    """Monitor connection health and attempt reconnection if needed."""
+    global jarvis_client
+    
+    while True:
+        try:
+            await asyncio.sleep(60)  # Check every minute
+            
+            if jarvis_client:
+                # Check if the bot is connected to Discord
+                if client.is_ready():
+                    # Perform health check on the Jarvis server
+                    if not await jarvis_client.health_check():
+                        logger.warning("Jarvis server health check failed")
+                else:
+                    logger.warning("Discord bot is not ready")
+                    
+        except Exception as e:
+            logger.error(f"Error in connection monitor: {e}")
+            await asyncio.sleep(30)  # Wait before retrying
 
 async def main():
-    """Main entry point."""
+    """Main entry point with enhanced error handling and monitoring."""
     # Debug: Show loaded environment variables (without exposing tokens)
     logger.info("Environment variables loaded:")
     logger.info(f"DISCORD_BOT_TOKEN: {'SET' if DISCORD_BOT_TOKEN and DISCORD_BOT_TOKEN != 'YOUR_DISCORD_BOT_TOKEN_HERE' else 'NOT SET'}")
@@ -1244,21 +1455,56 @@ async def main():
     logger.info("Starting Full-Featured Discord Jarvis Bot...")
     logger.info(f"Connecting to Jarvis Client HTTP Server: {JARVIS_CLIENT_URL}")
     
+    # Start connection monitor task
+    monitor_task = None
+    
     try:
-        # Start the bot
-        await client.start(DISCORD_BOT_TOKEN)
-    except discord.LoginFailure:
-        logger.error("Invalid Discord bot token")
-        logger.error("Please check your DISCORD_BOT_TOKEN in the .env file")
-    except discord.PrivilegedIntentsRequired as e:
-        logger.error("Privileged intents not enabled!")
-        logger.error("Go to https://discord.com/developers/applications/")
-        logger.error("Select your bot -> Bot -> Privileged Gateway Intents")
-        logger.error("Enable 'Message Content Intent'")
-        logger.error("Then restart the bot")
+        # Start the bot with retry logic
+        max_startup_retries = 3
+        for attempt in range(max_startup_retries):
+            try:
+                logger.info(f"Starting bot (attempt {attempt + 1}/{max_startup_retries})")
+                
+                # Start connection monitor
+                monitor_task = asyncio.create_task(connection_monitor())
+                
+                # Start the bot
+                await client.start(DISCORD_BOT_TOKEN)
+                break  # If we get here, the bot started successfully
+                
+            except discord.LoginFailure:
+                logger.error("Invalid Discord bot token")
+                logger.error("Please check your DISCORD_BOT_TOKEN in the .env file")
+                break
+            except discord.PrivilegedIntentsRequired as e:
+                logger.error("Privileged intents not enabled!")
+                logger.error("Go to https://discord.com/developers/applications/")
+                logger.error("Select your bot -> Bot -> Privileged Gateway Intents")
+                logger.error("Enable 'Message Content Intent'")
+                logger.error("Then restart the bot")
+                break
+            except Exception as e:
+                logger.error(f"Error starting bot (attempt {attempt + 1}): {e}")
+                if attempt < max_startup_retries - 1:
+                    wait_time = 5 * (attempt + 1)  # 5s, 10s, 15s
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error("Failed to start bot after all retry attempts")
+                    
+    except KeyboardInterrupt:
+        logger.info("Bot startup interrupted by user")
     except Exception as e:
-        logger.error(f"Error starting bot: {e}")
+        logger.error(f"Fatal error during startup: {e}")
     finally:
+        # Cleanup
+        if monitor_task:
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
+        
         await cleanup()
 
 
