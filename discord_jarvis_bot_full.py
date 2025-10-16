@@ -525,6 +525,15 @@ class DiscordCommandRouter:
                 song_name = arguments.get("song_name")
                 return await music_player.play_song(message.author, message.channel, song_name)
             
+            elif tool_name == "music_play_or_resume":
+                # Check if paused, if so resume, otherwise play random
+                guild_id = message.author.guild.id
+                if guild_id in music_player.is_paused and music_player.is_paused[guild_id]:
+                    return await music_player.resume(message.author, message.channel)
+                else:
+                    # Start playing with auto-queue
+                    return await music_player.play_random(message.author, message.channel, count=5)
+            
             elif tool_name == "music_pause":
                 return await music_player.pause(message.author, message.channel)
             
@@ -554,6 +563,27 @@ class DiscordCommandRouter:
             
             elif tool_name == "music_list_songs":
                 return await music_player.list_available_songs()
+            
+            elif tool_name == "music_random":
+                return await music_player.play_random(message.author, message.channel)
+            
+            elif tool_name == "music_search":
+                keyword = arguments.get("keyword")
+                if not keyword:
+                    return "❌ Please specify a search keyword"
+                return await music_player.search_songs(keyword)
+            
+            elif tool_name == "music_clear_queue":
+                return await music_player.clear_queue(message.author, message.channel)
+            
+            elif tool_name == "music_remove_from_queue":
+                position = arguments.get("position")
+                if not position:
+                    return "❌ Please specify a position to remove"
+                return await music_player.remove_from_queue(message.author, message.channel, position)
+            
+            elif tool_name == "music_mcp_queue":
+                return await music_player.get_mcp_queue()
             
             else:
                 return f"❌ Unknown music command: {tool_name}"
@@ -703,7 +733,10 @@ class DiscordCommandRouter:
         elif content.startswith('/play'):
             # Extract song name if provided
             song_name = message_content.replace('/play', '').strip()
-            return "music_play", {"song_name": song_name if song_name else None}, "local"
+            # If no song name, check if we should resume instead
+            if not song_name:
+                return "music_play_or_resume", {}, "local"
+            return "music_play", {"song_name": song_name}, "local"
         elif content.startswith('/pause'):
             return "music_pause", {}, "local"
         elif content.startswith('/resume'):
@@ -712,6 +745,17 @@ class DiscordCommandRouter:
             return "music_stop", {}, "local"
         elif content.startswith('/skip'):
             return "music_skip", {}, "local"
+        elif content.startswith('/queue clear'):
+            return "music_clear_queue", {}, "local"
+        elif content.startswith('/queue remove'):
+            # Extract position
+            import re
+            match = re.search(r'remove\s+(\d+)', content)
+            if match:
+                position = int(match.group(1))
+                return "music_remove_from_queue", {"position": position}, "local"
+            else:
+                return "music_queue_view", {}, "local"
         elif content.startswith('/queue'):
             # Check if adding to queue or viewing queue
             rest = message_content.replace('/queue', '').strip()
@@ -723,6 +767,16 @@ class DiscordCommandRouter:
             return "music_now_playing", {}, "local"
         elif content.startswith('/songs') or content.startswith('/list'):
             return "music_list_songs", {}, "local"
+        elif content.startswith('/random') or content.startswith('/shuffle'):
+            return "music_random", {}, "local"
+        elif content.startswith('/findsong') or content.startswith('/find'):
+            # Extract search keyword
+            keyword = message_content.replace('/findsong', '').replace('/find', '').strip()
+            if not keyword:
+                return "music_list_songs", {}, "local"
+            return "music_search", {"keyword": keyword}, "local"
+        elif content.startswith('/mcpqueue'):
+            return "music_mcp_queue", {}, "local"
         elif content.startswith('/leave') or content.startswith('/disconnect'):
             return "music_leave", {}, "local"
         elif content.startswith('/volume'):
@@ -736,10 +790,8 @@ class DiscordCommandRouter:
                 return "music_volume", {}, "local"
         elif content.startswith('/join'):
             return "music_join", {}, "local"
-        elif content.startswith('/leave') or content.startswith('/disconnect'):
-            return "music_leave", {}, "local"
         
-        # Search Commands
+        # Search Commands (web search)
         elif content.startswith('/search') or 'web search' in content:
             # Extract search query
             query = message_content.replace('/search', '').replace('web search', '').strip()
