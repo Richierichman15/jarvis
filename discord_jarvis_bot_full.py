@@ -59,6 +59,14 @@ except ImportError as e:
     logging.warning(f"Could not import server manager: {e}")
     SERVER_MANAGER_AVAILABLE = False
 
+# Import system monitoring
+try:
+    from jarvis.monitoring import start_system_monitoring, get_system_monitor
+    SYSTEM_MONITORING_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import system monitoring: {e}")
+    SYSTEM_MONITORING_AVAILABLE = False
+
 # Import music player
 try:
     from jarvis_music_player import MusicPlayer
@@ -107,6 +115,9 @@ session: Optional[aiohttp.ClientSession] = None
 
 # Global server manager instance
 server_manager: Optional[ServerManager] = None
+
+# Global system monitor instance
+system_monitor = None
 
 
 class JarvisClientMCPClient:
@@ -1094,6 +1105,22 @@ async def on_ready():
         logger.info("✅ Music player initialized")
     else:
         logger.info("ℹ️ Music player not available (module not loaded)")
+    
+    # Initialize system monitoring
+    if SYSTEM_MONITORING_AVAILABLE:
+        try:
+            global system_monitor
+            system_monitor = await start_system_monitoring(
+                interval=10,  # Monitor every 10 seconds
+                webhook_url=DISCORD_WEBHOOK_URL
+            )
+            logger.info("📊 System monitoring started with Discord webhook notifications")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize system monitoring: {e}")
+            system_monitor = None
+    else:
+        logger.warning("⚠️ System monitoring not available")
+        system_monitor = None
     
     # Initialize conversation context for tracking user queries
     conversation_context = ConversationContext(max_history=5)
