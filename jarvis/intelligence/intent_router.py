@@ -138,8 +138,8 @@ class ContextRetriever:
         # Try conversation memory first
         if self.conversation_memory:
             try:
-                recent_messages = await self.conversation_memory.get_recent_messages(
-                    user_id, limit=limit
+                recent_messages = self.conversation_memory.get_recent_messages(
+                    limit=limit
                 )
                 context.extend(recent_messages)
             except Exception as e:
@@ -269,9 +269,19 @@ class IntentRouter:
     def _build_intent_patterns(self) -> Dict[IntentType, List[str]]:
         """Build regex patterns for quick intent recognition."""
         return {
+            # Chat patterns - highest priority for greetings and casual conversation
+            IntentType.CHAT: [
+                r'\b(hello|hi|hey|how.?are.?you|what.?up|good.?morning|good.?evening|good.?afternoon)\b',
+                r'\b(how.?are.?we|how.?is.?it.?going|how.?do.?you.?do)\b',
+                r'\b(thank.?you|thanks|please|sorry|help|can.?you.?help)\b',
+                r'\b(what.?can.?you.?do|what.?are.?you|who.?are.?you)\b',
+                r'^(hello|hi|hey|howdy|greetings)',
+                r'\b(how.?are.?you.?today|how.?are.?we.?today)\b'
+            ],
             IntentType.TRADING: [
                 r'\b(portfolio|balance|positions|trades?|price|momentum|pnl|profit|loss|trading|invest|buy|sell)\b',
-                r'\b(bitcoin|btc|ethereum|eth|crypto|stock|market|exchange)\b'
+                r'\b(bitcoin|btc|ethereum|eth|crypto|stock|market|exchange)\b',
+                r'\b(current.?price|check.?price|get.?price)\b'
             ],
             IntentType.MUSIC: [
                 r'\b(play|pause|resume|stop|skip|music|song|queue|volume|shuffle|random)\b',
@@ -283,7 +293,7 @@ class IntentRouter:
             ],
             IntentType.NEWS: [
                 r'\b(news|latest|recent|breaking|update|article|headline)\b',
-                r'\b(ai|artificial intelligence|tech|technology|crypto|finance)\b'
+                r'\b(ai.?developments|tech.?news|technology.?news)\b'
             ],
             IntentType.SYSTEM: [
                 r'\b(status|system|memory|tasks|quests|help|info|health)\b',
@@ -291,11 +301,7 @@ class IntentRouter:
             ],
             IntentType.SEARCH: [
                 r'\b(search|find|look.?up|google|web|internet|information)\b',
-                r'\b(what|how|where|when|why|who)\b'
-            ],
-            IntentType.CHAT: [
-                r'\b(hello|hi|hey|how.?are.?you|what.?up|good.?morning|good.?evening)\b',
-                r'\b(thank.?you|thanks|please|sorry|help)\b'
+                r'\b(search.?for|find.?information|look.?up)\b'
             ]
         }
     
@@ -454,8 +460,27 @@ ANALYZE THE REQUEST:
         """Fallback pattern-based intent analysis."""
         text_lower = text.lower()
         
-        # Check each intent type
+        # Check chat patterns first (highest priority)
+        chat_patterns = self.intent_patterns.get(IntentType.CHAT, [])
+        for pattern in chat_patterns:
+            if re.search(pattern, text_lower):
+                tool_info = self._determine_tool_from_pattern(IntentType.CHAT, text_lower)
+                return IntentResult(
+                    intent_type=IntentType.CHAT,
+                    confidence=0.8,  # Higher confidence for chat patterns
+                    tool_name=tool_info["tool"],
+                    arguments=tool_info.get("arguments", {}),
+                    reasoning=f"Chat pattern matched: {pattern}",
+                    context_used=["pattern_matching"],
+                    fallback_suggestions=["Try being more specific", "Use exact command syntax"],
+                    processing_time=0.0
+                )
+        
+        # Check other intent types
         for intent_type, patterns in self.intent_patterns.items():
+            if intent_type == IntentType.CHAT:  # Skip chat, already checked
+                continue
+                
             for pattern in patterns:
                 if re.search(pattern, text_lower):
                     # Found a match, determine tool
@@ -484,6 +509,47 @@ ANALYZE THE REQUEST:
             processing_time=0.0
         )
     
+    def _extract_crypto_symbols(self, text: str) -> List[str]:
+        """Extract cryptocurrency symbols from text."""
+        # Common crypto symbols and their variations
+        crypto_symbols = {
+            'btc': 'BTC', 'bitcoin': 'BTC',
+            'eth': 'ETH', 'ethereum': 'ETH', 'ether': 'ETH',
+            'sol': 'SOL', 'solana': 'SOL',
+            'ada': 'ADA', 'cardano': 'ADA',
+            'dot': 'DOT', 'polkadot': 'DOT',
+            'matic': 'MATIC', 'polygon': 'MATIC',
+            'avax': 'AVAX', 'avalanche': 'AVAX',
+            'link': 'LINK', 'chainlink': 'LINK',
+            'uni': 'UNI', 'uniswap': 'UNI',
+            'atom': 'ATOM', 'cosmos': 'ATOM',
+            'near': 'NEAR',
+            'ftm': 'FTM', 'fantom': 'FTM',
+            'algo': 'ALGO', 'algorand': 'ALGO',
+            'xrp': 'XRP', 'ripple': 'XRP',
+            'ltc': 'LTC', 'litecoin': 'LTC',
+            'bch': 'BCH', 'bitcoin cash': 'BCH',
+            'doge': 'DOGE', 'dogecoin': 'DOGE',
+            'shib': 'SHIB', 'shiba': 'SHIB'
+        }
+        
+        text_lower = text.lower()
+        found_symbols = []
+        
+        # Look for exact symbol matches (3-5 uppercase letters) but exclude common words
+        common_words = {'THE', 'AND', 'FOR', 'WHAT', 'HOW', 'WHEN', 'WHERE', 'WHY', 'WHO', 'WITH', 'FROM', 'THIS', 'THAT', 'THESE', 'THOSE', 'PRICE', 'CURRENT', 'GET', 'SHOW', 'CHECK', 'FIND', 'LOOK', 'SEE'}
+        symbol_matches = re.findall(r'\b([A-Z]{3,5})\b', text.upper())
+        for match in symbol_matches:
+            if match not in found_symbols and match not in common_words:
+                found_symbols.append(match)
+        
+        # Look for crypto name matches
+        for name, symbol in crypto_symbols.items():
+            if name in text_lower and symbol not in found_symbols:
+                found_symbols.append(symbol)
+        
+        return found_symbols
+    
     def _determine_tool_from_pattern(self, intent_type: IntentType, text: str) -> Dict[str, Any]:
         """Determine the specific tool based on intent type and text content."""
         if intent_type == IntentType.TRADING:
@@ -492,14 +558,33 @@ ANALYZE THE REQUEST:
             elif "balance" in text:
                 return {"tool": "trading.trading.get_balance", "server": "jarvis"}
             elif "price" in text:
-                # Extract symbol if present
-                symbol_match = re.search(r'\b([A-Z]{2,5})\b', text.upper())
-                symbol = symbol_match.group(1) if symbol_match else "BTC"
-                return {
-                    "tool": "trading.trading.get_price",
-                    "server": "jarvis",
-                    "arguments": {"symbol": f"{symbol}/USD"}
-                }
+                # Extract symbols if present - handle multiple symbols
+                symbols = self._extract_crypto_symbols(text)
+                if symbols:
+                    if len(symbols) == 1:
+                        return {
+                            "tool": "trading.trading.get_price",
+                            "server": "jarvis",
+                            "arguments": {"symbol": f"{symbols[0]}/USD"}
+                        }
+                    else:
+                        # For multiple symbols, we'll need to call the tool multiple times
+                        # For now, return the first symbol and log that multiple were requested
+                        return {
+                            "tool": "trading.trading.get_price",
+                            "server": "jarvis",
+                            "arguments": {
+                                "symbol": f"{symbols[0]}/USD",
+                                "multiple_symbols": symbols,
+                                "note": f"Multiple symbols requested: {', '.join(symbols)}"
+                            }
+                        }
+                else:
+                    return {
+                        "tool": "trading.trading.get_price",
+                        "server": "jarvis",
+                        "arguments": {"symbol": "BTC/USD"}
+                    }
             elif "momentum" in text:
                 return {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"}
             elif "trades" in text:
@@ -598,12 +683,17 @@ ANALYZE THE REQUEST:
     
     async def _log_intent(self, text: str, result: IntentResult, context: IntentContext):
         """Log intent analysis results for debugging and improvement."""
+        # Convert IntentResult to JSON-serializable format
+        intent_result_dict = asdict(result)
+        # Convert IntentType enum to string value
+        intent_result_dict["intent_type"] = result.intent_type.value
+        
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "user_id": context.user_id,
             "channel_id": context.channel_id,
             "input_text": text,
-            "intent_result": asdict(result),
+            "intent_result": intent_result_dict,
             "context_summary": {
                 "conversation_length": len(context.conversation_history),
                 "previous_intents": len(context.previous_intents),

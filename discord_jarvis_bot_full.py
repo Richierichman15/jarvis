@@ -51,6 +51,14 @@ except ImportError as e:
     logging.warning(f"Could not import intelligence core: {e}")
     INTELLIGENCE_AVAILABLE = False
 
+# Import server manager
+try:
+    from server_manager import ServerManager
+    SERVER_MANAGER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import server manager: {e}")
+    SERVER_MANAGER_AVAILABLE = False
+
 # Import music player
 try:
     from jarvis_music_player import MusicPlayer
@@ -96,6 +104,9 @@ client = discord.Client(
 
 # Global aiohttp session for connection reuse
 session: Optional[aiohttp.ClientSession] = None
+
+# Global server manager instance
+server_manager: Optional[ServerManager] = None
 
 
 class JarvisClientMCPClient:
@@ -1033,13 +1044,33 @@ EVENT_NOTIFICATION_CHANNEL_ID = os.getenv('EVENT_NOTIFICATION_CHANNEL_ID', None)
 @client.event
 async def on_ready():
     """Event handler for when the bot is ready."""
-    global session, jarvis_client, command_router, model_manager, conversation_context, event_listener, music_player, intent_router
+    global session, jarvis_client, command_router, model_manager, conversation_context, event_listener, music_player, intent_router, server_manager
     
     logger.info(f'{client.user} has connected to Discord!')
     logger.info(f'Bot is in {len(client.guilds)} guilds')
     
     # Create aiohttp session
     session = aiohttp.ClientSession()
+    
+    # Initialize server manager and start missing servers
+    if SERVER_MANAGER_AVAILABLE:
+        try:
+            server_manager = ServerManager(JARVIS_CLIENT_URL)
+            logger.info("🔧 Server manager initialized")
+            
+            # Start missing servers
+            logger.info("🚀 Checking for missing servers...")
+            available = await server_manager.start_missing_servers()
+            
+            # Log server status
+            for server, is_available in available.items():
+                status = "✅" if is_available else "❌"
+                logger.info(f"  {server}: {status}")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize server manager: {e}")
+    else:
+        logger.warning("⚠️ Server manager not available - servers must be started manually")
     
     # Initialize Jarvis client and command router
     jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
@@ -1393,7 +1424,17 @@ async def cleanup():
 @client.event
 async def on_disconnect():
     """Event handler for bot disconnection."""
+    global server_manager
     logger.info("Bot disconnected from Discord")
+    
+    # Stop managed servers when bot disconnects
+    if server_manager and SERVER_MANAGER_AVAILABLE:
+        try:
+            logger.info("🛑 Stopping managed servers due to bot disconnection...")
+            await server_manager.stop_all_servers()
+        except Exception as e:
+            logger.error(f"Error stopping servers: {e}")
+    
     # Don't cleanup immediately - let the bot try to reconnect
     # await cleanup()
 
@@ -1417,7 +1458,7 @@ async def on_socket_raw_receive(msg):
 
 async def connection_monitor():
     """Monitor connection health and attempt reconnection if needed."""
-    global jarvis_client
+    global jarvis_client, server_manager
     
     while True:
         try:
@@ -1429,6 +1470,17 @@ async def connection_monitor():
                     # Perform health check on the Jarvis server
                     if not await jarvis_client.health_check():
                         logger.warning("Jarvis server health check failed")
+                        
+                        # Try to restart missing servers
+                        if server_manager and SERVER_MANAGER_AVAILABLE:
+                            logger.info("🔄 Attempting to restart missing servers...")
+                            try:
+                                available = await server_manager.start_missing_servers()
+                                for server, is_available in available.items():
+                                    if not is_available:
+                                        logger.warning(f"⚠️ {server} server still unavailable")
+                            except Exception as e:
+                                logger.error(f"Error restarting servers: {e}")
                 else:
                     logger.warning("Discord bot is not ready")
                     

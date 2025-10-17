@@ -80,19 +80,23 @@ class ConversationMemory:
         except Exception as e:
             print(f"Error saving message to session file: {e}")
     
-    def get_recent_messages(self, count: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_recent_messages(self, count: Optional[int] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get the most recent messages.
         
         Args:
-            count: Number of messages to return (None for all)
+            count: Number of messages to return (None for all) - DEPRECATED, use limit
+            limit: Number of messages to return (None for all)
             
         Returns:
             List of recent messages
         """
-        if count is None or count >= len(self.conversation_buffer):
+        # Use limit if provided, otherwise use count for backward compatibility
+        num_messages = limit if limit is not None else count
+        
+        if num_messages is None or num_messages >= len(self.conversation_buffer):
             return self.conversation_buffer
         
-        return self.conversation_buffer[-count:]
+        return self.conversation_buffer[-num_messages:]
     
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get the full conversation history from the session file.
