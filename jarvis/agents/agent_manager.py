@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from dataclasses import asdict
 
-from .agent_base import AgentBase, AgentInfo, AgentStatus, AgentCapability, AgentFactory
+from .agent_base import AgentBase, AgentInfo, AgentStatus, AgentCapability
 from .redis_communication import RedisCommunication, TaskMessage, ResponseMessage
 
 # Set up logging
@@ -60,23 +60,11 @@ class AgentManager:
                 "auto_start": True,
                 "max_concurrent_tasks": 5
             },
-            "music": {
-                "class": "MusicAgent", 
-                "capabilities": [AgentCapability.MUSIC],
-                "auto_start": True,
-                "max_concurrent_tasks": 3
-            },
-            "system": {
-                "class": "SystemAgent",
+            "solo_leveling": {
+                "class": "SoloLevelingAgent",
                 "capabilities": [AgentCapability.SYSTEM],
                 "auto_start": True,
                 "max_concurrent_tasks": 10
-            },
-            "fitness": {
-                "class": "FitnessAgent",
-                "capabilities": [AgentCapability.FITNESS],
-                "auto_start": True,
-                "max_concurrent_tasks": 5
             },
             "research": {
                 "class": "ResearchAgent",
@@ -98,6 +86,23 @@ class AgentManager:
         }
         
         self.logger = logging.getLogger("agent_manager")
+    
+    def _create_agent(self, agent_type: str, config: Dict[str, Any]) -> AgentBase:
+        """Create an agent instance based on type."""
+        try:
+            if agent_type == "trader":
+                from .trader_agent import TraderAgent
+                return TraderAgent()
+            elif agent_type == "solo_leveling":
+                from .solo_leveling_agent import SoloLevelingAgent
+                return SoloLevelingAgent()
+            elif agent_type == "research":
+                from .research_agent import ResearchAgent
+                return ResearchAgent()
+            else:
+                raise ValueError(f"Unknown agent type: {agent_type}")
+        except ImportError as e:
+            raise ImportError(f"Could not import agent {agent_type}: {e}")
     
     async def start(self):
         """Start the agent manager and all configured agents."""
@@ -182,7 +187,7 @@ class AgentManager:
             agent_config = config or self.agent_configs.get(agent_type, {})
             
             # Create agent instance
-            agent = AgentFactory.create_agent(agent_type, **agent_config)
+            agent = self._create_agent(agent_type, agent_config)
             
             # Start the agent
             await agent.start(self.redis_comm, self)
@@ -504,6 +509,38 @@ class AgentManager:
             
         except Exception as e:
             self.logger.error(f"Error scaling {agent_type} agents: {e}")
+            raise
+    
+    async def stop(self):
+        """Stop the agent manager and all agents."""
+        try:
+            self.logger.info("🛑 Stopping AgentManager...")
+            
+            # Stop all agents
+            for agent_id in list(self.agents.keys()):
+                await self.stop_agent(agent_id)
+            
+            # Stop monitoring
+            if self.monitoring_task:
+                self.monitoring_task.cancel()
+                try:
+                    await self.monitoring_task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Close Redis connection
+            if self.redis_comm:
+                try:
+                    await self.redis_comm.close()
+                except AttributeError:
+                    # Redis communication doesn't have a close method
+                    pass
+            
+            self.is_running = False
+            self.logger.info("✅ AgentManager stopped")
+            
+        except Exception as e:
+            self.logger.error(f"Error stopping AgentManager: {e}")
             raise
     
     def get_statistics(self) -> Dict[str, Any]:

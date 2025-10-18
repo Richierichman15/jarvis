@@ -16,18 +16,18 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from jarvis.agents import AgentManager, AgentCapability, TraderAgent, MusicAgent, SystemAgent, FitnessAgent, ResearchAgent
+    from jarvis.agents import AgentManager, AgentCapability, TraderAgent, SoloLevelingAgent, ResearchAgent
     from jarvis.intelligence import IntentRouter, IntentType
     AGENT_SYSTEM_AVAILABLE = True
 except ImportError as e:
-    print(f"❌ Could not import agent system: {e}")
+    print(f"Could not import agent system: {e}")
     AGENT_SYSTEM_AVAILABLE = False
     sys.exit(1)
 
 
 async def test_agent_creation():
     """Test individual agent creation and basic functionality."""
-    print("🧪 Testing Individual Agent Creation")
+    print("Testing Individual Agent Creation")
     print("=" * 40)
     
     agents = []
@@ -53,59 +53,23 @@ async def test_agent_creation():
         print(f"✅ TraderAgent response: {response.success}")
         print(f"   Result: {response.result.get('total_value', 'N/A') if response.result else 'None'}")
         
-        # Test MusicAgent
-        print("\n🎵 Testing MusicAgent...")
-        music = MusicAgent()
-        await music.start()
-        agents.append(music)
+        # Test SoloLevelingAgent
+        print("\n🎯 Testing SoloLevelingAgent...")
+        solo_leveling = SoloLevelingAgent()
+        await solo_leveling.start()
+        agents.append(solo_leveling)
         
         task = TaskRequest(
             task_id="test_002",
-            agent_id=music.agent_id,
-            capability=AgentCapability.MUSIC,
-            task_type="play_song",
-            parameters={"song_name": "90210"}
-        )
-        
-        response = await music._handle_task(task)
-        print(f"✅ MusicAgent response: {response.success}")
-        print(f"   Result: {response.result.get('message', 'N/A') if response.result else 'None'}")
-        
-        # Test SystemAgent
-        print("\n🖥️ Testing SystemAgent...")
-        system = SystemAgent()
-        await system.start()
-        agents.append(system)
-        
-        task = TaskRequest(
-            task_id="test_003",
-            agent_id=system.agent_id,
+            agent_id=solo_leveling.agent_id,
             capability=AgentCapability.SYSTEM,
             task_type="get_status",
             parameters={}
         )
         
-        response = await system._handle_task(task)
-        print(f"✅ SystemAgent response: {response.success}")
-        print(f"   Result: {response.result.get('system_status', 'N/A') if response.result else 'None'}")
-        
-        # Test FitnessAgent
-        print("\n💪 Testing FitnessAgent...")
-        fitness = FitnessAgent()
-        await fitness.start()
-        agents.append(fitness)
-        
-        task = TaskRequest(
-            task_id="test_004",
-            agent_id=fitness.agent_id,
-            capability=AgentCapability.FITNESS,
-            task_type="list_workouts",
-            parameters={"muscle_group": "chest"}
-        )
-        
-        response = await fitness._handle_task(task)
-        print(f"✅ FitnessAgent response: {response.success}")
-        print(f"   Result: {len(response.result.get('workouts', [])) if response.result else 0} workouts found")
+        response = await solo_leveling._handle_task(task)
+        print(f"✅ SoloLevelingAgent response: {response.success}")
+        print(f"   Result: {response.result.get('user_level', 'N/A') if response.result else 'None'}")
         
         # Test ResearchAgent
         print("\n🔍 Testing ResearchAgent...")
@@ -114,7 +78,7 @@ async def test_agent_creation():
         agents.append(research)
         
         task = TaskRequest(
-            task_id="test_005",
+            task_id="test_003",
             agent_id=research.agent_id,
             capability=AgentCapability.RESEARCH,
             task_type="scan_news",
@@ -211,9 +175,8 @@ async def test_intelligence_integration():
         # Test intent analysis
         test_cases = [
             "show me my portfolio balance",
-            "play 90210 by Travis Scott",
-            "what's my system status?",
-            "show me chest workouts",
+            "what's my current level?",
+            "create a new quest for learning Python",
             "get the latest tech news"
         ]
         
@@ -245,7 +208,7 @@ async def test_agent_health_monitoring():
     try:
         # Create a test agent
         print("🤖 Creating test agent...")
-        agent = SystemAgent()
+        agent = SoloLevelingAgent()
         await agent.start()
         
         # Get initial health
@@ -291,14 +254,14 @@ async def test_agent_communication():
         # Create multiple agents
         print("🤖 Creating multiple agents...")
         trader = TraderAgent()
-        music = MusicAgent()
-        system = SystemAgent()
+        solo_leveling = SoloLevelingAgent()
+        research = ResearchAgent()
         
         await trader.start()
-        await music.start()
-        await system.start()
+        await solo_leveling.start()
+        await research.start()
         
-        agents = [trader, music, system]
+        agents = [trader, solo_leveling, research]
         
         # Test concurrent task processing
         print("\n⚡ Testing concurrent task processing...")
@@ -402,7 +365,7 @@ async def run_performance_test():
     try:
         # Create agent
         print("🤖 Creating test agent...")
-        agent = SystemAgent()
+        agent = SoloLevelingAgent()
         await agent.start()
         
         # Test task processing speed
@@ -447,11 +410,11 @@ async def run_performance_test():
 
 async def main():
     """Main test function."""
-    print("🚀 Starting Jarvis Modular Agent System Tests")
+    print("Starting Jarvis Modular Agent System Tests")
     print("=" * 60)
     
     if not AGENT_SYSTEM_AVAILABLE:
-        print("❌ Agent system not available")
+        print("Agent system not available")
         return
     
     # Run all tests
@@ -491,7 +454,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n⏹️ Testing interrupted by user")
+        print("\nTesting interrupted by user")
     except Exception as e:
-        print(f"\n💥 Fatal error: {e}")
+        print(f"\nFatal error: {e}")
         sys.exit(1)

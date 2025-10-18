@@ -8,13 +8,11 @@ The Jarvis Modular Agent System transforms Jarvis into a distributed AI platform
 
 ## 🎯 **Overview**
 
-The Agent System consists of five specialized agents, each handling a specific domain:
+The Agent System consists of three specialized agents, each handling a specific domain:
 
 1. **TraderAgent** - Trading and portfolio management
-2. **MusicAgent** - Music playback and queue management  
-3. **SystemAgent** - System monitoring and management
-4. **FitnessAgent** - Workout and fitness tracking
-5. **ResearchAgent** - News scanning and web research
+2. **SoloLevelingAgent** - Life improvement and goal achievement system
+3. **ResearchAgent** - News scanning and web research
 
 ### **Key Features**
 - 🏗️ **Modular Architecture** - Each agent runs independently
@@ -48,9 +46,7 @@ Context Memory → LLM Reasoning → Redis Channels → Tool Execution
 
 #### **Specialized Agents**
 - **TraderAgent**: Portfolio, trades, market data, risk analysis
-- **MusicAgent**: Playback, queue, playlists, voice channels
-- **SystemAgent**: Status, processes, quests, health monitoring
-- **FitnessAgent**: Workouts, exercises, progress tracking
+- **SoloLevelingAgent**: Life improvement, goal achievement, quest system, progress tracking
 - **ResearchAgent**: News, web search, content analysis
 
 #### **Redis Communication**
@@ -179,112 +175,40 @@ task_id = await manager.send_task_to_agent(
 )
 ```
 
-### **2. MusicAgent**
+### **2. SoloLevelingAgent**
 
-**Capabilities**: Music Playback, Queue Management, Voice Channels
-
-**Tasks**:
-- `play_song` - Play specific song
-- `play_random` - Play random song
-- `search_songs` - Search music library
-- `list_songs` - List available songs
-- `add_to_queue` - Add song to queue
-- `get_queue` - Get current queue
-- `pause` - Pause playback
-- `resume` - Resume playback
-- `stop` - Stop playback
-- `skip` - Skip to next song
-- `set_volume` - Set volume level
-- `get_status` - Get playback status
-- `join_voice` - Join voice channel
-- `leave_voice` - Leave voice channel
-- `shuffle_queue` - Shuffle queue
-- `clear_queue` - Clear queue
-
-**Example**:
-```python
-# Natural language input
-"play 90210 by Travis Scott"
-
-# Routes to MusicAgent
-task_id = await manager.send_task_to_agent(
-    capability=AgentCapability.MUSIC,
-    task_type="play_song",
-    parameters={"song_name": "90210 by Travis Scott"}
-)
-```
-
-### **3. SystemAgent**
-
-**Capabilities**: System Monitoring, Task Management, Health Checks
+**Capabilities**: Life Improvement, Goal Achievement, Quest System, Progress Tracking
 
 **Tasks**:
-- `get_status` - Get system status
-- `get_memory` - Get memory usage
-- `get_tasks` - Get task list
-- `list_quests` - List available quests
-- `get_system_info` - Get system information
-- `get_processes` - Get running processes
-- `monitor_system` - Start system monitoring
-- `get_alerts` - Get system alerts
+- `get_status` - Get user status and progress
+- `get_level` - Get current level and experience
+- `get_quests` - Get available quests
+- `list_goals` - List user goals
+- `get_progress` - Get overall progress
 - `create_quest` - Create new quest
 - `update_quest` - Update quest
 - `complete_quest` - Complete quest
-- `add_task` - Add new task
-- `update_task` - Update task
-- `complete_task` - Complete task
-- `get_health` - Get health status
-- `restart_service` - Restart service
-- `get_logs` - Get system logs
+- `create_goal` - Create new goal
+- `update_goal` - Update goal
+- `get_achievements` - Get achievements
+- `get_motivation` - Get motivational message
+- `get_daily_summary` - Get daily progress summary
+- `level_up` - Level up user
 
 **Example**:
 ```python
 # Natural language input
-"what's my system status?"
+"what's my current level?"
 
-# Routes to SystemAgent
+# Routes to SoloLevelingAgent
 task_id = await manager.send_task_to_agent(
     capability=AgentCapability.SYSTEM,
-    task_type="get_status",
+    task_type="get_level",
     parameters={}
 )
 ```
 
-### **4. FitnessAgent**
-
-**Capabilities**: Workout Management, Exercise Tracking, Fitness Goals
-
-**Tasks**:
-- `list_workouts` - List available workouts
-- `search_workouts` - Search workouts
-- `get_workout_plan` - Get workout plan
-- `create_workout` - Create custom workout
-- `start_workout` - Start workout session
-- `complete_workout` - Complete workout
-- `get_exercises` - Get exercise database
-- `track_exercise` - Track exercise performance
-- `get_progress` - Get fitness progress
-- `set_goal` - Set fitness goal
-- `get_goals` - Get fitness goals
-- `get_workout_history` - Get workout history
-- `get_recommendations` - Get workout recommendations
-- `calculate_calories` - Calculate calories burned
-- `get_fitness_stats` - Get fitness statistics
-
-**Example**:
-```python
-# Natural language input
-"show me chest workouts"
-
-# Routes to FitnessAgent
-task_id = await manager.send_task_to_agent(
-    capability=AgentCapability.FITNESS,
-    task_type="list_workouts",
-    parameters={"muscle_group": "chest"}
-)
-```
-
-### **5. ResearchAgent**
+### **3. ResearchAgent**
 
 **Capabilities**: News Scanning, Web Search, Content Analysis
 
@@ -440,11 +364,10 @@ task_id = await router.route_to_agent(result, "user123")
 | Intent Type | Agent Capability | Example Input |
 |-------------|------------------|---------------|
 | Trading | TRADING | "show me my portfolio" |
-| Music | MUSIC | "play some music" |
-| Fitness | FITNESS | "show me chest workouts" |
+| Solo Leveling | SYSTEM | "what's my current level?" |
+| Goals | SYSTEM | "create a new quest" |
 | News | RESEARCH | "get the latest news" |
 | Search | RESEARCH | "search for AI developments" |
-| System | SYSTEM | "what's my system status?" |
 | Chat | CHAT | "how are you doing?" |
 
 ### **Context Awareness**
@@ -468,8 +391,8 @@ Agents can be scaled horizontally:
 # Scale TraderAgent to 3 instances
 await manager.scale_agent("trader", 3)
 
-# Scale MusicAgent to 2 instances  
-await manager.scale_agent("music", 2)
+# Scale SoloLevelingAgent to 2 instances  
+await manager.scale_agent("solo_leveling", 2)
 ```
 
 ### **Load Balancing**
@@ -509,11 +432,11 @@ agent_configs = {
         "auto_start": True,
         "max_concurrent_tasks": 5
     },
-    "music": {
-        "class": "MusicAgent",
-        "capabilities": [AgentCapability.MUSIC],
+    "solo_leveling": {
+        "class": "SoloLevelingAgent",
+        "capabilities": [AgentCapability.SYSTEM],
         "auto_start": True,
-        "max_concurrent_tasks": 3
+        "max_concurrent_tasks": 10
     }
 }
 ```
@@ -558,8 +481,8 @@ python test_agent_system.py
 
 # Test individual components
 python -m jarvis.agents.trader_agent
-python -m jarvis.agents.music_agent
-python -m jarvis.agents.system_agent
+python -m jarvis.agents.solo_leveling_agent
+python -m jarvis.agents.research_agent
 ```
 
 ### **Test Coverage**

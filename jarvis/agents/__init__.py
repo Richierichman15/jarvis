@@ -2,14 +2,12 @@
 Jarvis Modular Agent System
 
 This package provides a distributed agent architecture where specialized agents
-handle different domains (trading, music, system, fitness, research) and communicate
+handle different domains (trading, solo leveling, research) and communicate
 via Redis channels for scalable, fault-tolerant operation.
 
 Agents:
 - TraderAgent: Trading and portfolio management
-- MusicAgent: Music playback and queue management
-- SystemAgent: System monitoring and management
-- FitnessAgent: Workout and fitness tracking
+- SoloLevelingAgent: Life improvement and goal achievement system
 - ResearchAgent: News scanning and web research
 
 Components:
@@ -23,9 +21,7 @@ from .agent_manager import AgentManager
 from .redis_communication import RedisCommunication, TaskMessage, ResponseMessage
 try:
     from .trader_agent import TraderAgent
-    from .music_agent import MusicAgent
-    from .system_agent import SystemAgent
-    from .fitness_agent import FitnessAgent
+    from .solo_leveling_agent import SoloLevelingAgent
     from .research_agent import ResearchAgent
     AGENTS_AVAILABLE = True
 except ImportError as e:
@@ -33,11 +29,7 @@ except ImportError as e:
     # Create placeholder classes for when agents are not available
     class TraderAgent:
         pass
-    class MusicAgent:
-        pass
-    class SystemAgent:
-        pass
-    class FitnessAgent:
+    class SoloLevelingAgent:
         pass
     class ResearchAgent:
         pass
@@ -51,8 +43,6 @@ __all__ = [
     'TaskMessage',
     'ResponseMessage',
     'TraderAgent',
-    'MusicAgent',
-    'SystemAgent',
-    'FitnessAgent',
+    'SoloLevelingAgent',
     'ResearchAgent'
 ]
