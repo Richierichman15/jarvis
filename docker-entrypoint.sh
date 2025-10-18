@@ -23,7 +23,7 @@ if [ -z "$OLLAMA_HOST" ]; then
     echo "Ollama service is up and running!"
     
     # Pull the required model if not already available
-    REQUIRED_MODEL="mistral:7b-instruct-v0.2-q4_0"
+    REQUIRED_MODEL="llama3.1:8b-instruct-q8_0"
     echo "Checking for model: $REQUIRED_MODEL"
     
     if ! curl -s "$OLLAMA_HOST/api/tags" | grep -q "$REQUIRED_MODEL"; then

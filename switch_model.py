@@ -12,7 +12,7 @@ from pathlib import Path
 # Available models
 MODELS = {
     "llama3": "llama3:8b-instruct-q4_0",
-    "mistral": "mistral:7b-instruct-v0.2-q4_0",
+    "llama3.1": "llama3.1:8b-instruct-q8_0",
     "phi3": "phi3:mini"
 }
 
@@ -71,7 +71,7 @@ def switch_model(model_name):
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(description="Switch between local models for Jarvis")
-    parser.add_argument("model", nargs="?", help="Model to switch to (llama3, mistral, phi3)")
+    parser.add_argument("model", nargs="?", help="Model to switch to (llama3, llama3.1, phi3)")
     parser.add_argument("--list", "-l", action="store_true", help="List available models")
     
     args = parser.parse_args()

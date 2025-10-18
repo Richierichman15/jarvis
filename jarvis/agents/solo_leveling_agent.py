@@ -11,14 +11,12 @@ import logging
 import os
 import psutil
 import platform
-import sqlite3
 import json
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-# Load DATA_PATH and SYSTEM_DB_PATH from environment
-DATA_PATH = os.getenv("DATA_PATH", "app/data")
-SYSTEM_DB_PATH = os.path.normpath(os.getenv("SYSTEM_DB_PATH", "system.db"))
+# Load JSON database paths from environment
+JSON_DATA_PATH = os.path.normpath(os.getenv("JSON_DATA_PATH", "E:/Richie/github/system/json_data"))
 
 try:
     from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
@@ -29,69 +27,12 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from jarvis.agents.agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
 
-# Define data file paths using DATA_PATH
-QUEST_PATH = os.path.join(DATA_PATH, "system", "quests.json")
-GOALS_PATH = os.path.join(DATA_PATH, "system", "goals.json")
-SYSTEM_STATUS_PATH = os.path.join(DATA_PATH, "system", "system_status.json")
-
-# Default data structures
-DEFAULT_QUESTS_DATA = {
-    "quests": [
-        {
-            "id": "quest_1",
-            "title": "Complete Python Tutorial",
-            "description": "Finish the Python basics tutorial",
-            "status": "active",
-            "progress": 69,
-            "experience_reward": 150,
-            "difficulty": "easy",
-            "estimated_time": "2 hours",
-            "created_at": "2025-01-18T10:00:00Z"
-        },
-        {
-            "id": "quest_2", 
-            "title": "Practice Coding Daily",
-            "description": "Code for at least 30 minutes every day",
-            "status": "active",
-            "progress": 49,
-            "experience_reward": 100,
-            "difficulty": "medium",
-            "estimated_time": "30 minutes daily",
-            "created_at": "2025-01-18T10:00:00Z"
-        }
-    ],
-    "completed_quests": [],
-    "last_updated": "2025-01-18T12:00:00Z"
-}
-
-DEFAULT_GOALS_DATA = {
-    "goals": [
-        {
-            "id": "goal_1",
-            "title": "Learn AI and Machine Learning",
-            "description": "Master the fundamentals of AI and ML",
-            "status": "active",
-            "priority": "high",
-            "deadline": "2025-06-01",
-            "created_at": "2025-01-18T10:00:00Z"
-        }
-    ],
-    "completed_goals": [],
-    "last_updated": "2025-01-18T12:00:00Z"
-}
-
-DEFAULT_SYSTEM_STATUS_DATA = {
-    "agent_status": "operational",
-    "timestamp": "2025-01-18T12:00:00Z",
-    "user_level": 1,
-    "user_experience": 0,
-    "total_quests_completed": 0,
-    "daily_quests_completed": 0,
-    "active_goals": 1,
-    "active_quests": 2,
-    "achievements_unlocked": 1,
-    "uptime": 0
-}
+# Define JSON database file paths
+QUESTS_JSON_PATH = os.path.join(JSON_DATA_PATH, "quests.json")
+GOALS_JSON_PATH = os.path.join(JSON_DATA_PATH, "goals.json")
+ACHIEVEMENTS_JSON_PATH = os.path.join(JSON_DATA_PATH, "achievement.json")
+USER_JSON_PATH = os.path.join(JSON_DATA_PATH, "user.json")
+USERPROFILE_JSON_PATH = os.path.join(JSON_DATA_PATH, "userprofile.json")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -136,57 +77,73 @@ class SoloLevelingAgent(AgentBase):
         self.logger = logging.getLogger("agent.solo_leveling")
     
     async def start(self, redis_comm=None, agent_manager=None):
-        """Start the agent with data file verification."""
+        """Start the agent with JSON database verification."""
         # Log startup information
         print(f"[SoloLevelingAgent] CWD: {os.getcwd()}")
-        print(f"[SoloLevelingAgent] DATA_PATH: {DATA_PATH}")
-        print(f"[SoloLevelingAgent] SYSTEM_DB_PATH: {SYSTEM_DB_PATH}")
-        print(f"[SoloLevelingAgent] Database Path -> {os.path.abspath(SYSTEM_DB_PATH)}")
-        print(f"[SoloLevelingAgent] Database Exists: {os.path.exists(SYSTEM_DB_PATH)}")
-        print(f"[SoloLevelingAgent] Quest Path -> {os.path.abspath(QUEST_PATH)}")
-        print(f"[SoloLevelingAgent] Exists: {os.path.exists(QUEST_PATH)}")
-        print(f"[SoloLevelingAgent] Goals Path -> {os.path.abspath(GOALS_PATH)}")
-        print(f"[SoloLevelingAgent] Exists: {os.path.exists(GOALS_PATH)}")
-        print(f"[SoloLevelingAgent] System Status Path -> {os.path.abspath(SYSTEM_STATUS_PATH)}")
-        print(f"[SoloLevelingAgent] Exists: {os.path.exists(SYSTEM_STATUS_PATH)}")
+        print(f"[SoloLevelingAgent] JSON_DATA_PATH: {JSON_DATA_PATH}")
+        print(f"[SoloLevelingAgent] Quests JSON -> {os.path.abspath(QUESTS_JSON_PATH)} (Exists: {os.path.exists(QUESTS_JSON_PATH)})")
+        print(f"[SoloLevelingAgent] Goals JSON -> {os.path.abspath(GOALS_JSON_PATH)} (Exists: {os.path.exists(GOALS_JSON_PATH)})")
+        print(f"[SoloLevelingAgent] Achievements JSON -> {os.path.abspath(ACHIEVEMENTS_JSON_PATH)} (Exists: {os.path.exists(ACHIEVEMENTS_JSON_PATH)})")
+        print(f"[SoloLevelingAgent] User JSON -> {os.path.abspath(USER_JSON_PATH)} (Exists: {os.path.exists(USER_JSON_PATH)})")
+        print(f"[SoloLevelingAgent] UserProfile JSON -> {os.path.abspath(USERPROFILE_JSON_PATH)} (Exists: {os.path.exists(USERPROFILE_JSON_PATH)})")
         
-        # Verify database exists
-        if not os.path.exists(SYSTEM_DB_PATH):
-            raise FileNotFoundError(f"System database not found at: {os.path.abspath(SYSTEM_DB_PATH)}")
+        # Verify JSON database files exist
+        await self._verify_json_files()
         
-        # Verify data files exist
-        await self._verify_data_files()
+        # Load data from JSON files
+        await self._load_json_data()
         
         # Call parent start method
         await super().start(redis_comm, agent_manager)
     
-    async def _verify_data_files(self):
-        """Verify and create required data files."""
+    async def _verify_json_files(self):
+        """Verify JSON database files exist."""
         required_files = [
-            {"path": QUEST_PATH, "default_data": DEFAULT_QUESTS_DATA},
-            {"path": GOALS_PATH, "default_data": DEFAULT_GOALS_DATA},
-            {"path": SYSTEM_STATUS_PATH, "default_data": DEFAULT_SYSTEM_STATUS_DATA}
+            QUESTS_JSON_PATH,
+            GOALS_JSON_PATH, 
+            ACHIEVEMENTS_JSON_PATH,
+            USER_JSON_PATH,
+            USERPROFILE_JSON_PATH
         ]
-        self._verify_data_files_helper(required_files)
-    
-    def _verify_data_files_helper(self, required_files):
-        """Helper to verify and create data files."""
-        import json
-        for file_info in required_files:
-            file_path = file_info['path']
-            default_data = file_info.get('default_data', {})
-            
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            # Create file with default data if it doesn't exist
+        
+        missing_files = []
+        for file_path in required_files:
             if not os.path.exists(file_path):
-                try:
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        json.dump(default_data, f, indent=2, ensure_ascii=False)
-                    print(f"WARNING: Created placeholder: {file_path}")
-                except Exception as e:
-                    print(f"ERROR: Failed to create {file_path}: {e}")
+                missing_files.append(file_path)
+        
+        if missing_files:
+            raise FileNotFoundError(f"Missing JSON database files: {missing_files}")
+        
+        self.logger.info("✅ All JSON database files found")
+    
+    async def _load_json_data(self):
+        """Load data from JSON database files."""
+        try:
+            # Load quests
+            with open(QUESTS_JSON_PATH, 'r', encoding='utf-8') as f:
+                self.quests = json.load(f)
+            
+            # Load goals
+            with open(GOALS_JSON_PATH, 'r', encoding='utf-8') as f:
+                self.goals = json.load(f)
+            
+            # Load achievements
+            with open(ACHIEVEMENTS_JSON_PATH, 'r', encoding='utf-8') as f:
+                self.achievements = json.load(f)
+            
+            # Load user profile
+            with open(USERPROFILE_JSON_PATH, 'r', encoding='utf-8') as f:
+                user_profiles = json.load(f)
+                if user_profiles:
+                    profile = user_profiles[0]  # Get first user profile
+                    self.user_level = profile.get("level", 1)
+                    self.user_experience = profile.get("xp", 0)
+            
+            self.logger.info(f"✅ Loaded {len(self.quests)} quests, {len(self.goals)} goals, {len(self.achievements)} achievements")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load JSON data: {e}")
+            raise
     
     def _register_task_handlers(self):
         """Register solo leveling task handlers."""
@@ -255,57 +212,6 @@ class SoloLevelingAgent(AgentBase):
         """Load user goals and quests."""
         self.logger.info("📋 Loading user goals and quests...")
         
-        # Sample goals
-        self.goals = [
-            {
-                "id": "goal_001",
-                "title": "Learn Python Programming",
-                "description": "Master Python programming fundamentals",
-                "status": "active",
-                "progress": 0.3,
-                "target_date": "2025-06-01",
-                "created_at": datetime.now().isoformat(),
-                "category": "learning"
-            },
-            {
-                "id": "goal_002",
-                "title": "Build a Mobile App",
-                "description": "Create and publish a mobile application",
-                "status": "pending",
-                "progress": 0.0,
-                "target_date": "2025-12-01",
-                "created_at": datetime.now().isoformat(),
-                "category": "project"
-            }
-        ]
-        
-        # Sample quests
-        self.quests = [
-            {
-                "id": "quest_001",
-                "title": "Complete Python Tutorial",
-                "description": "Finish the Python basics tutorial",
-                "status": "active",
-                "progress": 0.6,
-                "experience_reward": 150,
-                "created_at": datetime.now().isoformat(),
-                "goal_id": "goal_001",
-                "difficulty": "easy",
-                "estimated_time": "2 hours"
-            },
-            {
-                "id": "quest_002",
-                "title": "Practice Coding Daily",
-                "description": "Code for at least 30 minutes every day",
-                "status": "active",
-                "progress": 0.4,
-                "experience_reward": 100,
-                "created_at": datetime.now().isoformat(),
-                "goal_id": "goal_001",
-                "difficulty": "medium",
-                "estimated_time": "30 minutes daily"
-            }
-        ]
         
         await asyncio.sleep(0.1)  # Simulate loading time
         self.logger.info(f"✅ Loaded {len(self.goals)} goals and {len(self.quests)} quests")
@@ -374,13 +280,15 @@ class SoloLevelingAgent(AgentBase):
         """Update quest progress based on user activity."""
         try:
             for quest in self.quests:
-                if quest["status"] == "active":
+                if quest.get("completed", 0) == 0:  # Quest is not completed
                     # Simulate progress based on time and effort
                     # In a real system, this would be based on actual user activity
-                    quest["progress"] = min(1.0, quest["progress"] + 0.01)
-                    
-                    if quest["progress"] >= 1.0:
-                        await self._complete_quest(quest)
+                    current_progress = quest.get("progress", 0)
+                    if isinstance(current_progress, (int, float)):
+                        quest["progress"] = min(100, current_progress + 1)  # Progress as percentage
+                        
+                        if quest["progress"] >= 100:
+                            await self._complete_quest(quest)
             
         except Exception as e:
             self.logger.error(f"Error updating quest progress: {e}")
@@ -388,16 +296,16 @@ class SoloLevelingAgent(AgentBase):
     async def _complete_quest(self, quest: Dict[str, Any]):
         """Complete a quest and award experience."""
         try:
-            quest["status"] = "completed"
-            quest["completed_at"] = datetime.now().isoformat()
+            quest["completed"] = 1
+            quest["progress"] = 100
             
             # Award experience
-            experience_gained = quest.get("experience_reward", 100)
+            experience_gained = 100  # Default XP reward
             self.user_experience += experience_gained
             self.total_quests_completed += 1
             self.daily_quests_completed += 1
             
-            self.logger.info(f"Quest completed: {quest['title']} (+{experience_gained} XP)")
+            self.logger.info(f"Quest completed: {quest.get('name', 'Unknown')} (+{experience_gained} XP)")
             
             # Update goal progress
             if quest.get("goal_id"):
@@ -412,13 +320,14 @@ class SoloLevelingAgent(AgentBase):
             goal = next((g for g in self.goals if g["id"] == goal_id), None)
             if goal:
                 # Update progress based on experience gained
-                progress_increase = min(0.1, experience_gained / 1000)
-                goal["progress"] = min(1.0, goal["progress"] + progress_increase)
+                progress_increase = min(10, experience_gained / 10)  # Convert to percentage
+                current_progress = goal.get("progress", 0)
+                goal["progress"] = min(100, current_progress + progress_increase)
                 
-                if goal["progress"] >= 1.0:
-                    goal["status"] = "completed"
+                if goal["progress"] >= 100:
+                    goal["completed"] = 1
                     goal["completed_at"] = datetime.now().isoformat()
-                    self.logger.info(f"Goal completed: {goal['title']}")
+                    self.logger.info(f"Goal completed: {goal.get('title', 'Unknown')}")
             
         except Exception as e:
             self.logger.error(f"Error updating goal progress: {e}")
@@ -450,18 +359,27 @@ class SoloLevelingAgent(AgentBase):
         """Check for new achievements."""
         try:
             for achievement in self.achievements:
-                if achievement["status"] == "locked":
-                    if achievement["id"] == "ach_002":  # Quest Master
-                        if self.total_quests_completed >= achievement["target"]:
-                            achievement["status"] = "unlocked"
-                            achievement["unlocked_at"] = datetime.now().isoformat()
-                            self.logger.info(f"Achievement unlocked: {achievement['title']}")
+                if achievement.get("unlocked", 0) == 0:  # Achievement is locked
+                    condition_type = achievement.get("condition_type", "")
+                    condition_value = achievement.get("condition_value", 0)
                     
-                    elif achievement["id"] == "ach_003":  # Level Up
-                        if self.user_level >= achievement["target"]:
-                            achievement["status"] = "unlocked"
+                    if condition_type == "tasks_completed":
+                        if self.total_quests_completed >= condition_value:
+                            achievement["unlocked"] = 1
                             achievement["unlocked_at"] = datetime.now().isoformat()
-                            self.logger.info(f"Achievement unlocked: {achievement['title']}")
+                            self.logger.info(f"Achievement unlocked: {achievement.get('name', 'Unknown')}")
+                    
+                    elif condition_type == "level_reached":
+                        if self.user_level >= condition_value:
+                            achievement["unlocked"] = 1
+                            achievement["unlocked_at"] = datetime.now().isoformat()
+                            self.logger.info(f"Achievement unlocked: {achievement.get('name', 'Unknown')}")
+                    
+                    elif condition_type == "xp_earned":
+                        if self.user_experience >= condition_value:
+                            achievement["unlocked"] = 1
+                            achievement["unlocked_at"] = datetime.now().isoformat()
+                            self.logger.info(f"Achievement unlocked: {achievement.get('name', 'Unknown')}")
             
         except Exception as e:
             self.logger.error(f"Error checking achievements: {e}")
@@ -470,11 +388,12 @@ class SoloLevelingAgent(AgentBase):
         """Check for level-based achievements."""
         try:
             for achievement in self.achievements:
-                if achievement["id"] == "ach_003" and achievement["status"] == "locked":
-                    if self.user_level >= achievement["target"]:
-                        achievement["status"] = "unlocked"
+                if (achievement.get("condition_type") == "level_reached" and 
+                    achievement.get("unlocked", 0) == 0):
+                    if self.user_level >= achievement.get("condition_value", 0):
+                        achievement["unlocked"] = 1
                         achievement["unlocked_at"] = datetime.now().isoformat()
-                        self.logger.info(f"🏆 Achievement unlocked: {achievement['title']}")
+                        self.logger.info(f"Achievement unlocked: {achievement.get('name', 'Unknown')}")
             
         except Exception as e:
             self.logger.error(f"Error checking level achievements: {e}")
@@ -492,76 +411,87 @@ class SoloLevelingAgent(AgentBase):
             self.logger.error(f"Error updating daily progress: {e}")
     
     async def _save_user_progress(self):
-        """Save user progress to persistent storage."""
-        self.logger.info("💾 Saving user progress...")
-        await asyncio.sleep(0.1)  # Simulate saving time
-        self.logger.info("✅ User progress saved")
+        """Save user progress to JSON files."""
+        try:
+            self.logger.info("💾 Saving user progress to JSON files...")
+            
+            # Save quests
+            with open(QUESTS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self.quests, f, indent=2, ensure_ascii=False)
+            
+            # Save goals
+            with open(GOALS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self.goals, f, indent=2, ensure_ascii=False)
+            
+            # Save achievements
+            with open(ACHIEVEMENTS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self.achievements, f, indent=2, ensure_ascii=False)
+            
+            # Update and save user profile
+            with open(USERPROFILE_JSON_PATH, 'r', encoding='utf-8') as f:
+                user_profiles = json.load(f)
+            
+            if user_profiles:
+                user_profiles[0]["level"] = self.user_level
+                user_profiles[0]["xp"] = self.user_experience
+                user_profiles[0]["updated_at"] = datetime.now().isoformat()
+                
+                with open(USERPROFILE_JSON_PATH, 'w', encoding='utf-8') as f:
+                    json.dump(user_profiles, f, indent=2, ensure_ascii=False)
+            
+            self.logger.info("✅ User progress saved to JSON files")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save user progress: {e}")
+    
+    async def _save_quests(self):
+        """Save quests to JSON file."""
+        try:
+            with open(QUESTS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self.quests, f, indent=2, ensure_ascii=False)
+            self.logger.info("✅ Quests saved to JSON file")
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save quests: {e}")
+    
+    async def _save_goals(self):
+        """Save goals to JSON file."""
+        try:
+            with open(GOALS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self.goals, f, indent=2, ensure_ascii=False)
+            self.logger.info("✅ Goals saved to JSON file")
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save goals: {e}")
+    
+    async def _save_achievements(self):
+        """Save achievements to JSON file."""
+        try:
+            with open(ACHIEVEMENTS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self.achievements, f, indent=2, ensure_ascii=False)
+            self.logger.info("✅ Achievements saved to JSON file")
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save achievements: {e}")
     
     def get_quests(self) -> Dict[str, Any]:
-        """Load quests from SQLite database specified by SYSTEM_DB_PATH."""
+        """Load quests from JSON database."""
         try:
-            # Log the database path being used
-            db_path = os.path.abspath(SYSTEM_DB_PATH)
-            self.logger.info(f"Loading quests from database: {db_path}")
+            self.logger.info(f"Loading quests from JSON: {QUESTS_JSON_PATH}")
             
-            # Check if database file exists
-            if not os.path.exists(SYSTEM_DB_PATH):
-                raise FileNotFoundError(f"System database not found at: {db_path}")
-            
-            # Connect to the database
-            with sqlite3.connect(SYSTEM_DB_PATH) as conn:
-                cursor = conn.cursor()
-                
-                # Check if quests table exists
-                cursor.execute("""
-                    SELECT name FROM sqlite_master 
-                    WHERE type='table' AND name='quests'
-                """)
-                
-                if not cursor.fetchone():
-                    self.logger.warning("Quests table not found in database")
-                    return {
-                        "message": "No quests table found in the database",
-                        "quests": []
-                    }
-                
-                # Query all quests from the quests table
-                cursor.execute("SELECT * FROM quests")
-                rows = cursor.fetchall()
-                
-                # Get column names
-                column_names = [description[0] for description in cursor.description]
-                
-                if not rows:
-                    self.logger.info("No quests found in database")
-                    return {
-                        "message": "No quests found in the database",
-                        "quests": []
-                    }
-                
-                # Convert rows to list of dictionaries
-                quests = []
-                for row in rows:
-                    quest = dict(zip(column_names, row))
-                    # Convert any datetime objects to strings
-                    for key, value in quest.items():
-                        if hasattr(value, 'isoformat'):
-                            quest[key] = value.isoformat()
-                    quests.append(quest)
-                
-                self.logger.info(f"Loaded {len(quests)} quests from database")
-                
+            if not self.quests:
+                self.logger.info("No quests loaded in memory")
                 return {
-                    "message": f"Loaded {len(quests)} quests from database",
-                    "quests": quests
+                    "message": "No quests found",
+                    "quests": []
                 }
+            
+            self.logger.info(f"Loaded {len(self.quests)} quests from JSON")
+            
+            return {
+                "message": f"Loaded {len(self.quests)} quests from JSON database",
+                "quests": self.quests
+            }
                 
-        except sqlite3.Error as e:
-            error_msg = f"Database error loading quests: {str(e)}"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
         except Exception as e:
-            error_msg = f"Error loading quests from database: {str(e)}"
+            error_msg = f"Error loading quests from JSON: {str(e)}"
             self.logger.error(error_msg)
             raise Exception(error_msg)
     
@@ -593,9 +523,9 @@ class SoloLevelingAgent(AgentBase):
                 "user_experience": self.user_experience,
                 "total_quests_completed": self.total_quests_completed,
                 "daily_quests_completed": self.daily_quests_completed,
-                "active_goals": len([g for g in self.goals if g["status"] == "active"]),
-                "active_quests": len([q for q in self.quests if q["status"] == "active"]),
-                "achievements_unlocked": len([a for a in self.achievements if a["status"] == "unlocked"]),
+                "active_goals": len([g for g in self.goals if g.get("completed", 0) == 0]),
+                "active_quests": len([q for q in self.quests if q.get("completed", 0) == 0]),
+                "achievements_unlocked": len([a for a in self.achievements if a.get("unlocked", 0) == 1]),
                 "uptime": self.get_info().uptime_seconds
             }
             
@@ -655,16 +585,18 @@ class SoloLevelingAgent(AgentBase):
             
             if quest_data["quests"]:
                 # Apply status filter if provided
-                if status_filter:
-                    filtered_quests = [q for q in quest_data["quests"] if q.get("status") == status_filter]
+                if status_filter == "completed":
+                    filtered_quests = [q for q in quest_data["quests"] if q.get("completed", 0) == 1]
+                elif status_filter == "active" or status_filter == "pending":
+                    filtered_quests = [q for q in quest_data["quests"] if q.get("completed", 0) == 0]
                 else:
                     filtered_quests = quest_data["quests"]
                 
-                # Calculate status counts
+                # Calculate status counts based on completed field
                 status_counts = {
-                    "active": len([q for q in quest_data["quests"] if q.get("status") == "active"]),
-                    "pending": len([q for q in quest_data["quests"] if q.get("status") == "pending"]),
-                    "completed": len([q for q in quest_data["quests"] if q.get("status") == "completed"])
+                    "active": len([q for q in quest_data["quests"] if q.get("completed", 0) == 0]),
+                    "pending": len([q for q in quest_data["quests"] if q.get("completed", 0) == 0]),
+                    "completed": len([q for q in quest_data["quests"] if q.get("completed", 0) == 1])
                 }
                 
                 result = {
@@ -707,8 +639,10 @@ class SoloLevelingAgent(AgentBase):
             
             filtered_goals = self.goals
             
-            if status_filter:
-                filtered_goals = [g for g in filtered_goals if g["status"] == status_filter]
+            if status_filter == "completed":
+                filtered_goals = [g for g in filtered_goals if g.get("completed", 0) == 1]
+            elif status_filter == "active" or status_filter == "pending":
+                filtered_goals = [g for g in filtered_goals if g.get("completed", 0) == 0]
             
             if category_filter:
                 filtered_goals = [g for g in filtered_goals if g.get("category") == category_filter]
@@ -718,9 +652,9 @@ class SoloLevelingAgent(AgentBase):
                 "total_goals": len(self.goals),
                 "filtered_goals": len(filtered_goals),
                 "status_counts": {
-                    "active": len([g for g in self.goals if g["status"] == "active"]),
-                    "pending": len([g for g in self.goals if g["status"] == "pending"]),
-                    "completed": len([g for g in self.goals if g["status"] == "completed"])
+                    "active": len([g for g in self.goals if g.get("completed", 0) == 0]),
+                    "pending": len([g for g in self.goals if g.get("completed", 0) == 0]),
+                    "completed": len([g for g in self.goals if g.get("completed", 0) == 1])
                 }
             }
             
@@ -750,28 +684,28 @@ class SoloLevelingAgent(AgentBase):
                 "goals_progress": [
                     {
                         "goal_id": goal["id"],
-                        "title": goal["title"],
-                        "progress": goal["progress"],
-                        "status": goal["status"]
+                        "title": goal.get("title", "Unknown"),
+                        "progress": goal.get("progress", 0),
+                        "status": "completed" if goal.get("completed", 0) == 1 else "active"
                     }
                     for goal in self.goals
                 ],
                 "quests_progress": [
                     {
                         "quest_id": quest["id"],
-                        "title": quest["title"],
-                        "progress": quest["progress"],
-                        "status": quest["status"]
+                        "title": quest.get("name", "Unknown"),
+                        "progress": quest.get("progress", 0),
+                        "status": "completed" if quest.get("completed", 0) == 1 else "active"
                     }
                     for quest in self.quests
                 ],
                 "achievements": [
                     {
                         "id": ach["id"],
-                        "title": ach["title"],
-                        "status": ach["status"],
+                        "title": ach.get("name", "Unknown"),
+                        "status": "unlocked" if ach.get("unlocked", 0) == 1 else "locked",
                         "progress": ach.get("progress", 0),
-                        "target": ach.get("target", 0)
+                        "target": ach.get("condition_value", 0)
                     }
                     for ach in self.achievements
                 ]
@@ -807,20 +741,25 @@ class SoloLevelingAgent(AgentBase):
                     error="Title and description are required"
                 )
             
+            # Generate new quest ID based on existing quests
+            max_id = max([q.get("id", 0) for q in self.quests], default=0)
+            if isinstance(max_id, str) and max_id.isdigit():
+                max_id = int(max_id)
+            elif isinstance(max_id, str):
+                max_id = 0
+            
             quest = {
-                "id": f"quest_{len(self.quests) + 1:03d}",
-                "title": title,
+                "id": max_id + 1,
+                "name": title,
                 "description": description,
-                "status": "pending",
-                "progress": 0.0,
-                "experience_reward": task.parameters.get("experience_reward", 100),
-                "created_at": datetime.now().isoformat(),
-                "goal_id": goal_id,
-                "difficulty": task.parameters.get("difficulty", "medium"),
-                "estimated_time": task.parameters.get("estimated_time", "1 hour")
+                "progress": 0,
+                "completed": 0
             }
             
             self.quests.append(quest)
+            
+            # Save to JSON file
+            await self._save_quests()
             
             result = {
                 "message": f"Quest '{title}' created successfully",
@@ -848,6 +787,10 @@ class SoloLevelingAgent(AgentBase):
             quest_id = task.parameters.get("quest_id")
             updates = task.parameters.get("updates", {})
             
+            # Convert quest_id to int if it's a string
+            if isinstance(quest_id, str) and quest_id.isdigit():
+                quest_id = int(quest_id)
+            
             quest = next((q for q in self.quests if q["id"] == quest_id), None)
             
             if not quest:
@@ -862,6 +805,9 @@ class SoloLevelingAgent(AgentBase):
             for key, value in updates.items():
                 if key in quest:
                     quest[key] = value
+            
+            # Save to JSON file
+            await self._save_quests()
             
             result = {
                 "message": f"Quest {quest_id} updated successfully",
@@ -888,6 +834,10 @@ class SoloLevelingAgent(AgentBase):
         try:
             quest_id = task.parameters.get("quest_id")
             
+            # Convert quest_id to int if it's a string
+            if isinstance(quest_id, str) and quest_id.isdigit():
+                quest_id = int(quest_id)
+            
             quest = next((q for q in self.quests if q["id"] == quest_id), None)
             
             if not quest:
@@ -898,7 +848,7 @@ class SoloLevelingAgent(AgentBase):
                     error=f"Quest {quest_id} not found"
                 )
             
-            if quest["status"] == "completed":
+            if quest.get("completed", 0) == 1:
                 return TaskResponse(
                     task_id=task.task_id,
                     agent_id=self.agent_id,
@@ -907,12 +857,23 @@ class SoloLevelingAgent(AgentBase):
                 )
             
             # Complete the quest
-            await self._complete_quest(quest)
+            quest["completed"] = 1
+            quest["progress"] = 100
+            
+            # Award experience
+            experience_gained = 100  # Default XP reward
+            self.user_experience += experience_gained
+            self.total_quests_completed += 1
+            self.daily_quests_completed += 1
+            
+            # Save to JSON files
+            await self._save_quests()
+            await self._save_user_progress()
             
             result = {
-                "message": f"Quest '{quest['title']}' completed!",
+                "message": f"Quest '{quest['name']}' completed!",
                 "quest": quest,
-                "experience_gained": quest.get("experience_reward", 100),
+                "experience_gained": experience_gained,
                 "new_level": self.user_level,
                 "new_experience": self.user_experience
             }
@@ -947,18 +908,32 @@ class SoloLevelingAgent(AgentBase):
                     error="Title and description are required"
                 )
             
+            # Generate new goal ID based on existing goals
+            max_id = max([g.get("id", 0) for g in self.goals], default=0)
+            if isinstance(max_id, str) and max_id.isdigit():
+                max_id = int(max_id)
+            elif isinstance(max_id, str):
+                max_id = 0
+            
             goal = {
-                "id": f"goal_{len(self.goals) + 1:03d}",
+                "id": max_id + 1,
+                "user_id": 1,  # Default user ID
                 "title": title,
                 "description": description,
-                "status": "pending",
-                "progress": 0.0,
+                "category": category,
+                "priority": task.parameters.get("priority", "medium"),
                 "target_date": task.parameters.get("target_date"),
+                "progress": 0.0,
+                "completed": 0,
+                "completed_at": None,
                 "created_at": datetime.now().isoformat(),
-                "category": category
+                "updated_at": datetime.now().isoformat()
             }
             
             self.goals.append(goal)
+            
+            # Save to JSON file
+            await self._save_goals()
             
             result = {
                 "message": f"Goal '{title}' created successfully",
@@ -986,6 +961,10 @@ class SoloLevelingAgent(AgentBase):
             goal_id = task.parameters.get("goal_id")
             updates = task.parameters.get("updates", {})
             
+            # Convert goal_id to int if it's a string
+            if isinstance(goal_id, str) and goal_id.isdigit():
+                goal_id = int(goal_id)
+            
             goal = next((g for g in self.goals if g["id"] == goal_id), None)
             
             if not goal:
@@ -1000,6 +979,12 @@ class SoloLevelingAgent(AgentBase):
             for key, value in updates.items():
                 if key in goal:
                     goal[key] = value
+            
+            # Update the updated_at timestamp
+            goal["updated_at"] = datetime.now().isoformat()
+            
+            # Save to JSON file
+            await self._save_goals()
             
             result = {
                 "message": f"Goal {goal_id} updated successfully",
@@ -1026,16 +1011,19 @@ class SoloLevelingAgent(AgentBase):
         try:
             status_filter = task.parameters.get("status")
             
-            if status_filter:
-                filtered_achievements = [a for a in self.achievements if a["status"] == status_filter]
+            # Filter achievements based on unlocked status
+            if status_filter == "unlocked":
+                filtered_achievements = [a for a in self.achievements if a.get("unlocked", 0) == 1]
+            elif status_filter == "locked":
+                filtered_achievements = [a for a in self.achievements if a.get("unlocked", 0) == 0]
             else:
                 filtered_achievements = self.achievements
             
             result = {
                 "achievements": filtered_achievements,
                 "total_achievements": len(self.achievements),
-                "unlocked_achievements": len([a for a in self.achievements if a["status"] == "unlocked"]),
-                "locked_achievements": len([a for a in self.achievements if a["status"] == "locked"])
+                "unlocked_achievements": len([a for a in self.achievements if a.get("unlocked", 0) == 1]),
+                "locked_achievements": len([a for a in self.achievements if a.get("unlocked", 0) == 0])
             }
             
             return TaskResponse(
@@ -1094,15 +1082,15 @@ class SoloLevelingAgent(AgentBase):
                 "goals_progress": [
                     {
                         "goal_id": goal["id"],
-                        "title": goal["title"],
-                        "progress": goal["progress"],
-                        "status": goal["status"]
+                        "title": goal.get("title", "Unknown"),
+                        "progress": goal.get("progress", 0),
+                        "status": "completed" if goal.get("completed", 0) == 1 else "active"
                     }
-                    for goal in self.goals if goal["status"] == "active"
+                    for goal in self.goals if goal.get("completed", 0) == 0
                 ],
                 "achievements_unlocked_today": len([
                     a for a in self.achievements 
-                    if a["status"] == "unlocked" and a.get("unlocked_at", "").startswith(datetime.now().strftime("%Y-%m-%d"))
+                    if a.get("unlocked", 0) == 1 and a.get("unlocked_at", "").startswith(datetime.now().strftime("%Y-%m-%d"))
                 ]),
                 "motivation": random.choice(self.leveling_config["motivation_messages"])
             }

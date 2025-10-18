@@ -70,7 +70,7 @@ User Query
     ↓
 Try GPT-4o-mini (OpenAI)
     ↓ [If fails]
-Try Ollama Local LLM (Mistral 7B)
+Try Ollama Local LLM (llama3.1:8b-instruct-q8_0)
     ↓ [If fails]
 Return error message
 ```

@@ -44,14 +44,14 @@ if not OPENWEATHER_API_KEY:
 
 # Available local models
 LOCAL_MODELS = {
-    "llama3": "llama3:8b-instruct-q4_0",     # Good all-rounder
-    "mistral": "mistral:7b-instruct-v0.2-q4_0",  # Great reasoning
-    "phi3": "phi3:mini"     # Efficient smaller model
+    "llama3.1": "llama3.1:8b-instruct-q8_0",     # Primary model for all agents
+    "llama3": "llama3:8b-instruct-q4_0",         # Fallback option
+    "phi3": "phi3:mini"                          # Efficient smaller model
 }
 
 # Model settings
-LOCAL_MODEL_NAME = LOCAL_MODELS["mistral"]  # Changed to use Mistral as default
-LOCAL_MODEL_BASE_URL = "http://localhost:11434/api"  # Ollama API endpoint
+LOCAL_MODEL_NAME = LOCAL_MODELS["llama3.1"]  # Using llama3.1:8b-instruct-q8_0 as default
+LOCAL_MODEL_BASE_URL = "http://localhost:11434"  # Ollama API endpoint
 
 OPENAI_MODEL = "gpt-4-turbo-preview"  # Latest GPT-4 model
 CLAUDE_MODEL = "claude-3-sonnet-20240229"  # Latest Claude 3 Sonnet model

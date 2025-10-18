@@ -28,7 +28,7 @@ class OllamaModel:
         """
         self.model_name = model_name
         self.base_url = base_url
-        self.generate_endpoint = f"{base_url}/generate"
+        self.generate_endpoint = f"{base_url}/api/generate"
         self.current_retry_count = 0
         self.max_retries = 3
         self.max_timeout = 60  # Increased from 30 seconds
@@ -42,7 +42,7 @@ class OllamaModel:
         """
         try:
             # First check if we can reach the API
-            response = requests.get(f"{self.base_url}/version", timeout=5)
+            response = requests.get(f"{self.base_url}/api/version", timeout=5)
             if response.status_code == 200:
                 return True
                 
