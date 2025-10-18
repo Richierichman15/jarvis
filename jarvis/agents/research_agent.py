@@ -10,10 +10,21 @@ import asyncio
 import logging
 import aiohttp
 import json
+import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 
-from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+# Load DATA_PATH from environment
+DATA_PATH = os.getenv("DATA_PATH", "app/data")
+
+try:
+    from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+except ImportError:
+    # Handle direct execution
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from jarvis.agents.agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +68,15 @@ class ResearchAgent(AgentBase):
         self.http_session = None
         
         self.logger = logging.getLogger("agent.research")
+    
+    async def start(self, redis_comm=None, agent_manager=None):
+        """Start the agent with startup logging."""
+        # Log startup information
+        print(f"[ResearchAgent] CWD: {os.getcwd()}")
+        print(f"[ResearchAgent] DATA_PATH: {DATA_PATH}")
+        
+        # Call parent start method
+        await super().start(redis_comm, agent_manager)
     
     def _register_task_handlers(self):
         """Register research task handlers."""
@@ -214,14 +234,12 @@ class ResearchAgent(AgentBase):
             limit = task.parameters.get("limit", 10)
             sources = task.parameters.get("sources", [])
             
-            self.logger.info(f"🔍 Calling MCP server for jarvis_scan_news...")
+            self.logger.info(f"🔍 Calling MCP server for web.search...")
             # Call the real MCP server for news scanning
             args = {
-                "category": category,
-                "limit": limit,
-                "sources": sources
+                "query": category
             }
-            result = await self._call_mcp_server("jarvis_scan_news", args, "search")
+            result = await self._call_mcp_server("web.search", args, "search")
             self.logger.info(f"📊 Received news data: {result}")
             
             # Add to research history

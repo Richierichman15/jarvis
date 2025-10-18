@@ -1220,7 +1220,7 @@ async def execute_intelligent_tool(intent_result: 'IntentResult', message: disco
         arguments = intent_result.arguments
         
         # Try agent system first
-        if agent_manager:
+        if agent_manager is not None:
             try:
                 agent_router = AgentToolRouter(agent_manager)
                 result = await agent_router.call_tool(tool_name, arguments)
@@ -1233,6 +1233,8 @@ async def execute_intelligent_tool(intent_result: 'IntentResult', message: disco
                     logger.warning(f"Agent system couldn't handle tool, falling back to MCP: {result}")
             except Exception as e:
                 logger.warning(f"Agent system error, falling back to MCP: {e}")
+        else:
+            logger.warning("⚠️ Agent system not available - bot may still be initializing")
         
         # Fallback to MCP servers
         server = "jarvis"  # Default server
@@ -1352,8 +1354,14 @@ async def on_ready():
         robust_mcp_client = None
     
     # Initialize Jarvis client and command router
-    jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
-    command_router = DiscordCommandRouter(jarvis_client)
+    try:
+        jarvis_client = JarvisClientMCPClient(JARVIS_CLIENT_URL, session)
+        command_router = DiscordCommandRouter(jarvis_client)
+        logger.info("🔧 Jarvis client and command router initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not initialize Jarvis client: {e}")
+        jarvis_client = None
+        command_router = None
     
     # Initialize intelligence core
     if INTELLIGENCE_AVAILABLE:
@@ -1366,6 +1374,26 @@ async def on_ready():
     else:
         logger.warning("⚠️ Intelligence core not available")
         intent_router = None
+    
+    # Initialize model manager for AI-powered response formatting
+    if MODEL_AVAILABLE:
+        try:
+            model_manager = ModelManager()
+            logger.info("🤖 Model manager initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize model manager: {e}")
+            model_manager = None
+    else:
+        logger.warning("⚠️ Model manager not available")
+        model_manager = None
+    
+    # Initialize conversation context
+    try:
+        conversation_context = ConversationContext()
+        logger.info("💬 Conversation context initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not initialize conversation context: {e}")
+        conversation_context = None
     
     # Initialize music player
     if MUSIC_PLAYER_AVAILABLE:
@@ -1491,7 +1519,11 @@ async def on_message(message):
             
             # Step 2: Fallback to traditional command router if intelligent routing failed
             if raw_response is None:
-                raw_response = await command_router.handle_message(message)
+                if command_router is not None:
+                    raw_response = await command_router.handle_message(message)
+                else:
+                    logger.error("Command router is not initialized - cannot process message")
+                    raw_response = "❌ Bot is still initializing. Please wait a moment and try again."
             
             # Step 3: Format the response using AI (if available)
             if model_manager and MODEL_AVAILABLE:

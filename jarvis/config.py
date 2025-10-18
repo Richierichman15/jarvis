@@ -18,6 +18,14 @@ os.makedirs(MEMORY_DIR, exist_ok=True)  # Ensure memory directory exists
 DEBUG_LOGS_DIR = PROJECT_ROOT / "jarvis" / "debug_logs"
 os.makedirs(DEBUG_LOGS_DIR, exist_ok=True)  # Ensure debug logs directory exists
 
+# Data directory for agent data files
+DATA_PATH = os.environ.get("DATA_PATH", str(PROJECT_ROOT / "data"))
+os.makedirs(DATA_PATH, exist_ok=True)  # Ensure data directory exists
+
+# Agent startup logs directory
+AGENT_LOGS_DIR = PROJECT_ROOT / "logs"
+os.makedirs(AGENT_LOGS_DIR, exist_ok=True)  # Ensure logs directory exists
+
 # OpenAI API configuration
 # First check for API key in environment, then use default if not available
 OPENAI_API_KEY = os.environ.get("OPENAI_KEY", "")

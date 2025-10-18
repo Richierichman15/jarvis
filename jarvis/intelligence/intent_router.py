@@ -267,8 +267,8 @@ class IntentRouter:
             "goals": {"tool": "system.system.list_goals", "server": "system"},
             
             # News and search
-            "news": {"tool": "jarvis_scan_news", "server": "search"},
-            "search": {"tool": "jarvis_web_search", "server": "search"},
+            "news": {"tool": "web.search", "server": "search"},
+            "search": {"tool": "web.search", "server": "search"},
             
             # Events
             "events": {"tool": "events_get_statistics", "server": "local"},

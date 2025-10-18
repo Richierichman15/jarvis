@@ -8,12 +8,90 @@ tracking progress, and providing motivation through a gamified system.
 
 import asyncio
 import logging
+import os
 import psutil
 import platform
+import sqlite3
+import json
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+# Load DATA_PATH and SYSTEM_DB_PATH from environment
+DATA_PATH = os.getenv("DATA_PATH", "app/data")
+SYSTEM_DB_PATH = os.path.normpath(os.getenv("SYSTEM_DB_PATH", "system.db"))
+
+try:
+    from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+except ImportError:
+    # Handle direct execution
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from jarvis.agents.agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+
+# Define data file paths using DATA_PATH
+QUEST_PATH = os.path.join(DATA_PATH, "system", "quests.json")
+GOALS_PATH = os.path.join(DATA_PATH, "system", "goals.json")
+SYSTEM_STATUS_PATH = os.path.join(DATA_PATH, "system", "system_status.json")
+
+# Default data structures
+DEFAULT_QUESTS_DATA = {
+    "quests": [
+        {
+            "id": "quest_1",
+            "title": "Complete Python Tutorial",
+            "description": "Finish the Python basics tutorial",
+            "status": "active",
+            "progress": 69,
+            "experience_reward": 150,
+            "difficulty": "easy",
+            "estimated_time": "2 hours",
+            "created_at": "2025-01-18T10:00:00Z"
+        },
+        {
+            "id": "quest_2", 
+            "title": "Practice Coding Daily",
+            "description": "Code for at least 30 minutes every day",
+            "status": "active",
+            "progress": 49,
+            "experience_reward": 100,
+            "difficulty": "medium",
+            "estimated_time": "30 minutes daily",
+            "created_at": "2025-01-18T10:00:00Z"
+        }
+    ],
+    "completed_quests": [],
+    "last_updated": "2025-01-18T12:00:00Z"
+}
+
+DEFAULT_GOALS_DATA = {
+    "goals": [
+        {
+            "id": "goal_1",
+            "title": "Learn AI and Machine Learning",
+            "description": "Master the fundamentals of AI and ML",
+            "status": "active",
+            "priority": "high",
+            "deadline": "2025-06-01",
+            "created_at": "2025-01-18T10:00:00Z"
+        }
+    ],
+    "completed_goals": [],
+    "last_updated": "2025-01-18T12:00:00Z"
+}
+
+DEFAULT_SYSTEM_STATUS_DATA = {
+    "agent_status": "operational",
+    "timestamp": "2025-01-18T12:00:00Z",
+    "user_level": 1,
+    "user_experience": 0,
+    "total_quests_completed": 0,
+    "daily_quests_completed": 0,
+    "active_goals": 1,
+    "active_quests": 2,
+    "achievements_unlocked": 1,
+    "uptime": 0
+}
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -56,6 +134,59 @@ class SoloLevelingAgent(AgentBase):
         self.achievements = []
         
         self.logger = logging.getLogger("agent.solo_leveling")
+    
+    async def start(self, redis_comm=None, agent_manager=None):
+        """Start the agent with data file verification."""
+        # Log startup information
+        print(f"[SoloLevelingAgent] CWD: {os.getcwd()}")
+        print(f"[SoloLevelingAgent] DATA_PATH: {DATA_PATH}")
+        print(f"[SoloLevelingAgent] SYSTEM_DB_PATH: {SYSTEM_DB_PATH}")
+        print(f"[SoloLevelingAgent] Database Path -> {os.path.abspath(SYSTEM_DB_PATH)}")
+        print(f"[SoloLevelingAgent] Database Exists: {os.path.exists(SYSTEM_DB_PATH)}")
+        print(f"[SoloLevelingAgent] Quest Path -> {os.path.abspath(QUEST_PATH)}")
+        print(f"[SoloLevelingAgent] Exists: {os.path.exists(QUEST_PATH)}")
+        print(f"[SoloLevelingAgent] Goals Path -> {os.path.abspath(GOALS_PATH)}")
+        print(f"[SoloLevelingAgent] Exists: {os.path.exists(GOALS_PATH)}")
+        print(f"[SoloLevelingAgent] System Status Path -> {os.path.abspath(SYSTEM_STATUS_PATH)}")
+        print(f"[SoloLevelingAgent] Exists: {os.path.exists(SYSTEM_STATUS_PATH)}")
+        
+        # Verify database exists
+        if not os.path.exists(SYSTEM_DB_PATH):
+            raise FileNotFoundError(f"System database not found at: {os.path.abspath(SYSTEM_DB_PATH)}")
+        
+        # Verify data files exist
+        await self._verify_data_files()
+        
+        # Call parent start method
+        await super().start(redis_comm, agent_manager)
+    
+    async def _verify_data_files(self):
+        """Verify and create required data files."""
+        required_files = [
+            {"path": QUEST_PATH, "default_data": DEFAULT_QUESTS_DATA},
+            {"path": GOALS_PATH, "default_data": DEFAULT_GOALS_DATA},
+            {"path": SYSTEM_STATUS_PATH, "default_data": DEFAULT_SYSTEM_STATUS_DATA}
+        ]
+        self._verify_data_files_helper(required_files)
+    
+    def _verify_data_files_helper(self, required_files):
+        """Helper to verify and create data files."""
+        import json
+        for file_info in required_files:
+            file_path = file_info['path']
+            default_data = file_info.get('default_data', {})
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Create file with default data if it doesn't exist
+            if not os.path.exists(file_path):
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(default_data, f, indent=2, ensure_ascii=False)
+                    print(f"WARNING: Created placeholder: {file_path}")
+                except Exception as e:
+                    print(f"ERROR: Failed to create {file_path}: {e}")
     
     def _register_task_handlers(self):
         """Register solo leveling task handlers."""
@@ -366,6 +497,74 @@ class SoloLevelingAgent(AgentBase):
         await asyncio.sleep(0.1)  # Simulate saving time
         self.logger.info("✅ User progress saved")
     
+    def get_quests(self) -> Dict[str, Any]:
+        """Load quests from SQLite database specified by SYSTEM_DB_PATH."""
+        try:
+            # Log the database path being used
+            db_path = os.path.abspath(SYSTEM_DB_PATH)
+            self.logger.info(f"Loading quests from database: {db_path}")
+            
+            # Check if database file exists
+            if not os.path.exists(SYSTEM_DB_PATH):
+                raise FileNotFoundError(f"System database not found at: {db_path}")
+            
+            # Connect to the database
+            with sqlite3.connect(SYSTEM_DB_PATH) as conn:
+                cursor = conn.cursor()
+                
+                # Check if quests table exists
+                cursor.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table' AND name='quests'
+                """)
+                
+                if not cursor.fetchone():
+                    self.logger.warning("Quests table not found in database")
+                    return {
+                        "message": "No quests table found in the database",
+                        "quests": []
+                    }
+                
+                # Query all quests from the quests table
+                cursor.execute("SELECT * FROM quests")
+                rows = cursor.fetchall()
+                
+                # Get column names
+                column_names = [description[0] for description in cursor.description]
+                
+                if not rows:
+                    self.logger.info("No quests found in database")
+                    return {
+                        "message": "No quests found in the database",
+                        "quests": []
+                    }
+                
+                # Convert rows to list of dictionaries
+                quests = []
+                for row in rows:
+                    quest = dict(zip(column_names, row))
+                    # Convert any datetime objects to strings
+                    for key, value in quest.items():
+                        if hasattr(value, 'isoformat'):
+                            quest[key] = value.isoformat()
+                    quests.append(quest)
+                
+                self.logger.info(f"Loaded {len(quests)} quests from database")
+                
+                return {
+                    "message": f"Loaded {len(quests)} quests from database",
+                    "quests": quests
+                }
+                
+        except sqlite3.Error as e:
+            error_msg = f"Database error loading quests: {str(e)}"
+            self.logger.error(error_msg)
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"Error loading quests from database: {str(e)}"
+            self.logger.error(error_msg)
+            raise Exception(error_msg)
+    
     async def _handle_task(self, task: TaskRequest) -> TaskResponse:
         """Handle solo leveling tasks."""
         try:
@@ -446,25 +645,44 @@ class SoloLevelingAgent(AgentBase):
             )
     
     async def _handle_get_quests(self, task: TaskRequest) -> TaskResponse:
-        """Handle get quests request."""
+        """Handle get quests request - loads from SQLite database."""
         try:
+            # Load quests from database
+            quest_data = self.get_quests()
+            
+            # Get status filter if provided
             status_filter = task.parameters.get("status")
             
-            if status_filter:
-                filtered_quests = [q for q in self.quests if q["status"] == status_filter]
-            else:
-                filtered_quests = self.quests
-            
-            result = {
-                "quests": filtered_quests,
-                "total_quests": len(self.quests),
-                "filtered_quests": len(filtered_quests),
-                "status_counts": {
-                    "active": len([q for q in self.quests if q["status"] == "active"]),
-                    "pending": len([q for q in self.quests if q["status"] == "pending"]),
-                    "completed": len([q for q in self.quests if q["status"] == "completed"])
+            if quest_data["quests"]:
+                # Apply status filter if provided
+                if status_filter:
+                    filtered_quests = [q for q in quest_data["quests"] if q.get("status") == status_filter]
+                else:
+                    filtered_quests = quest_data["quests"]
+                
+                # Calculate status counts
+                status_counts = {
+                    "active": len([q for q in quest_data["quests"] if q.get("status") == "active"]),
+                    "pending": len([q for q in quest_data["quests"] if q.get("status") == "pending"]),
+                    "completed": len([q for q in quest_data["quests"] if q.get("status") == "completed"])
                 }
-            }
+                
+                result = {
+                    "message": quest_data["message"],
+                    "quests": filtered_quests,
+                    "total_quests": len(quest_data["quests"]),
+                    "filtered_quests": len(filtered_quests),
+                    "status_counts": status_counts
+                }
+            else:
+                # No quests found
+                result = {
+                    "message": quest_data["message"],
+                    "quests": [],
+                    "total_quests": 0,
+                    "filtered_quests": 0,
+                    "status_counts": {"active": 0, "pending": 0, "completed": 0}
+                }
             
             return TaskResponse(
                 task_id=task.task_id,

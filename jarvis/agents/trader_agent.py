@@ -8,10 +8,54 @@ market data retrieval, trade execution, and risk analysis using MCP server comma
 
 import asyncio
 import logging
+import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+# Load DATA_PATH from environment
+DATA_PATH = os.getenv("DATA_PATH", "app/data")
+
+try:
+    from .agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+except ImportError:
+    # Handle direct execution
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from jarvis.agents.agent_base import AgentBase, AgentCapability, TaskRequest, TaskResponse
+
+# Define data file paths using DATA_PATH
+PORTFOLIO_PATH = os.path.join(DATA_PATH, "live", "live_portfolio_state.json")
+LIVE_TRADES_PATH = os.path.join(DATA_PATH, "live", "live_trades.json")
+EXIT_ENGINE_PATH = os.path.join(DATA_PATH, "live", "exit_engine_state.json")
+
+# Default data structures
+DEFAULT_PORTFOLIO_DATA = {
+    "portfolio_value": 5000.0,
+    "cash": 5000.0,
+    "initial_balance": 5000.0,
+    "return_percentage": 0.0,
+    "trading_active": True,
+    "positions": {},
+    "crypto_symbols": ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "ADA-USD", "TRX-USD", "XLM-USD", "PAXG-USD"],
+    "last_updated": "2025-01-18T12:00:00Z",
+    "daily_pnl": 0.0,
+    "daily_drawdown": 0.0,
+    "daily_trade_count": 0,
+    "daily_start_value": 5000.0,
+    "daily_start_value_date": "2025-01-18"
+}
+
+DEFAULT_LIVE_TRADES_DATA = {
+    "trades": []
+}
+
+DEFAULT_EXIT_ENGINE_DATA = {
+    "active_trades": {},
+    "trailing_stops": {},
+    "trade_states": {},
+    "last_updated": "2025-01-18T12:00:00Z"
+}
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +88,52 @@ class TraderAgent(AgentBase):
         self.market_data_cache = {}
         
         self.logger = logging.getLogger("agent.trader")
+    
+    async def start(self, redis_comm=None, agent_manager=None):
+        """Start the agent with data file verification."""
+        # Log startup information
+        print(f"[TraderAgent] CWD: {os.getcwd()}")
+        print(f"[TraderAgent] DATA_PATH: {DATA_PATH}")
+        print(f"[TraderAgent] Portfolio Path -> {os.path.abspath(PORTFOLIO_PATH)}")
+        print(f"[TraderAgent] Exists: {os.path.exists(PORTFOLIO_PATH)}")
+        print(f"[TraderAgent] Live Trades Path -> {os.path.abspath(LIVE_TRADES_PATH)}")
+        print(f"[TraderAgent] Exists: {os.path.exists(LIVE_TRADES_PATH)}")
+        print(f"[TraderAgent] Exit Engine Path -> {os.path.abspath(EXIT_ENGINE_PATH)}")
+        print(f"[TraderAgent] Exists: {os.path.exists(EXIT_ENGINE_PATH)}")
+        
+        # Verify data files exist
+        await self._verify_data_files()
+        
+        # Call parent start method
+        await super().start(redis_comm, agent_manager)
+    
+    async def _verify_data_files(self):
+        """Verify and create required data files."""
+        required_files = [
+            {"path": PORTFOLIO_PATH, "default_data": DEFAULT_PORTFOLIO_DATA},
+            {"path": LIVE_TRADES_PATH, "default_data": DEFAULT_LIVE_TRADES_DATA},
+            {"path": EXIT_ENGINE_PATH, "default_data": DEFAULT_EXIT_ENGINE_DATA}
+        ]
+        self._verify_data_files_helper(required_files)
+    
+    def _verify_data_files_helper(self, required_files):
+        """Helper to verify and create data files."""
+        import json
+        for file_info in required_files:
+            file_path = file_info['path']
+            default_data = file_info.get('default_data', {})
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Create file with default data if it doesn't exist
+            if not os.path.exists(file_path):
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(default_data, f, indent=2, ensure_ascii=False)
+                    print(f"WARNING: Created placeholder: {file_path}")
+                except Exception as e:
+                    print(f"ERROR: Failed to create {file_path}: {e}")
     
     def _register_task_handlers(self):
         """Register trading task handlers for MCP server commands."""
@@ -176,6 +266,255 @@ class TraderAgent(AgentBase):
                     error_msg = f"HTTP error: {response.status}"
                     self.logger.error(f"❌ {error_msg}")
                     raise Exception(error_msg)
+    
+    # Live Trading Handler Methods
+    async def _handle_portfolio_overview(self, task: TaskRequest) -> TaskResponse:
+        """Handle portfolio overview requests."""
+        try:
+            self.logger.info(f"📊 Handling portfolio overview request...")
+            result = await self._call_mcp_server("portfolio.get_overview", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_portfolio_positions(self, task: TaskRequest) -> TaskResponse:
+        """Handle portfolio positions requests."""
+        try:
+            self.logger.info(f"📈 Handling portfolio positions request...")
+            result = await self._call_mcp_server("portfolio.get_positions", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_portfolio_trades(self, task: TaskRequest) -> TaskResponse:
+        """Handle portfolio trades requests."""
+        try:
+            limit = task.parameters.get("limit", 50)
+            symbol = task.parameters.get("symbol")
+            
+            args = {"limit": limit}
+            if symbol:
+                args["symbol"] = symbol
+            
+            self.logger.info(f"📋 Handling portfolio trades request...")
+            result = await self._call_mcp_server("portfolio.get_trades", args, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_portfolio_performance(self, task: TaskRequest) -> TaskResponse:
+        """Handle portfolio performance requests."""
+        try:
+            self.logger.info(f"📊 Handling portfolio performance request...")
+            result = await self._call_mcp_server("portfolio.get_performance", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_trading_balance(self, task: TaskRequest) -> TaskResponse:
+        """Handle trading balance requests."""
+        try:
+            self.logger.info(f"💰 Handling trading balance request...")
+            result = await self._call_mcp_server("trading.get_portfolio_balance", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_recent_executions(self, task: TaskRequest) -> TaskResponse:
+        """Handle recent executions requests."""
+        try:
+            limit = task.parameters.get("limit", 20)
+            symbol = task.parameters.get("symbol")
+            
+            args = {"limit": limit}
+            if symbol:
+                args["symbol"] = symbol
+            
+            self.logger.info(f"⚡ Handling recent executions request...")
+            result = await self._call_mcp_server("trading.get_recent_executions", args, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_momentum_signals(self, task: TaskRequest) -> TaskResponse:
+        """Handle momentum signals requests."""
+        try:
+            symbols = task.parameters.get("symbols")
+            
+            args = {}
+            if symbols:
+                args["symbols"] = symbols
+            
+            self.logger.info(f"📈 Handling momentum signals request...")
+            result = await self._call_mcp_server("trading.get_momentum_signals", args, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    # Paper Trading Handler Methods
+    async def _handle_paper_portfolio(self, task: TaskRequest) -> TaskResponse:
+        """Handle paper portfolio requests."""
+        try:
+            self.logger.info(f"📄 Handling paper portfolio request...")
+            result = await self._call_mcp_server("paper.get_portfolio", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_paper_balance(self, task: TaskRequest) -> TaskResponse:
+        """Handle paper balance requests."""
+        try:
+            self.logger.info(f"💰 Handling paper balance request...")
+            result = await self._call_mcp_server("paper.get_balance", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_paper_performance(self, task: TaskRequest) -> TaskResponse:
+        """Handle paper performance requests."""
+        try:
+            self.logger.info(f"📊 Handling paper performance request...")
+            result = await self._call_mcp_server("paper.get_performance", {}, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
+    
+    async def _handle_paper_trades(self, task: TaskRequest) -> TaskResponse:
+        """Handle paper trades requests."""
+        try:
+            limit = task.parameters.get("limit", 50)
+            symbol = task.parameters.get("symbol")
+            
+            args = {"limit": limit}
+            if symbol:
+                args["symbol"] = symbol
+            
+            self.logger.info(f"📋 Handling paper trades request...")
+            result = await self._call_mcp_server("paper.get_trades", args, "trading")
+            
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=True,
+                result=result
+            )
+        except Exception as e:
+            return TaskResponse(
+                task_id=task.task_id,
+                agent_id=self.agent_id,
+                success=False,
+                error=str(e)
+            )
 
     async def _handle_task(self, task: TaskRequest) -> TaskResponse:
         """Handle trading tasks."""
