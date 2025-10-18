@@ -33,8 +33,8 @@ def load_config() -> BrainConfig:
     ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
     ollama_model = os.getenv("OLLAMA_MODEL", "llama3.1").strip()
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-    # Check for both OPENAI_API_KEY and OPENAI_KEY
-    openai_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_KEY") or None
+    # Check for OPENAI_KEY (primary) and OPENAI_API_KEY (fallback)
+    openai_api_key = os.getenv("OPENAI_KEY") or os.getenv("OPENAI_API_KEY") or None
     memory_db_path = Path(os.getenv("MEMORY_DB_PATH", "./data/memory.sqlite")).resolve()
 
     # Ensure data dir exists

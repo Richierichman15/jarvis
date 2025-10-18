@@ -144,33 +144,39 @@ task_id = await intent_router.route_to_agent(intent_result, str(message.author.i
 
 ### **1. TraderAgent**
 
-**Capabilities**: Trading, Portfolio Management, Market Analysis
+**Capabilities**: Live Trading (Primary), Paper Trading (Secondary), Portfolio Management, Market Analysis
 
-**Tasks**:
-- `get_portfolio` - Get portfolio overview
-- `get_balance` - Get trading balance
-- `get_positions` - Get active positions
-- `get_price` - Get current price for symbol
-- `get_trades` - Get recent trades
-- `get_momentum_signals` - Get momentum analysis
-- `get_pnl_summary` - Get profit/loss summary
-- `run_doctor` - Run trading diagnostics
-- `place_order` - Place trading order
-- `cancel_order` - Cancel order
-- `get_orderbook` - Get order book data
-- `get_ohlcv` - Get OHLCV data
-- `analyze_market` - Market analysis
-- `risk_assessment` - Risk evaluation
+**Live Trading Commands**:
+- `portfolio.get_overview` - Live portfolio summary
+- `portfolio.get_positions` - Live positions with current prices
+- `portfolio.get_trades` - Live trade history
+- `portfolio.get_performance` - Live performance metrics
+- `trading.get_portfolio_balance` - Live balance and positions
+- `trading.get_recent_executions` - Recent live trades
+- `trading.get_momentum_signals` - Momentum analysis
+
+**Paper Trading Commands**:
+- `paper.get_portfolio` - Paper portfolio summary
+- `paper.get_balance` - Paper balance
+- `paper.get_performance` - Paper performance
+- `paper.get_trades` - Paper trade history
 
 **Example**:
 ```python
 # Natural language input
-"show me my portfolio balance"
+"show me my live portfolio balance"
 
 # Routes to TraderAgent
 task_id = await manager.send_task_to_agent(
     capability=AgentCapability.TRADING,
-    task_type="get_portfolio",
+    task_type="portfolio.get_overview",
+    parameters={}
+)
+
+# Paper trading example
+task_id = await manager.send_task_to_agent(
+    capability=AgentCapability.TRADING,
+    task_type="paper.get_portfolio",
     parameters={}
 )
 ```
@@ -264,7 +270,7 @@ The agent system uses Redis channels for communication:
   "task_id": "task_123",
   "agent_id": "trader_abc123",
   "capability": "trading",
-  "task_type": "get_portfolio",
+  "task_type": "portfolio.get_overview",
   "parameters": {},
   "priority": 1,
   "timeout": 30,

@@ -17,6 +17,7 @@ sys.path.insert(0, str(project_root))
 
 try:
     from jarvis.agents import AgentManager, AgentCapability, TraderAgent, SoloLevelingAgent, ResearchAgent
+    from jarvis.agents.agent_base import TaskRequest, TaskResponse
     from jarvis.intelligence import IntentRouter, IntentType
     AGENT_SYSTEM_AVAILABLE = True
 except ImportError as e:
@@ -34,7 +35,7 @@ async def test_agent_creation():
     
     try:
         # Test TraderAgent
-        print("\n📈 Testing TraderAgent...")
+        print("\n[TRADER] Testing TraderAgent...")
         trader = TraderAgent()
         await trader.start()
         agents.append(trader)
@@ -45,16 +46,16 @@ async def test_agent_creation():
             task_id="test_001",
             agent_id=trader.agent_id,
             capability=AgentCapability.TRADING,
-            task_type="get_portfolio",
+            task_type="portfolio.get_overview",
             parameters={}
         )
         
         response = await trader._handle_task(task)
-        print(f"✅ TraderAgent response: {response.success}")
+        print(f"[OK] TraderAgent response: {response.success}")
         print(f"   Result: {response.result.get('total_value', 'N/A') if response.result else 'None'}")
         
         # Test SoloLevelingAgent
-        print("\n🎯 Testing SoloLevelingAgent...")
+        print("\n[SOLO] Testing SoloLevelingAgent...")
         solo_leveling = SoloLevelingAgent()
         await solo_leveling.start()
         agents.append(solo_leveling)
@@ -68,11 +69,11 @@ async def test_agent_creation():
         )
         
         response = await solo_leveling._handle_task(task)
-        print(f"✅ SoloLevelingAgent response: {response.success}")
+        print(f"[OK] SoloLevelingAgent response: {response.success}")
         print(f"   Result: {response.result.get('user_level', 'N/A') if response.result else 'None'}")
         
         # Test ResearchAgent
-        print("\n🔍 Testing ResearchAgent...")
+        print("\n[RESEARCH] Testing ResearchAgent...")
         research = ResearchAgent()
         await research.start()
         agents.append(research)
@@ -86,13 +87,13 @@ async def test_agent_creation():
         )
         
         response = await research._handle_task(task)
-        print(f"✅ ResearchAgent response: {response.success}")
+        print(f"[OK] ResearchAgent response: {response.success}")
         print(f"   Result: {len(response.result.get('articles', [])) if response.result else 0} articles found")
         
-        print(f"\n✅ All {len(agents)} agents created and tested successfully!")
+        print(f"\n[OK] All {len(agents)} agents created and tested successfully!")
         
     except Exception as e:
-        print(f"❌ Error testing agents: {e}")
+        print(f"[ERROR] Error testing agents: {e}")
     
     finally:
         # Cleanup
@@ -100,76 +101,76 @@ async def test_agent_creation():
             try:
                 await agent.stop()
             except Exception as e:
-                print(f"⚠️ Error stopping agent: {e}")
+                print(f"[WARNING] Error stopping agent: {e}")
         
-        print("🧹 Cleanup completed")
+        print("[CLEANUP] Cleanup completed")
 
 
 async def test_agent_manager():
     """Test the AgentManager with Redis communication."""
-    print("\n🧪 Testing AgentManager")
+    print("\n[TEST] Testing AgentManager")
     print("=" * 30)
     
     manager = None
     
     try:
         # Create AgentManager
-        print("🚀 Creating AgentManager...")
+        print("[START] Creating AgentManager...")
         manager = AgentManager()
         
         # Note: This test will fail if Redis is not running
         # In a real scenario, you'd start Redis first
         try:
             await manager.start()
-            print("✅ AgentManager started successfully")
+            print("[OK] AgentManager started successfully")
             
             # Get system health
             health = await manager.get_system_health()
-            print(f"🏥 System health: {health.get('overall_health', 'unknown')}")
+            print(f"[HEALTH] System health: {health.get('overall_health', 'unknown')}")
             print(f"   Health score: {health.get('health_score', 0)}%")
             print(f"   Active agents: {health.get('active_agents', 0)}")
             
             # Get agent status
             status = await manager.get_agent_status()
-            print(f"📊 Agent status: {len(status.get('agents', {}))} agents managed")
+            print(f"[STATS] Agent status: {len(status.get('agents', {}))} agents managed")
             
             # Test task routing
-            print("\n📤 Testing task routing...")
+            print("\n[SEND] Testing task routing...")
             task_id = await manager.send_task_to_agent(
                 capability=AgentCapability.TRADING,
-                task_type="get_portfolio",
+                task_type="portfolio.get_overview",
                 parameters={}
             )
-            print(f"✅ Task sent: {task_id}")
+            print(f"[OK] Task sent: {task_id}")
             
             # Get statistics
             stats = manager.get_statistics()
-            print(f"📈 Statistics: {stats['agent_count']} agents, {stats['manager_stats']['total_restarts']} restarts")
+            print(f"[TRADER] Statistics: {stats['agent_count']} agents, {stats['manager_stats']['total_restarts']} restarts")
             
         except Exception as e:
-            print(f"⚠️ AgentManager test failed (likely Redis not running): {e}")
+            print(f"[WARNING] AgentManager test failed (likely Redis not running): {e}")
             print("   This is expected if Redis is not installed/running")
     
     except Exception as e:
-        print(f"❌ Error testing AgentManager: {e}")
+        print(f"[ERROR] Error testing AgentManager: {e}")
     
     finally:
         if manager:
             try:
                 await manager.stop()
-                print("✅ AgentManager stopped")
+                print("[OK] AgentManager stopped")
             except Exception as e:
-                print(f"⚠️ Error stopping AgentManager: {e}")
+                print(f"[WARNING] Error stopping AgentManager: {e}")
 
 
 async def test_intelligence_integration():
     """Test Intelligence Core integration with Agent System."""
-    print("\n🧪 Testing Intelligence Core Integration")
+    print("\n[TEST] Testing Intelligence Core Integration")
     print("=" * 40)
     
     try:
         # Create IntentRouter
-        print("🧠 Creating IntentRouter...")
+        print("[BRAIN] Creating IntentRouter...")
         router = IntentRouter()
         
         # Test intent analysis
@@ -181,7 +182,7 @@ async def test_intelligence_integration():
         ]
         
         for i, text in enumerate(test_cases, 1):
-            print(f"\n🔍 Test {i}: '{text}'")
+            print(f"\n[RESEARCH] Test {i}: '{text}'")
             
             result = await router.analyze_intent(text, "test_user", "test_channel")
             
@@ -194,32 +195,32 @@ async def test_intelligence_integration():
             task_id = await router.route_to_agent(result, "test_user")
             print(f"   Task ID: {task_id}")
         
-        print(f"\n✅ Intelligence Core integration tested successfully!")
+        print(f"\n[OK] Intelligence Core integration tested successfully!")
         
     except Exception as e:
-        print(f"❌ Error testing Intelligence Core integration: {e}")
+        print(f"[ERROR] Error testing Intelligence Core integration: {e}")
 
 
 async def test_agent_health_monitoring():
     """Test agent health monitoring and restart capabilities."""
-    print("\n🧪 Testing Agent Health Monitoring")
+    print("\n[TEST] Testing Agent Health Monitoring")
     print("=" * 35)
     
     try:
         # Create a test agent
-        print("🤖 Creating test agent...")
+        print("[AGENT] Creating test agent...")
         agent = SoloLevelingAgent()
         await agent.start()
         
         # Get initial health
         health = agent.get_health_status()
-        print(f"✅ Agent health: {health['status']}")
+        print(f"[OK] Agent health: {health['status']}")
         print(f"   Uptime: {health['uptime_seconds']}s")
         print(f"   Tasks processed: {health['tasks_processed']}")
         print(f"   Errors: {health['errors_count']}")
         
         # Simulate some work
-        print("\n⚙️ Simulating agent work...")
+        print("\n[WORK] Simulating agent work...")
         for i in range(3):
             task = TaskRequest(
                 task_id=f"health_test_{i}",
@@ -234,25 +235,25 @@ async def test_agent_health_monitoring():
         
         # Check health again
         health = agent.get_health_status()
-        print(f"\n📊 Updated health:")
+        print(f"\n[STATS] Updated health:")
         print(f"   Tasks processed: {health['tasks_processed']}")
         print(f"   Is healthy: {health['is_healthy']}")
         
         await agent.stop()
-        print("✅ Health monitoring test completed")
+        print("[OK] Health monitoring test completed")
         
     except Exception as e:
-        print(f"❌ Error testing health monitoring: {e}")
+        print(f"[ERROR] Error testing health monitoring: {e}")
 
 
 async def test_agent_communication():
     """Test inter-agent communication patterns."""
-    print("\n🧪 Testing Agent Communication")
+    print("\n[TEST] Testing Agent Communication")
     print("=" * 30)
     
     try:
         # Create multiple agents
-        print("🤖 Creating multiple agents...")
+        print("[AGENT] Creating multiple agents...")
         trader = TraderAgent()
         solo_leveling = SoloLevelingAgent()
         research = ResearchAgent()
@@ -264,7 +265,7 @@ async def test_agent_communication():
         agents = [trader, solo_leveling, research]
         
         # Test concurrent task processing
-        print("\n⚡ Testing concurrent task processing...")
+        print("\n[SPEED] Testing concurrent task processing...")
         
         tasks = []
         for i, agent in enumerate(agents):
@@ -272,7 +273,7 @@ async def test_agent_communication():
                 task_id=f"comm_test_{i}",
                 agent_id=agent.agent_id,
                 capability=agent.capabilities[0],
-                task_type="get_status" if hasattr(agent, '_handle_get_status') else "get_portfolio",
+                task_type="get_status" if hasattr(agent, '_handle_get_status') else "portfolio.get_overview",
                 parameters={}
             )
             tasks.append(agent._handle_task(task))
@@ -280,7 +281,7 @@ async def test_agent_communication():
         # Wait for all tasks to complete
         responses = await asyncio.gather(*tasks, return_exceptions=True)
         
-        print(f"✅ Processed {len(responses)} concurrent tasks")
+        print(f"[OK] Processed {len(responses)} concurrent tasks")
         for i, response in enumerate(responses):
             if isinstance(response, Exception):
                 print(f"   Task {i}: Error - {response}")
@@ -288,7 +289,7 @@ async def test_agent_communication():
                 print(f"   Task {i}: Success - {response.success}")
         
         # Test agent info exchange
-        print("\n📋 Testing agent info exchange...")
+        print("\n[INFO] Testing agent info exchange...")
         for agent in agents:
             info = agent.get_info()
             print(f"   {agent.name}: {info.status.value}, {info.tasks_processed} tasks")
@@ -297,25 +298,25 @@ async def test_agent_communication():
         for agent in agents:
             await agent.stop()
         
-        print("✅ Communication test completed")
+        print("[OK] Communication test completed")
         
     except Exception as e:
-        print(f"❌ Error testing agent communication: {e}")
+        print(f"[ERROR] Error testing agent communication: {e}")
 
 
 async def test_error_handling():
     """Test error handling and recovery."""
-    print("\n🧪 Testing Error Handling")
+    print("\n[TEST] Testing Error Handling")
     print("=" * 25)
     
     try:
         # Create agent
-        print("🤖 Creating test agent...")
+        print("[AGENT] Creating test agent...")
         agent = TraderAgent()
         await agent.start()
         
         # Test invalid task
-        print("\n❌ Testing invalid task handling...")
+        print("\n[ERROR] Testing invalid task handling...")
         invalid_task = TaskRequest(
             task_id="error_test",
             agent_id=agent.agent_id,
@@ -329,12 +330,12 @@ async def test_error_handling():
         print(f"   Error message: {response.error}")
         
         # Test malformed parameters
-        print("\n⚠️ Testing malformed parameters...")
+        print("\n[WARNING] Testing malformed parameters...")
         malformed_task = TaskRequest(
             task_id="malformed_test",
             agent_id=agent.agent_id,
             capability=AgentCapability.TRADING,
-            task_type="get_price",
+            task_type="trading.get_momentum_signals",
             parameters={"invalid_param": "test"}
         )
         
@@ -342,7 +343,7 @@ async def test_error_handling():
         print(f"   Malformed task handled: {response.success}")
         
         # Test agent restart
-        print("\n🔄 Testing agent restart...")
+        print("\n[RESTART] Testing agent restart...")
         await agent.stop()
         await asyncio.sleep(1)
         await agent.start()
@@ -351,25 +352,25 @@ async def test_error_handling():
         print(f"   Agent restarted: {health['status'] == 'running'}")
         
         await agent.stop()
-        print("✅ Error handling test completed")
+        print("[OK] Error handling test completed")
         
     except Exception as e:
-        print(f"❌ Error testing error handling: {e}")
+        print(f"[ERROR] Error testing error handling: {e}")
 
 
 async def run_performance_test():
     """Run performance tests on the agent system."""
-    print("\n🧪 Running Performance Tests")
+    print("\n[TEST] Running Performance Tests")
     print("=" * 30)
     
     try:
         # Create agent
-        print("🤖 Creating test agent...")
+        print("[AGENT] Creating test agent...")
         agent = SoloLevelingAgent()
         await agent.start()
         
         # Test task processing speed
-        print("\n⚡ Testing task processing speed...")
+        print("\n[SPEED] Testing task processing speed...")
         num_tasks = 10
         start_time = time.time()
         
@@ -395,17 +396,17 @@ async def run_performance_test():
         print(f"   Tasks per second: {num_tasks / total_time:.1f}")
         
         # Test memory usage
-        print("\n💾 Testing memory usage...")
+        print("\n[MEMORY] Testing memory usage...")
         health = agent.get_health_status()
         print(f"   Active tasks: {health['active_tasks']}")
         print(f"   Tasks processed: {health['tasks_processed']}")
         print(f"   Errors: {health['errors_count']}")
         
         await agent.stop()
-        print("✅ Performance test completed")
+        print("[OK] Performance test completed")
         
     except Exception as e:
-        print(f"❌ Error running performance test: {e}")
+        print(f"[ERROR] Error running performance test: {e}")
 
 
 async def main():
@@ -436,18 +437,18 @@ async def main():
             await test_func()
             passed += 1
         except Exception as e:
-            print(f"❌ Test {test_func.__name__} failed: {e}")
+            print(f"[ERROR] Test {test_func.__name__} failed: {e}")
             failed += 1
     
     print("\n" + "=" * 60)
-    print(f"🎉 Testing Complete!")
-    print(f"📊 Results: {passed} passed, {failed} failed")
+    print(f"[SUCCESS] Testing Complete!")
+    print(f"[STATS] Results: {passed} passed, {failed} failed")
     print(f"Success Rate: {(passed / (passed + failed) * 100):.1f}%")
     
     if failed == 0:
-        print("🎊 All tests passed! Agent system is working correctly.")
+        print("[ALL_PASS] All tests passed! Agent system is working correctly.")
     else:
-        print("⚠️ Some tests failed. Check the logs for details.")
+        print("[WARNING] Some tests failed. Check the logs for details.")
 
 
 if __name__ == "__main__":

@@ -20,14 +20,14 @@ os.makedirs(DEBUG_LOGS_DIR, exist_ok=True)  # Ensure debug logs directory exists
 
 # OpenAI API configuration
 # First check for API key in environment, then use default if not available
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_KEY", "")
 if not OPENAI_API_KEY:
-    print("Warning: OPENAI_API_KEY not found in environment variables or .env file")
+    print("Warning: OPENAI_KEY not found in environment variables or .env file")
 
-# Claude API configuration
+# Claude API configuration (optional - using fallback LLM)
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
 if not CLAUDE_API_KEY:
-    print("Warning: CLAUDE_API_KEY not found in environment variables or .env file")
+    print("Note: CLAUDE_API_KEY not found. Using fallback LLM for Claude functionality.")
 
 # OpenWeatherMap API configuration
 OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")

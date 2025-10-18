@@ -377,7 +377,10 @@ class IntentRouter:
             
             # Get LLM response
             if self.model_manager:
-                response = await self.model_manager.generate_response(prompt)
+                # Convert prompt to message format for model manager
+                messages = [{"role": "system", "content": "You are an intelligent intent analysis system."},
+                           {"role": "user", "content": prompt}]
+                response = self.model_manager.generate_response(messages)
             elif BRAIN_AVAILABLE:
                 response = await brain_generate(prompt)
             else:

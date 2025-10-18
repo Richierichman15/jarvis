@@ -7,19 +7,19 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-print("🔍 Checking OpenAI API Key Configuration...\n")
+print("Checking OpenAI API Key Configuration...\n")
 
-# Check for both possible key names
-openai_api_key = os.environ.get("OPENAI_API_KEY")
+# Check for both possible key names (OPENAI_KEY is primary)
 openai_key = os.environ.get("OPENAI_KEY")
+openai_api_key = os.environ.get("OPENAI_API_KEY")
 
-print(f"OPENAI_API_KEY: {'✅ Found' if openai_api_key else '❌ Not found'}")
-if openai_api_key:
-    print(f"  Value: {openai_api_key[:10]}...{openai_api_key[-4:] if len(openai_api_key) > 14 else ''}")
-
-print(f"\nOPENAI_KEY: {'✅ Found' if openai_key else '❌ Not found'}")
+print(f"OPENAI_KEY: {'Found' if openai_key else 'Not found'}")
 if openai_key:
     print(f"  Value: {openai_key[:10]}...{openai_key[-4:] if len(openai_key) > 14 else ''}")
+
+print(f"\nOPENAI_API_KEY: {'Found' if openai_api_key else 'Not found'}")
+if openai_api_key:
+    print(f"  Value: {openai_api_key[:10]}...{openai_api_key[-4:] if len(openai_api_key) > 14 else ''}")
 
 # Test if OpenAIModel can initialize
 print("\n" + "="*60)
@@ -29,25 +29,25 @@ print("="*60)
 try:
     from jarvis.models.openai_model import OpenAIModel
     model = OpenAIModel()
-    print("✅ OpenAI model initialized successfully!")
+    print("OpenAI model initialized successfully!")
     print(f"   Using model: {model.model}")
     
     # Try a simple test
-    print("\n🧪 Testing model with a simple query...")
+    print("\nTesting model with a simple query...")
     try:
         response = model.generate(
             prompt="Say 'Hello, I am Jarvis!' and nothing else.",
             max_tokens=20
         )
-        print(f"✅ Model response: {response}")
-        print("\n🎉 SUCCESS! Your OpenAI key is working perfectly!")
+        print(f"Model response: {response}")
+        print("\nSUCCESS! Your OpenAI key is working perfectly!")
     except Exception as e:
-        print(f"⚠️  Model initialized but test failed: {e}")
+        print(f"Model initialized but test failed: {e}")
         import traceback
         traceback.print_exc()
         
 except Exception as e:
-    print(f"❌ Failed to initialize OpenAI model: {e}")
+    print(f"Failed to initialize OpenAI model: {e}")
     import traceback
     print("\nFull error:")
     traceback.print_exc()

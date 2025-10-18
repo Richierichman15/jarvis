@@ -17,8 +17,8 @@ def test_dual_model():
     console.print(Panel.fit("Dual Model Test", title="JARVIS"))
     
     # Check if OpenAI API key is set
-    if not os.environ.get("OPENAI_API_KEY"):
-        console.print("Warning: OpenAI API key not set. Please set the OPENAI_API_KEY environment variable.", style="bold red")
+    if not os.environ.get("OPENAI_KEY") and not os.environ.get("OPENAI_API_KEY"):
+        console.print("Warning: OpenAI API key not set. Please set the OPENAI_KEY environment variable.", style="bold red")
         return 1
     
     # Initialize the dual model manager

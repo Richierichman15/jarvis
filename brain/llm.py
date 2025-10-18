@@ -69,7 +69,7 @@ def _generate_ollama(system_prompt: str, user_prompt: str) -> str:
 def _generate_openai(system_prompt: str, user_prompt: str) -> str:
     cfg = load_config()
     if not cfg.openai_api_key:
-        return "[LLM unavailable: OPENAI_API_KEY not set]"
+        return "[LLM unavailable: OPENAI_KEY not set]"
 
     try:
         # Prefer OpenAI SDK if present

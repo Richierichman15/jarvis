@@ -10,10 +10,10 @@ class OpenAIModel:
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize OpenAI model with API key."""
-        # Check for both OPENAI_API_KEY and OPENAI_KEY
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_KEY") or ""
+        # Check for OPENAI_KEY (primary) and OPENAI_API_KEY (fallback)
+        self.api_key = api_key or os.environ.get("OPENAI_KEY") or os.environ.get("OPENAI_API_KEY") or ""
         if not self.api_key:
-            raise ValueError("OpenAI API key not found in environment (OPENAI_API_KEY or OPENAI_KEY)")
+            raise ValueError("OpenAI API key not found in environment (OPENAI_KEY or OPENAI_API_KEY)")
             
         self.client = openai.OpenAI(api_key=self.api_key)
         self.model = "gpt-4o-mini"  # Using GPT-4o-mini for faster, cost-effective responses
