@@ -232,15 +232,15 @@ class IntentRouter:
     def _build_tool_mappings(self) -> Dict[str, Dict[str, Any]]:
         """Build comprehensive tool mappings for fallback routing."""
         return {
-            # Trading mappings
-            "portfolio": {"tool": "trading.portfolio.get_overview", "server": "jarvis"},
-            "balance": {"tool": "trading.trading.get_balance", "server": "jarvis"},
-            "positions": {"tool": "trading.portfolio.get_positions", "server": "jarvis"},
-            "trades": {"tool": "trading.trading.get_recent_executions", "server": "jarvis"},
-            "price": {"tool": "trading.trading.get_price", "server": "jarvis"},
-            "momentum": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
-            "pnl": {"tool": "trading.trading.get_pnl_summary", "server": "jarvis"},
-            "doctor": {"tool": "trading.trading.doctor", "server": "jarvis"},
+            # Trading mappings - use new MCP format
+            "portfolio": {"tool": "portfolio.get_overview", "server": "jarvis"},
+            "balance": {"tool": "trading.get_portfolio_balance", "server": "jarvis"},
+            "positions": {"tool": "portfolio.get_positions", "server": "jarvis"},
+            "trades": {"tool": "trading.get_recent_executions", "server": "jarvis"},
+            "price": {"tool": "trading.get_momentum_signals", "server": "jarvis"},
+            "momentum": {"tool": "trading.get_momentum_signals", "server": "jarvis"},
+            "pnl": {"tool": "portfolio.get_performance", "server": "jarvis"},
+            "doctor": {"tool": "trading.get_momentum_signals", "server": "jarvis"},
             
             # Music mappings
             "play": {"tool": "music_play", "server": "local"},

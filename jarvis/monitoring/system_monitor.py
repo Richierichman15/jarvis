@@ -129,13 +129,11 @@ class SystemMonitor:
             }
         }
         
-        # Agent configurations (if agent system is running)
+        # Agent configurations (new modular agent system)
         self.agent_configs = {
-            'trader_agent': {'port': 8001, 'health_endpoint': '/health'},
-            'music_agent': {'port': 8002, 'health_endpoint': '/health'},
-            'system_agent': {'port': 8003, 'health_endpoint': '/health'},
-            'fitness_agent': {'port': 8004, 'health_endpoint': '/health'},
-            'research_agent': {'port': 8005, 'health_endpoint': '/health'}
+            'TraderAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None},
+            'SoloLevelingAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None},
+            'ResearchAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None}
         }
         
         # Performance tracking

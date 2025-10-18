@@ -385,6 +385,25 @@ class AgentManager:
             self.logger.error(f"Error sending task: {e}")
             raise
     
+    async def wait_for_response(self, task_id: str, timeout: int = 30) -> Optional[ResponseMessage]:
+        """Wait for a task response from an agent."""
+        if not self.redis_comm:
+            return None
+        
+        try:
+            # Wait for response through Redis
+            response = await asyncio.wait_for(
+                self.redis_comm.wait_for_response(task_id),
+                timeout=timeout
+            )
+            return response
+        except asyncio.TimeoutError:
+            self.logger.warning(f"Timeout waiting for response to task {task_id}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error waiting for response: {e}")
+            return None
+    
     async def get_agent_status(self, agent_id: str = None) -> Dict[str, Any]:
         """Get status of specific agent or all agents."""
         try:
