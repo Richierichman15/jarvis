@@ -245,31 +245,10 @@ class TraderAgent(AgentBase):
     async def _handle_portfolio_trades(self, task: TaskRequest) -> TaskResponse:
         """Handle live portfolio trades request."""
         try:
-            trades_data = {
-                "trades": [
-                    {
-                        "id": "trade_001",
-                        "symbol": "BTC/USD",
-                        "side": "buy",
-                        "size": 0.1,
-                        "price": 48000.0,
-                        "timestamp": "2025-01-22T10:30:00Z",
-                        "pnl": 200.0
-                    },
-                    {
-                        "id": "trade_002",
-                        "symbol": "ETH/USD",
-                        "side": "sell",
-                        "size": 5.0,
-                        "price": 3100.0,
-                        "timestamp": "2025-01-22T09:15:00Z",
-                        "pnl": 500.0
-                    }
-                ],
-                "total_trades": 2,
-                "total_pnl": 700.0,
-                "trading_mode": "live"
-            }
+            self.logger.info(f"🔍 Calling MCP server for portfolio.get_trades...")
+            # Call the real MCP server for portfolio trades
+            trades_data = await self._call_mcp_server("portfolio.get_trades", {}, "trading")
+            self.logger.info(f"📊 Received portfolio trades: {trades_data}")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -289,21 +268,10 @@ class TraderAgent(AgentBase):
     async def _handle_portfolio_performance(self, task: TaskRequest) -> TaskResponse:
         """Handle live portfolio performance request."""
         try:
-            performance_data = {
-                "daily_pnl": 1250.0,
-                "weekly_pnl": 3500.0,
-                "monthly_pnl": 8500.0,
-                "total_pnl": 25000.0,
-                "daily_pnl_percent": 1.0,
-                "weekly_pnl_percent": 2.8,
-                "monthly_pnl_percent": 6.8,
-                "total_pnl_percent": 20.0,
-                "best_trade": 2500.0,
-                "worst_trade": -800.0,
-                "win_rate": 0.65,
-                "profit_factor": 1.8,
-                "trading_mode": "live"
-            }
+            self.logger.info(f"🔍 Calling MCP server for portfolio.get_performance...")
+            # Call the real MCP server for portfolio performance
+            performance_data = await self._call_mcp_server("portfolio.get_performance", {}, "trading")
+            self.logger.info(f"📊 Received portfolio performance: {performance_data}")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -344,32 +312,10 @@ class TraderAgent(AgentBase):
     async def _handle_recent_executions(self, task: TaskRequest) -> TaskResponse:
         """Handle recent live trade executions request."""
         try:
-            executions_data = {
-                "executions": [
-                    {
-                        "id": "exec_001",
-                        "symbol": "BTC/USD",
-                        "side": "buy",
-                        "size": 0.1,
-                        "price": 48000.0,
-                        "timestamp": "2025-01-22T10:30:00Z",
-                        "status": "filled",
-                        "commission": 2.4
-                    },
-                    {
-                        "id": "exec_002",
-                        "symbol": "ETH/USD",
-                        "side": "sell",
-                        "size": 5.0,
-                        "price": 3100.0,
-                        "timestamp": "2025-01-22T09:15:00Z",
-                        "status": "filled",
-                        "commission": 7.75
-                    }
-                ],
-                "total_executions": 2,
-                "trading_mode": "live"
-            }
+            self.logger.info(f"🔍 Calling MCP server for trading.get_recent_executions...")
+            # Call the real MCP server for recent executions
+            executions_data = await self._call_mcp_server("trading.get_recent_executions", {}, "trading")
+            self.logger.info(f"📊 Received recent executions: {executions_data}")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -389,35 +335,10 @@ class TraderAgent(AgentBase):
     async def _handle_momentum_signals(self, task: TaskRequest) -> TaskResponse:
         """Handle momentum signals request."""
         try:
-            signals_data = {
-                "signals": [
-                    {
-                        "symbol": "BTC/USD",
-                        "signal": "bullish",
-                        "strength": 0.75,
-                        "indicators": {
-                            "rsi": 65.2,
-                            "macd": "positive",
-                            "bollinger": "upper_band"
-                        },
-                        "confidence": 0.8
-                    },
-                    {
-                        "symbol": "ETH/USD",
-                        "signal": "neutral",
-                        "strength": 0.45,
-                        "indicators": {
-                            "rsi": 52.1,
-                            "macd": "neutral",
-                            "bollinger": "middle"
-                        },
-                        "confidence": 0.6
-                    }
-                ],
-                "overall_sentiment": "bullish",
-                "last_updated": datetime.now().isoformat(),
-                "trading_mode": "live"
-            }
+            self.logger.info(f"🔍 Calling MCP server for trading.get_momentum_signals...")
+            # Call the real MCP server for momentum signals
+            signals_data = await self._call_mcp_server("trading.get_momentum_signals", {}, "trading")
+            self.logger.info(f"📊 Received momentum signals: {signals_data}")
             
             return TaskResponse(
                 task_id=task.task_id,

@@ -177,6 +177,16 @@ class RobustMCPClient:
                 ))
             except Exception as e:
                 self.logger.warning(f"Could not start search server: {e}")
+            
+            # Start system server if available
+            try:
+                await self._spawn_and_hold("system", StdioServerParameters(
+                    command="C:\\Program Files\\Python313\\python.exe",
+                    args=["-u", "E:/Richie/github/system/system_server.py"],
+                    cwd="E:/Richie/github/system"
+                ))
+            except Exception as e:
+                self.logger.warning(f"Could not start system server: {e}")
                 
             self.logger.info(f"✅ Connected to {len(self.sessions)} MCP servers: {list(self.sessions.keys())}")
             

@@ -242,6 +242,13 @@ class IntentRouter:
             "pnl": {"tool": "portfolio.get_performance", "server": "trading"},
             "doctor": {"tool": "trading.get_momentum_signals", "server": "trading"},
             
+            # Paper trading mappings
+            "paper_portfolio": {"tool": "paper.get_portfolio", "server": "trading"},
+            "paper_balance": {"tool": "paper.get_balance", "server": "trading"},
+            "paper_performance": {"tool": "paper.get_performance", "server": "trading"},
+            "paper_trades": {"tool": "paper.get_trades", "server": "trading"},
+            "paper_history": {"tool": "paper.get_trades", "server": "trading"},
+            
             # Music mappings
             "play": {"tool": "music_play", "server": "local"},
             "pause": {"tool": "music_pause", "server": "local"},
@@ -255,12 +262,13 @@ class IntentRouter:
             "status": {"tool": "jarvis_get_status", "server": "jarvis"},
             "memory": {"tool": "jarvis_get_memory", "server": "jarvis"},
             "tasks": {"tool": "jarvis_get_tasks", "server": "jarvis"},
-            "quests": {"tool": "system.system.list_quests", "server": "jarvis"},
-            "system": {"tool": "system.system.get_status", "server": "jarvis"},
+            "quests": {"tool": "system.system.list_quests", "server": "system"},
+            "system": {"tool": "system.system.get_status", "server": "system"},
+            "goals": {"tool": "system.system.list_goals", "server": "system"},
             
             # News and search
-            "news": {"tool": "jarvis_scan_news", "server": "jarvis"},
-            "search": {"tool": "jarvis_web_search", "server": "jarvis"},
+            "news": {"tool": "jarvis_scan_news", "server": "search"},
+            "search": {"tool": "jarvis_web_search", "server": "search"},
             
             # Events
             "events": {"tool": "events_get_statistics", "server": "local"},

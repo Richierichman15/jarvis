@@ -159,6 +159,36 @@ class ResearchAgent(AgentBase):
             self.logger.error(f"Error making request to {url}: {e}")
             return {"error": str(e)}
     
+    async def _call_mcp_server(self, tool_name: str, args: dict = None, server: str = "search") -> dict:
+        """Helper method to call MCP server tools."""
+        if args is None:
+            args = {}
+        
+        self.logger.info(f"🌐 Making HTTP request to MCP server: {tool_name} on {server}")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "http://localhost:3012/run-tool",
+                json={"tool": tool_name, "args": args, "server": server},
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                self.logger.info(f"📡 HTTP response status: {response.status}")
+                if response.status == 200:
+                    data = await response.json()
+                    self.logger.info(f"📦 Response data: {data}")
+                    if data.get('ok'):
+                        result = data.get('result', {})
+                        self.logger.info(f"✅ MCP server returned: {result}")
+                        return result
+                    else:
+                        error_msg = f"MCP server error: {data.get('detail', 'Unknown error')}"
+                        self.logger.error(f"❌ {error_msg}")
+                        raise Exception(error_msg)
+                else:
+                    error_msg = f"HTTP error: {response.status}"
+                    self.logger.error(f"❌ {error_msg}")
+                    raise Exception(error_msg)
+
     async def _handle_task(self, task: TaskRequest) -> TaskResponse:
         """Handle research tasks."""
         try:
@@ -184,75 +214,21 @@ class ResearchAgent(AgentBase):
             limit = task.parameters.get("limit", 10)
             sources = task.parameters.get("sources", [])
             
-            # Check cache first
-            cache_key = f"news_{category}_{limit}"
-            if cache_key in self.news_cache:
-                cached_data = self.news_cache[cache_key]
-                if datetime.fromisoformat(cached_data["timestamp"]) > datetime.now() - timedelta(seconds=self.research_config["cache_duration"]):
-                    return TaskResponse(
-                        task_id=task.task_id,
-                        agent_id=self.agent_id,
-                        success=True,
-                        result=cached_data["data"]
-                    )
-            
-            # Simulate news scanning (in reality, this would call news APIs)
-            news_articles = [
-                {
-                    "title": "AI Breakthrough in Natural Language Processing",
-                    "summary": "Researchers achieve new milestone in AI language understanding",
-                    "source": "Tech News",
-                    "url": "https://example.com/ai-breakthrough",
-                    "published_at": datetime.now().isoformat(),
-                    "category": "technology",
-                    "sentiment": "positive"
-                },
-                {
-                    "title": "Market Volatility Continues Amid Economic Uncertainty",
-                    "summary": "Global markets show mixed signals as investors remain cautious",
-                    "source": "Financial Times",
-                    "url": "https://example.com/market-volatility",
-                    "published_at": datetime.now().isoformat(),
-                    "category": "finance",
-                    "sentiment": "neutral"
-                },
-                {
-                    "title": "Cryptocurrency Adoption Reaches New Heights",
-                    "summary": "Major corporations announce cryptocurrency integration plans",
-                    "source": "Crypto News",
-                    "url": "https://example.com/crypto-adoption",
-                    "published_at": datetime.now().isoformat(),
-                    "category": "cryptocurrency",
-                    "sentiment": "positive"
-                }
-            ]
-            
-            # Filter by category if specified
-            if category != "general":
-                news_articles = [article for article in news_articles if article["category"] == category]
-            
-            # Limit results
-            news_articles = news_articles[:limit]
-            
-            result = {
-                "articles": news_articles,
-                "total_articles": len(news_articles),
+            self.logger.info(f"🔍 Calling MCP server for jarvis_scan_news...")
+            # Call the real MCP server for news scanning
+            args = {
                 "category": category,
-                "sources": sources,
-                "scanned_at": datetime.now().isoformat()
+                "limit": limit,
+                "sources": sources
             }
-            
-            # Cache the result
-            self.news_cache[cache_key] = {
-                "timestamp": datetime.now().isoformat(),
-                "data": result
-            }
+            result = await self._call_mcp_server("jarvis_scan_news", args, "search")
+            self.logger.info(f"📊 Received news data: {result}")
             
             # Add to research history
             self.research_history.append({
                 "task_type": "scan_news",
                 "query": category,
-                "results_count": len(news_articles),
+                "results_count": len(result.get("articles", [])),
                 "timestamp": datetime.now().isoformat()
             })
             
