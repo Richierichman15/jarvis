@@ -225,19 +225,26 @@ class RedisCommunication:
             await pubsub.subscribe(self.response_channel)
             
             async def response_listener():
-                async for message in pubsub.listen():
-                    if message['type'] == 'message':
-                        try:
-                            data = json.loads(message['data'])
-                            response = ResponseMessage.from_dict(data)
-                            
-                            # Notify waiting tasks
-                            if response.task_id in self.pending_responses:
-                                future = self.pending_responses.pop(response.task_id)
-                                future.set_result(response)
-                            
-                        except Exception as e:
-                            self.logger.error(f"Error processing response: {e}")
+                try:
+                    async for message in pubsub.listen():
+                        if message['type'] == 'message':
+                            try:
+                                data = json.loads(message['data'])
+                                response = ResponseMessage.from_dict(data)
+                                
+                                # Notify waiting tasks
+                                if response.task_id in self.pending_responses:
+                                    future = self.pending_responses.pop(response.task_id)
+                                    future.set_result(response)
+                                
+                            except Exception as e:
+                                self.logger.error(f"Error processing response: {e}")
+                except asyncio.CancelledError:
+                    # Graceful shutdown
+                    await pubsub.unsubscribe(self.response_channel)
+                    await pubsub.close()
+                    self.logger.debug("Response listener shut down gracefully")
+                    raise
             
             task = asyncio.create_task(response_listener())
             self.subscribers["response_listener"] = task
