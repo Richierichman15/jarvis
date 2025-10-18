@@ -1307,14 +1307,8 @@ async def on_ready():
             server_manager = ServerManager(JARVIS_CLIENT_URL)
             logger.info("🔧 Server manager initialized")
             
-            # Start missing servers
-            logger.info("🚀 Checking for missing servers...")
-            available = await server_manager.start_missing_servers()
-            
-            # Log server status
-            for server, is_available in available.items():
-                status = "✅" if is_available else "❌"
-                logger.info(f"  {server}: {status}")
+            # Note: Server checking will be done after HTTP server is confirmed running
+            logger.info("ℹ️ Server checking deferred until HTTP server is ready")
                 
         except Exception as e:
             logger.warning(f"⚠️ Could not initialize server manager: {e}")
@@ -1370,15 +1364,13 @@ async def on_ready():
     else:
         logger.info("ℹ️ Music player not available (module not loaded)")
     
-    # Initialize system monitoring
+    # Initialize system monitoring (DISABLED to prevent spam)
     if SYSTEM_MONITORING_AVAILABLE:
         try:
             global system_monitor
-            system_monitor = await start_system_monitoring(
-                interval=10,  # Monitor every 10 seconds
-                webhook_url=DISCORD_WEBHOOK_URL
-            )
-            logger.info("📊 System monitoring started with Discord webhook notifications")
+            # Disable monitoring to prevent spam alerts
+            system_monitor = None
+            logger.info("📊 System monitoring available but disabled to prevent spam")
         except Exception as e:
             logger.warning(f"⚠️ Could not initialize system monitoring: {e}")
             system_monitor = None

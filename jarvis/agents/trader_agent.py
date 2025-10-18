@@ -146,6 +146,37 @@ class TraderAgent(AgentBase):
             "timestamp": datetime.now()
         }
     
+    async def _call_mcp_server(self, tool_name: str, args: dict = None, server: str = "trading") -> dict:
+        """Helper method to call MCP server tools."""
+        import aiohttp
+        if args is None:
+            args = {}
+        
+        self.logger.info(f"🌐 Making HTTP request to MCP server: {tool_name} on {server}")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "http://localhost:3012/run-tool",
+                json={"tool": tool_name, "args": args, "server": server},
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                self.logger.info(f"📡 HTTP response status: {response.status}")
+                if response.status == 200:
+                    data = await response.json()
+                    self.logger.info(f"📦 Response data: {data}")
+                    if data.get('ok'):
+                        result = data.get('result', {})
+                        self.logger.info(f"✅ MCP server returned: {result}")
+                        return result
+                    else:
+                        error_msg = f"MCP server error: {data.get('detail', 'Unknown error')}"
+                        self.logger.error(f"❌ {error_msg}")
+                        raise Exception(error_msg)
+                else:
+                    error_msg = f"HTTP error: {response.status}"
+                    self.logger.error(f"❌ {error_msg}")
+                    raise Exception(error_msg)
+
     async def _handle_task(self, task: TaskRequest) -> TaskResponse:
         """Handle trading tasks."""
         try:
@@ -169,34 +200,10 @@ class TraderAgent(AgentBase):
     async def _handle_portfolio_overview(self, task: TaskRequest) -> TaskResponse:
         """Handle live portfolio overview request."""
         try:
-            # Live portfolio data from MCP server
-            portfolio_data = {
-                "total_value": 125000.50,
-                "total_pnl": 2500.75,
-                "total_pnl_percent": 2.04,
-                "positions": [
-                    {
-                        "symbol": "BTC/USD",
-                        "size": 0.5,
-                        "entry_price": 45000.0,
-                        "current_price": 50000.0,
-                        "pnl": 2500.0,
-                        "pnl_percent": 11.11
-                    },
-                    {
-                        "symbol": "ETH/USD", 
-                        "size": 10.0,
-                        "entry_price": 3000.0,
-                        "current_price": 3200.0,
-                        "pnl": 2000.0,
-                        "pnl_percent": 6.67
-                    }
-                ],
-                "cash_balance": 50000.0,
-                "margin_used": 75000.0,
-                "free_margin": 50000.0,
-                "trading_mode": "live"
-            }
+            self.logger.info(f"🔍 Calling MCP server for portfolio.get_overview...")
+            # Call the real MCP server for portfolio data
+            portfolio_data = await self._call_mcp_server("portfolio.get_overview", {}, "trading")
+            self.logger.info(f"📊 Received portfolio data: {portfolio_data}")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -206,6 +213,7 @@ class TraderAgent(AgentBase):
             )
             
         except Exception as e:
+            self.logger.error(f"❌ Error calling MCP server: {e}")
             return TaskResponse(
                 task_id=task.task_id,
                 agent_id=self.agent_id,
@@ -216,33 +224,8 @@ class TraderAgent(AgentBase):
     async def _handle_portfolio_positions(self, task: TaskRequest) -> TaskResponse:
         """Handle live portfolio positions request."""
         try:
-            positions_data = {
-                "positions": [
-                    {
-                        "symbol": "BTC/USD",
-                        "side": "long",
-                        "size": 0.5,
-                        "entry_price": 45000.0,
-                        "current_price": 50000.0,
-                        "pnl": 2500.0,
-                        "pnl_percent": 11.11,
-                        "margin": 22500.0
-                    },
-                    {
-                        "symbol": "ETH/USD",
-                        "side": "long", 
-                        "size": 10.0,
-                        "entry_price": 3000.0,
-                        "current_price": 3200.0,
-                        "pnl": 2000.0,
-                        "pnl_percent": 6.67,
-                        "margin": 30000.0
-                    }
-                ],
-                "total_positions": 2,
-                "total_pnl": 4500.0,
-                "trading_mode": "live"
-            }
+            # Call the real MCP server for positions data
+            positions_data = await self._call_mcp_server("portfolio.get_positions", {}, "trading")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -340,14 +323,8 @@ class TraderAgent(AgentBase):
     async def _handle_trading_balance(self, task: TaskRequest) -> TaskResponse:
         """Handle live trading balance request."""
         try:
-            balance_data = {
-                "total_balance": 125000.50,
-                "available_balance": 50000.0,
-                "margin_used": 75000.0,
-                "currency": "USD",
-                "last_updated": datetime.now().isoformat(),
-                "trading_mode": "live"
-            }
+            # Call the real MCP server for balance data
+            balance_data = await self._call_mcp_server("trading.get_portfolio_balance", {}, "trading")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -462,33 +439,8 @@ class TraderAgent(AgentBase):
     async def _handle_paper_portfolio(self, task: TaskRequest) -> TaskResponse:
         """Handle paper trading portfolio request."""
         try:
-            paper_portfolio_data = {
-                "total_value": 100000.00,
-                "total_pnl": 1500.25,
-                "total_pnl_percent": 1.50,
-                "positions": [
-                    {
-                        "symbol": "BTC/USD",
-                        "size": 0.3,
-                        "entry_price": 46000.0,
-                        "current_price": 50000.0,
-                        "pnl": 1200.0,
-                        "pnl_percent": 8.70
-                    },
-                    {
-                        "symbol": "ETH/USD", 
-                        "size": 8.0,
-                        "entry_price": 3100.0,
-                        "current_price": 3200.0,
-                        "pnl": 800.0,
-                        "pnl_percent": 3.23
-                    }
-                ],
-                "cash_balance": 60000.0,
-                "margin_used": 40000.0,
-                "free_margin": 60000.0,
-                "trading_mode": "paper"
-            }
+            # Call the real MCP server for paper portfolio data
+            paper_portfolio_data = await self._call_mcp_server("paper.get_portfolio", {}, "trading")
             
             return TaskResponse(
                 task_id=task.task_id,
@@ -508,14 +460,8 @@ class TraderAgent(AgentBase):
     async def _handle_paper_balance(self, task: TaskRequest) -> TaskResponse:
         """Handle paper trading balance request."""
         try:
-            paper_balance_data = {
-                "total_balance": 100000.00,
-                "available_balance": 60000.0,
-                "margin_used": 40000.0,
-                "currency": "USD",
-                "last_updated": datetime.now().isoformat(),
-                "trading_mode": "paper"
-            }
+            # Call the real MCP server for paper balance data
+            paper_balance_data = await self._call_mcp_server("paper.get_balance", {}, "trading")
             
             return TaskResponse(
                 task_id=task.task_id,

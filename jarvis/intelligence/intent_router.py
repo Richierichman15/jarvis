@@ -233,14 +233,14 @@ class IntentRouter:
         """Build comprehensive tool mappings for fallback routing."""
         return {
             # Trading mappings - use new MCP format
-            "portfolio": {"tool": "portfolio.get_overview", "server": "jarvis"},
-            "balance": {"tool": "trading.get_portfolio_balance", "server": "jarvis"},
-            "positions": {"tool": "portfolio.get_positions", "server": "jarvis"},
-            "trades": {"tool": "trading.get_recent_executions", "server": "jarvis"},
-            "price": {"tool": "trading.get_momentum_signals", "server": "jarvis"},
-            "momentum": {"tool": "trading.get_momentum_signals", "server": "jarvis"},
-            "pnl": {"tool": "portfolio.get_performance", "server": "jarvis"},
-            "doctor": {"tool": "trading.get_momentum_signals", "server": "jarvis"},
+            "portfolio": {"tool": "portfolio.get_overview", "server": "trading"},
+            "balance": {"tool": "trading.get_portfolio_balance", "server": "trading"},
+            "positions": {"tool": "portfolio.get_positions", "server": "trading"},
+            "trades": {"tool": "trading.get_recent_executions", "server": "trading"},
+            "price": {"tool": "trading.get_momentum_signals", "server": "trading"},
+            "momentum": {"tool": "trading.get_momentum_signals", "server": "trading"},
+            "pnl": {"tool": "portfolio.get_performance", "server": "trading"},
+            "doctor": {"tool": "trading.get_momentum_signals", "server": "trading"},
             
             # Music mappings
             "play": {"tool": "music_play", "server": "local"},

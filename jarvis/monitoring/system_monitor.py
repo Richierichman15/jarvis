@@ -131,9 +131,9 @@ class SystemMonitor:
         
         # Agent configurations (new modular agent system)
         self.agent_configs = {
-            'TraderAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None},
-            'SoloLevelingAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None},
-            'ResearchAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None}
+            'TraderAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None, 'port': None},
+            'SoloLevelingAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None, 'port': None},
+            'ResearchAgent': {'process_name': 'agent_manager.py', 'health_endpoint': None, 'port': None}
         }
         
         # Performance tracking

@@ -293,11 +293,18 @@ class RedisCommunication:
             self.logger.error(f"Error sending task: {e}")
             raise
     
-    async def get_task_for_agent(self, agent_id: str) -> Optional[TaskRequest]:
-        """Get the next task for a specific agent."""
+    async def get_task_for_agent(self, agent_id: str, agent_capabilities: List[AgentCapability] = None) -> Optional[TaskRequest]:
+        """Get the next task for a specific agent based on its capabilities."""
         try:
-            # Check all capability queues for tasks
-            for capability, queue_name in self.capability_queues.items():
+            # If no capabilities specified, check all queues (backward compatibility)
+            capabilities_to_check = agent_capabilities if agent_capabilities else list(self.capability_queues.keys())
+            
+            # Check only the capability queues that match the agent's capabilities
+            for capability in capabilities_to_check:
+                queue_name = self.capability_queues.get(capability)
+                if not queue_name:
+                    continue
+                    
                 # Get highest priority task (lowest score)
                 result = await self.redis_client.zpopmin(queue_name, count=1)
                 

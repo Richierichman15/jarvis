@@ -261,9 +261,9 @@ class AgentBase(ABC):
         """Main task processing loop."""
         while self.status == AgentStatus.RUNNING:
             try:
-                # Check for new tasks from Redis
+                # Check for new tasks from Redis (only for this agent's capabilities)
                 if self.redis_comm:
-                    task = await self.redis_comm.get_task_for_agent(self.agent_id)
+                    task = await self.redis_comm.get_task_for_agent(self.agent_id, self.capabilities)
                     if task:
                         await self._process_task(task)
                 
