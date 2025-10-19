@@ -3,6 +3,8 @@ Local model handler for Jarvis using Ollama API.
 """
 import json
 import requests
+import aiohttp
+import asyncio
 import logging
 import time
 import os
@@ -207,7 +209,7 @@ class OllamaModel:
         # If we've exhausted retries
         return "Error: Failed to get a response from the local model after multiple attempts."
     
-    def is_available(self) -> bool:
+    async def is_available(self) -> bool:
         """Check if the model is available and responding.
         
         Returns:
@@ -234,28 +236,39 @@ class OllamaModel:
                     "stream": False  # Important to get a single response
                 }
                 logger.info(f"Sending test request to {self.generate_endpoint} (attempt {attempt+1}/{max_retries})")
-                response = requests.post(self.generate_endpoint, json=payload, timeout=15)
                 
-                is_available = response.status_code == 200
-                logger.info(f"Local model available: {is_available}, Status code: {response.status_code}")
+                # Use async HTTP request with shorter timeout
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        self.generate_endpoint, 
+                        json=payload, 
+                        timeout=aiohttp.ClientTimeout(total=5)  # Much shorter timeout
+                    ) as response:
+                        is_available = response.status == 200
+                        logger.info(f"Local model available: {is_available}, Status code: {response.status}")
+                        
+                        if is_available:
+                            return True
+                            
+                        # If model not found, let the user know
+                        if response.status == 404:
+                            logger.error(f"Model '{self.model_name}' not found in Ollama")
+                            return False
                 
-                if is_available:
-                    return True
-                    
-                # If model not found, let the user know
-                if response.status_code == 404:
-                    logger.error(f"Model '{self.model_name}' not found in Ollama")
-                    return False
-                    
                 # If not available, wait before retrying
                 if attempt < max_retries - 1:
                     logger.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
+                    await asyncio.sleep(retry_delay)
                     
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout when checking local model availability (attempt {attempt+1})")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
             except Exception as e:
                 logger.error(f"Exception when checking local model availability: {str(e)}")
                 if attempt < max_retries - 1:
                     logger.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
+                    await asyncio.sleep(retry_delay)
         
         return False 
