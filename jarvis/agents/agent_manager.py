@@ -71,6 +71,12 @@ class AgentManager:
                 "capabilities": [AgentCapability.RESEARCH],
                 "auto_start": True,
                 "max_concurrent_tasks": 8
+            },
+            "reasoner": {
+                "class": "ReasonerAgent",
+                "capabilities": [AgentCapability.SYSTEM],
+                "auto_start": True,
+                "max_concurrent_tasks": 4
             }
         }
         

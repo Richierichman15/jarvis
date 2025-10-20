@@ -6,6 +6,8 @@ Automated Discord notifications for trading momentum signals every 3 hours.
 
 - **⏰ Scheduled Notifications**: Sends momentum updates every 3 hours automatically
 - **📱 Discord Integration**: Rich embeds with momentum signals sent to your Discord channel
+- **🤖 AI-Powered Formatting**: Uses the same AI formatter as the Discord bot for natural, readable messages
+- **📊 Smart Data Parsing**: Automatically formats momentum signals with emojis, percentages, and signal strength
 - **🔄 Continuous Operation**: Runs as a background service
 - **🧪 Test Mode**: Send test notifications to verify setup
 - **📊 Status Monitoring**: Check service status and configuration
@@ -91,15 +93,30 @@ Every 3 hours, you'll get a Discord notification with:
 
 ### Example Notification
 
+**AI-Formatted (Primary):**
 ```
-📊 Momentum Signals Update
+🚀 Momentum Signals Update (last updated: 2025-10-20)
 
-📈 BTC/USD: Bullish (+2.45) - $45,200.00 (+3.2%)
-📉 ETH/USD: Bearish (-1.23) - $2,800.00 (-1.8%)
-➡️ SOL/USD: Neutral (+0.12) - $95.50 (+0.5%)
+- Bitcoin (BTC-USD): 
+  - Current Price: $110,555
+  - 6h Momentum: 2.27% 📈
+  - 24h Momentum: 3.52% 📈
+  - Signal Strength: Weak Up
 
-⏰ Next Update: in 2 hours 45 minutes
-🔄 Service Status: 🟢 Active
+- Ethereum (ETH-USD):
+  - Current Price: $4,050.15
+  - 6h Momentum: 2.71% 📈
+  - 24h Momentum: 4.32% 📈
+  - Signal Strength: Weak Up
+
+Keep an eye on these trends!
+```
+
+**Fallback Format (if AI unavailable):**
+```
+📈 BTC/USD: $110,555.00 | 6h: +2.27% | 24h: +3.52% | WEAK_UP
+📈 ETH/USD: $4,050.15 | 6h: +2.71% | 24h: +4.32% | WEAK_UP
+📈 SOL/USD: $192.13 | 6h: +3.46% | 24h: +3.51% | WEAK_UP
 ```
 
 ## 🛠️ Configuration

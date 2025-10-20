@@ -14,6 +14,15 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
+# Import formatter for AI-powered formatting
+try:
+    from formatter import format_response
+    from jarvis.models.model_manager import ModelManager
+    FORMATTER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import formatter or model manager: {e}")
+    FORMATTER_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -39,6 +48,18 @@ class MomentumNotificationService:
         self.session: Optional[aiohttp.ClientSession] = None
         self.is_running = False
         self.last_notification = None
+        
+        # Initialize model manager for AI formatting
+        self.model_manager = None
+        if FORMATTER_AVAILABLE:
+            try:
+                self.model_manager = ModelManager()
+                logger.info("✅ Model manager initialized for formatting")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not initialize model manager: {e}")
+                logger.warning("Momentum data will be sent without AI formatting")
+        else:
+            logger.warning("⚠️ Formatter not available - momentum data will be sent without AI formatting")
         
         # Validate configuration
         if not self.discord_webhook_url:
@@ -123,8 +144,8 @@ class MomentumNotificationService:
                 logger.warning("⚠️ No momentum data received")
                 return
             
-            # Create Discord embed
-            embed = self._create_momentum_embed(momentum_data)
+            # Create Discord embed (now async)
+            embed = await self._create_momentum_embed(momentum_data)
             
             # Send to Discord
             await self._send_discord_webhook(embed)
@@ -177,47 +198,39 @@ class MomentumNotificationService:
             logger.error(f"Error fetching momentum signals: {e}")
             return None
     
-    def _create_momentum_embed(self, momentum_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _create_momentum_embed(self, momentum_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a Discord embed for momentum signals."""
         current_time = datetime.now()
         
-        # Parse momentum data (adjust based on actual response format)
-        if isinstance(momentum_data, str):
-            # If it's a string response, use it as description
-            description = momentum_data
-        elif isinstance(momentum_data, dict):
-            # If it's structured data, format it nicely
-            description_parts = []
+        # Format the momentum data using the same logic as Discord bot
+        if isinstance(momentum_data, dict) and 'momentum_signals' in momentum_data:
+            signals = momentum_data['momentum_signals']
             
-            # Look for common momentum signal fields
-            if 'signals' in momentum_data:
-                signals = momentum_data['signals']
-                for signal in signals[:10]:  # Limit to 10 signals
-                    symbol = signal.get('symbol', 'Unknown')
-                    momentum = signal.get('momentum', 0)
-                    price = signal.get('price', 0)
-                    change = signal.get('change_percent', 0)
-                    
-                    emoji = "📈" if momentum > 0 else "📉" if momentum < 0 else "➡️"
-                    direction = "Bullish" if momentum > 0 else "Bearish" if momentum < 0 else "Neutral"
-                    
-                    description_parts.append(
-                        f"{emoji} **{symbol}**: {direction} ({momentum:+.2f}) - ${price:,.2f} ({change:+.2f}%)"
+            # Format using AI if available
+            if self.model_manager and FORMATTER_AVAILABLE:
+                try:
+                    # Convert to string for formatter
+                    raw_json = json.dumps(momentum_data, indent=2)
+                    formatted_text = await format_response(
+                        raw_response=raw_json,
+                        model_manager=self.model_manager,
+                        context="Momentum signals update for Discord notification. Format with emojis and percentages."
                     )
-            
-            elif 'summary' in momentum_data:
-                description = momentum_data['summary']
+                    description = formatted_text
+                except Exception as e:
+                    logger.warning(f"AI formatting failed, using fallback: {e}")
+                    description = self._format_momentum_fallback(signals)
             else:
-                # Fallback: format the entire response
-                description = json.dumps(momentum_data, indent=2)[:2000]  # Discord limit
+                description = self._format_momentum_fallback(signals)
         else:
-            description = str(momentum_data)[:2000]
+            # Fallback for unexpected format
+            description = json.dumps(momentum_data, indent=2)[:2000]
         
-        # Create the embed
+        # Create embed with formatted description
         embed = {
             "title": "📊 Momentum Signals Update",
-            "description": description if description else "No momentum signals available",
-            "color": 0x3498DB,  # Blue color
+            "description": description,
+            "color": 0x3498DB,
             "timestamp": current_time.isoformat(),
             "footer": {
                 "text": "Momentum Notification Service • Updated every 3 hours"
@@ -237,6 +250,34 @@ class MomentumNotificationService:
         }
         
         return embed
+    
+    def _format_momentum_fallback(self, signals: Dict[str, Any]) -> str:
+        """Fallback formatting when AI is unavailable."""
+        lines = []
+        
+        for symbol, data in list(signals.items())[:10]:  # Limit to 10
+            price = data.get('current_price', 0)
+            momentum_6h = data.get('momentum_6h_pct', 0)
+            momentum_24h = data.get('momentum_24h_pct', 0)
+            signal = data.get('signal_strength', 'NEUTRAL')
+            
+            # Choose emoji based on signal
+            if 'UP' in signal:
+                emoji = "📈"
+            elif 'DOWN' in signal:
+                emoji = "📉"
+            else:
+                emoji = "➡️"
+            
+            # Format symbol (BTC-USD -> BTC/USD)
+            display_symbol = symbol.replace('-', '/')
+            
+            lines.append(
+                f"{emoji} **{display_symbol}**: ${price:,.2f} | "
+                f"6h: {momentum_6h:+.2f}% | 24h: {momentum_24h:+.2f}% | {signal}"
+            )
+        
+        return "\n".join(lines) if lines else "No momentum signals available"
     
     async def _send_discord_webhook(self, embed: Dict[str, Any]):
         """Send embed to Discord via webhook."""

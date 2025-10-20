@@ -23,6 +23,7 @@ try:
     from .trader_agent import TraderAgent
     from .solo_leveling_agent import SoloLevelingAgent
     from .research_agent import ResearchAgent
+    from .reasoner_agent import ReasonerAgent
     AGENTS_AVAILABLE = True
 except ImportError as e:
     AGENTS_AVAILABLE = False
@@ -32,6 +33,8 @@ except ImportError as e:
     class SoloLevelingAgent:
         pass
     class ResearchAgent:
+        pass
+    class ReasonerAgent:
         pass
 
 __all__ = [
@@ -44,5 +47,6 @@ __all__ = [
     'ResponseMessage',
     'TraderAgent',
     'SoloLevelingAgent',
-    'ResearchAgent'
+    'ResearchAgent',
+    'ReasonerAgent'
 ]
