@@ -12,6 +12,7 @@ import os
 import psutil
 import platform
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -74,6 +75,19 @@ class SoloLevelingAgent(AgentBase):
         self.goals = []
         self.achievements = []
         
+        # Personality
+        self.personality = "supportive, gamified, motivational"
+
+        # Persistent XP/streak storage (SQLite)
+        try:
+            from .memory_utils import SoloLevelingDB
+            db_dir = Path("data").absolute()
+            db_dir.mkdir(parents=True, exist_ok=True)
+            self.level_db = SoloLevelingDB(str(db_dir / "solo_leveling.sqlite"))
+        except Exception as e:
+            self.level_db = None
+            self.logger.warning(f"XP DB unavailable, continuing without persistence: {e}")
+
         self.logger = logging.getLogger("agent.solo_leveling")
     
     async def start(self, redis_comm=None, agent_manager=None):
@@ -165,6 +179,14 @@ class SoloLevelingAgent(AgentBase):
     async def _initialize(self):
         """Initialize solo leveling specific resources."""
         try:
+            # Load persisted user state if available
+            if hasattr(self, 'level_db') and self.level_db:
+                state = self.level_db.get_user_state()
+                self.user_level = max(1, int(state.get("level", 1)))
+                self.user_experience = int(state.get("xp", 0))
+                self.user_streak = int(state.get("streak", 0) or 0)
+                self.last_active_date = state.get("last_active_date")
+
             # Initialize user progress tracking
             await self._initialize_user_progress()
             
@@ -196,6 +218,15 @@ class SoloLevelingAgent(AgentBase):
             
             # Save user progress
             await self._save_user_progress()
+
+            # Persist user XP to SQLite
+            if hasattr(self, 'level_db') and self.level_db:
+                try:
+                    today = datetime.now().date().isoformat()
+                    streak = getattr(self, "user_streak", 0)
+                    self.level_db.save_user_state(self.user_level, self.user_experience, streak, today)
+                except Exception as e:
+                    self.logger.warning(f"Failed to persist user state: {e}")
             
             self.logger.info("✅ SoloLevelingAgent cleanup completed")
             
@@ -406,6 +437,21 @@ class SoloLevelingAgent(AgentBase):
             if current_hour == 0 and self.daily_quests_completed > 0:
                 self.daily_quests_completed = 0
                 self.logger.info("📅 Daily quest counter reset")
+            
+            # Maintain simple streak: if any activity today, increment streak
+            today = datetime.now().date().isoformat()
+            last_date = getattr(self, "last_active_date", None)
+            if last_date != today and (self.daily_quests_completed > 0 or self.total_quests_completed > 0):
+                try:
+                    from datetime import date
+                    prev_date = None if not last_date else datetime.fromisoformat(last_date).date()
+                    if prev_date is not None and (datetime.now().date() - prev_date).days == 1:
+                        self.user_streak = getattr(self, "user_streak", 0) + 1
+                    else:
+                        self.user_streak = 1
+                    self.last_active_date = today
+                except Exception:
+                    self.user_streak = getattr(self, "user_streak", 0) or 1
             
         except Exception as e:
             self.logger.error(f"Error updating daily progress: {e}")
@@ -865,6 +911,15 @@ class SoloLevelingAgent(AgentBase):
             self.user_experience += experience_gained
             self.total_quests_completed += 1
             self.daily_quests_completed += 1
+            
+            # Persist immediately if DB available
+            if hasattr(self, 'level_db') and self.level_db:
+                try:
+                    today = datetime.now().date().isoformat()
+                    streak = getattr(self, "user_streak", 0)
+                    self.level_db.save_user_state(self.user_level, self.user_experience, streak, today)
+                except Exception as e:
+                    self.logger.warning(f"Failed to persist XP on quest complete: {e}")
             
             # Save to JSON files
             await self._save_quests()

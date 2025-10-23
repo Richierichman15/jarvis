@@ -87,6 +87,20 @@ class TraderAgent(AgentBase):
         self.pending_orders = {}
         self.market_data_cache = {}
         
+        # Personality
+        self.personality = "pragmatic, risk-aware, data-driven"
+
+        # Pattern memory DB
+        try:
+            from .memory_utils import TraderMemoryDB
+            from pathlib import Path
+            db_dir = Path("data").absolute()
+            db_dir.mkdir(parents=True, exist_ok=True)
+            self.trader_db = TraderMemoryDB(str(db_dir / "trader_memory.sqlite"))
+        except Exception as e:
+            self.trader_db = None
+            self.logger.warning(f"Trader DB unavailable, continuing without persistence: {e}")
+        
         self.logger = logging.getLogger("agent.trader")
     
     async def start(self, redis_comm=None, agent_manager=None):
@@ -413,6 +427,14 @@ class TraderAgent(AgentBase):
             
             self.logger.info(f"📈 Handling momentum signals request...")
             result = await self._call_mcp_server("trading.get_momentum_signals", args, "trading")
+            
+            # Persist signals for pattern learning (best-effort)
+            try:
+                signals = result.get("momentum_signals") if isinstance(result, dict) else None
+                if signals and hasattr(self, 'trader_db') and self.trader_db:
+                    self.trader_db.log_momentum_signals(signals)
+            except Exception as e:
+                self.logger.warning(f"Failed to persist momentum signals: {e}")
             
             return TaskResponse(
                 task_id=task.task_id,
