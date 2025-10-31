@@ -1380,16 +1380,37 @@ async def on_ready():
         try:
             model_manager = ModelManager()
             logger.info("🤖 Model manager initialized")
+            
+            # Check Ollama availability asynchronously
+            if model_manager.ollama_model:
+                try:
+                    await model_manager.check_ollama_availability()
+                    if model_manager.ollama_available:
+                        logger.info(f"✅ Ollama is available: {model_manager.ollama_model.model_name}")
+                    else:
+                        logger.info("⚠️ Ollama model initialized but not currently available")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error checking Ollama availability: {e}")
+            
+            # Verify OpenAI availability
+            if model_manager.openai_available and model_manager.openai_model:
+                logger.info("✅ OpenAI GPT-4o-mini is available")
+            elif model_manager.openai_model is None:
+                logger.warning("⚠️ OpenAI model not initialized - check OPENAI_KEY or OPENAI_API_KEY environment variable")
+            else:
+                logger.warning("⚠️ OpenAI model initialized but marked as unavailable")
+                
         except Exception as e:
             logger.warning(f"⚠️ Could not initialize model manager: {e}")
+            logger.exception("Model manager initialization error details:")
             model_manager = None
     else:
         logger.warning("⚠️ Model manager not available")
         model_manager = None
     
-    # Initialize conversation context
+    # Initialize conversation context for tracking user queries
     try:
-        conversation_context = ConversationContext()
+        conversation_context = ConversationContext(max_history=5)
         logger.info("💬 Conversation context initialized")
     except Exception as e:
         logger.warning(f"⚠️ Could not initialize conversation context: {e}")
@@ -1415,23 +1436,6 @@ async def on_ready():
     else:
         logger.warning("⚠️ System monitoring not available")
         system_monitor = None
-    
-    # Initialize conversation context for tracking user queries
-    conversation_context = ConversationContext(max_history=5)
-    logger.info("✅ Conversation context initialized")
-    
-    # Initialize AI model for response formatting
-    if MODEL_AVAILABLE:
-        try:
-            model_manager = ModelManager()
-            logger.info("✅ AI model initialized for response formatting")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not initialize AI model for formatting: {e}")
-            logger.warning("Responses will be sent without AI formatting")
-            model_manager = None
-    else:
-        logger.warning("⚠️ Model manager not available - responses will be sent raw")
-        model_manager = None
     
     # Initialize event listener if channel is configured
     if EVENT_LISTENER_AVAILABLE and EVENT_NOTIFICATION_CHANNEL_ID:
