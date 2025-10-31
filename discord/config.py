@@ -1,8 +1,25 @@
 """Configuration module for Discord bot."""
 import os
 import logging
+import sys
+import importlib
 from typing import Optional
 from dotenv import load_dotenv
+
+# CRITICAL: Import the actual discord.py library FIRST before our package might interfere
+# This ensures that when other modules (jarvis_event_listener, jarvis_music_player) import discord,
+# they get the library, not our discord package
+try:
+    # Import the actual discord library and ensure it's in sys.modules
+    discord_lib = importlib.import_module('discord')
+    # Temporarily save our package name if it exists
+    if 'discord' in sys.modules and not hasattr(sys.modules['discord'], 'Client'):
+        # If 'discord' is already our package, we need to work around this
+        _discord_pkg_backup = sys.modules.pop('discord', None)
+        sys.modules['discord'] = discord_lib
+        # Now other modules can safely import discord
+except ImportError:
+    pass  # discord library not available
 
 # Load environment variables
 load_dotenv()

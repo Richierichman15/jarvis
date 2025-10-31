@@ -17,17 +17,19 @@ import importlib
 from datetime import datetime
 from typing import Optional
 
-# CRITICAL: Import the actual discord.py library FIRST
-# Then import our discord package with an alias to avoid conflicts
+# CRITICAL: Import the actual discord.py library FIRST and ensure it's in sys.modules
+# This must happen before importing our discord package
 import discord as discord_lib  # The actual discord.py library
+sys.modules['discord'] = discord_lib  # Ensure it's the default
 
-# Import configuration from our discord package
-# Use importlib to explicitly import our package
-_discord_pkg = importlib.import_module('discord')
+# Now import our discord package (config module)
+# Since discord library is already in sys.modules, modules that import discord will get the library
+import discord as _discord_pkg  # Import our package but keep it as _discord_pkg
 from discord import config
 
-# Now discord refers to the library, but we can access our package via _discord_pkg if needed
-discord = discord_lib  # Ensure discord refers to the library
+# Restore discord to refer to the library (not our package)
+discord = discord_lib
+sys.modules['discord'] = discord_lib
 
 # Import components
 from discord.clients import RobustMCPClient, JarvisClientMCPClient
@@ -37,18 +39,9 @@ from discord.utils import send_long_message, send_error_webhook
 from discord.handlers.tool_executor import execute_intelligent_tool
 
 # Import optional components
-# Ensure discord library is in sys.modules before importing jarvis_event_listener
+# The discord library should already be in sys.modules from config.py
 try:
-    # Temporarily remove our discord package from sys.modules so jarvis_event_listener gets the library
-    _discord_pkg = sys.modules.pop('discord', None)
-    try:
-        from jarvis_event_listener import TradingEventListener
-    finally:
-        # Restore our discord package
-        if _discord_pkg:
-            sys.modules['discord'] = _discord_pkg
-        # But ensure the library is also available as 'discord'
-        sys.modules['discord'] = _discord_lib
+    from jarvis_event_listener import TradingEventListener
 except ImportError:
     TradingEventListener = None
 
