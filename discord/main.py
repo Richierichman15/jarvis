@@ -31,6 +31,9 @@ from discord import config
 discord = discord_lib
 sys.modules['discord'] = discord_lib
 
+# Now that discord library is properly set up, trigger config availability checks
+config._ensure_checks_done()
+
 # Import components
 from discord.clients import RobustMCPClient, JarvisClientMCPClient
 from discord.routers import DiscordCommandRouter

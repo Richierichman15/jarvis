@@ -114,12 +114,86 @@ def _check_mcp_client_available():
     except ImportError:
         return False
 
-# Set defaults - will be checked when needed
-MODEL_AVAILABLE = _check_model_available()
-EVENT_LISTENER_AVAILABLE = _check_event_listener_available()
-INTELLIGENCE_AVAILABLE = _check_intelligence_available()
-SERVER_MANAGER_AVAILABLE = _check_server_manager_available()
-SYSTEM_MONITORING_AVAILABLE = _check_monitoring_available()
-MUSIC_PLAYER_AVAILABLE = _check_music_player_available()
-MCP_CLIENT_AVAILABLE = _check_mcp_client_available()
+# Set defaults - use lazy evaluation to avoid import conflicts
+# These will be checked when actually accessed, not at module import time
+# This prevents conflicts with discord library imports
+_MODEL_AVAILABLE = None
+_EVENT_LISTENER_AVAILABLE = None
+_INTELLIGENCE_AVAILABLE = None
+_SERVER_MANAGER_AVAILABLE = None
+_SYSTEM_MONITORING_AVAILABLE = None
+_MUSIC_PLAYER_AVAILABLE = None
+_MCP_CLIENT_AVAILABLE = None
+
+def _get_model_available():
+    global _MODEL_AVAILABLE
+    if _MODEL_AVAILABLE is None:
+        _MODEL_AVAILABLE = _check_model_available()
+    return _MODEL_AVAILABLE
+
+def _get_event_listener_available():
+    global _EVENT_LISTENER_AVAILABLE
+    if _EVENT_LISTENER_AVAILABLE is None:
+        _EVENT_LISTENER_AVAILABLE = _check_event_listener_available()
+    return _EVENT_LISTENER_AVAILABLE
+
+def _get_intelligence_available():
+    global _INTELLIGENCE_AVAILABLE
+    if _INTELLIGENCE_AVAILABLE is None:
+        _INTELLIGENCE_AVAILABLE = _check_intelligence_available()
+    return _INTELLIGENCE_AVAILABLE
+
+def _get_server_manager_available():
+    global _SERVER_MANAGER_AVAILABLE
+    if _SERVER_MANAGER_AVAILABLE is None:
+        _SERVER_MANAGER_AVAILABLE = _check_server_manager_available()
+    return _SERVER_MANAGER_AVAILABLE
+
+def _get_monitoring_available():
+    global _SYSTEM_MONITORING_AVAILABLE
+    if _SYSTEM_MONITORING_AVAILABLE is None:
+        _SYSTEM_MONITORING_AVAILABLE = _check_monitoring_available()
+    return _SYSTEM_MONITORING_AVAILABLE
+
+def _get_music_player_available():
+    global _MUSIC_PLAYER_AVAILABLE
+    if _MUSIC_PLAYER_AVAILABLE is None:
+        _MUSIC_PLAYER_AVAILABLE = _check_music_player_available()
+    return _MUSIC_PLAYER_AVAILABLE
+
+def _get_mcp_client_available():
+    global _MCP_CLIENT_AVAILABLE
+    if _MCP_CLIENT_AVAILABLE is None:
+        _MCP_CLIENT_AVAILABLE = _check_mcp_client_available()
+    return _MCP_CLIENT_AVAILABLE
+
+# Use lazy evaluation - checks are done when _ensure_checks_done() is called
+# We'll access them through functions when needed, but for compatibility,
+# set them to False initially and they'll be checked when first accessed
+_MODULE_LOADED = False
+
+def _ensure_checks_done():
+    """Ensure availability checks are done (called after discord library is set up)."""
+    global MODEL_AVAILABLE, EVENT_LISTENER_AVAILABLE, INTELLIGENCE_AVAILABLE
+    global SERVER_MANAGER_AVAILABLE, SYSTEM_MONITORING_AVAILABLE, MUSIC_PLAYER_AVAILABLE, MCP_CLIENT_AVAILABLE
+    global _MODULE_LOADED
+    
+    if not _MODULE_LOADED:
+        MODEL_AVAILABLE = _check_model_available()
+        EVENT_LISTENER_AVAILABLE = _check_event_listener_available()
+        INTELLIGENCE_AVAILABLE = _check_intelligence_available()
+        SERVER_MANAGER_AVAILABLE = _check_server_manager_available()
+        SYSTEM_MONITORING_AVAILABLE = _check_monitoring_available()
+        MUSIC_PLAYER_AVAILABLE = _check_music_player_available()
+        MCP_CLIENT_AVAILABLE = _check_mcp_client_available()
+        _MODULE_LOADED = True
+
+# Set initial defaults to False - will be properly checked when _ensure_checks_done() is called
+MODEL_AVAILABLE = False
+EVENT_LISTENER_AVAILABLE = False
+INTELLIGENCE_AVAILABLE = False
+SERVER_MANAGER_AVAILABLE = False
+SYSTEM_MONITORING_AVAILABLE = False
+MUSIC_PLAYER_AVAILABLE = False
+MCP_CLIENT_AVAILABLE = False
 
