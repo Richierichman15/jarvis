@@ -4,7 +4,8 @@ import sys
 import logging
 from typing import Dict, Any, Optional
 
-from discord.config import MCP_CLIENT_AVAILABLE
+from discord import config
+MCP_CLIENT_AVAILABLE = config.MCP_CLIENT_AVAILABLE
 
 if MCP_CLIENT_AVAILABLE:
     from mcp import ClientSession, StdioServerParameters

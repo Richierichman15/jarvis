@@ -5,7 +5,7 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 import discord
 
-from discord.clients.http_client import JarvisClientMCPClient
+from ..clients.http_client import JarvisClientMCPClient
 
 logger = logging.getLogger(__name__)
 

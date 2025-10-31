@@ -6,7 +6,7 @@ from typing import List
 from datetime import datetime
 import discord
 
-from discord.config import DISCORD_WEBHOOK_URL
+from discord import config
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ async def send_long_message(message: discord.Message, text: str) -> None:
 
 async def send_error_webhook(error_msg: str, original_message: str, session: aiohttp.ClientSession = None):
     """Send error notification to Discord webhook."""
-    if not DISCORD_WEBHOOK_URL or not session:
+    if not config.DISCORD_WEBHOOK_URL or not session:
         return
     
     try:
@@ -124,7 +124,7 @@ async def send_error_webhook(error_msg: str, original_message: str, session: aio
             "content": f"🚨 **Jarvis Bot Error**\n\n**Error:** {error_msg}\n**Original Message:** {original_message}\n**Time:** {datetime.now().isoformat()}"
         }
         
-        async with session.post(DISCORD_WEBHOOK_URL, json=webhook_data) as response:
+        async with session.post(config.DISCORD_WEBHOOK_URL, json=webhook_data) as response:
             if response.status == 204:
                 logger.info("Error notification sent to webhook")
             else:
