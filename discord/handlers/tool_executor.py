@@ -2,8 +2,23 @@
 import logging
 from typing import Dict, Any
 
-from discord.clients import RobustMCPClient, JarvisClientMCPClient
-from discord.routers import DiscordCommandRouter
+# Import clients and routers from discord_bot namespace
+try:
+    from discord_bot.clients import RobustMCPClient, JarvisClientMCPClient
+    from discord_bot.routers import DiscordCommandRouter
+except ImportError:
+    # Fallback: try relative imports if running as normal package
+    try:
+        from ..clients import RobustMCPClient, JarvisClientMCPClient
+        from ..routers import DiscordCommandRouter
+    except ImportError:
+        # Type hints only - actual imports come from main.py
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from ..clients import RobustMCPClient, JarvisClientMCPClient
+            from ..routers import DiscordCommandRouter
+        else:
+            raise
 
 logger = logging.getLogger(__name__)
 

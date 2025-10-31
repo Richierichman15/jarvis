@@ -233,21 +233,21 @@ class IntentRouter:
         """Build comprehensive tool mappings for fallback routing."""
         return {
             # Trading mappings - use new MCP format
-            "portfolio": {"tool": "portfolio.get_overview", "server": "trading"},
-            "balance": {"tool": "trading.get_portfolio_balance", "server": "trading"},
-            "positions": {"tool": "portfolio.get_positions", "server": "trading"},
-            "trades": {"tool": "trading.get_recent_executions", "server": "trading"},
+            "portfolio": {"tool": "trading.portfolio.get_overview", "server": "jarvis"},
+            "balance": {"tool": "trading.trading.get_portfolio_balance", "server": "jarvis"},
+            "positions": {"tool": "trading.portfolio.get_positions", "server": "jarvis"},
+            "trades": {"tool": "trading.trading.get_recent_executions", "server": "jarvis"},
             "price": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
             "momentum": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
             "pnl": {"tool": "trading.portfolio.get_performance", "server": "jarvis"},
             "doctor": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
             
             # Paper trading mappings
-            "paper_portfolio": {"tool": "paper.get_portfolio", "server": "trading"},
-            "paper_balance": {"tool": "paper.get_balance", "server": "trading"},
-            "paper_performance": {"tool": "paper.get_performance", "server": "trading"},
-            "paper_trades": {"tool": "paper.get_trades", "server": "trading"},
-            "paper_history": {"tool": "paper.get_trades", "server": "trading"},
+            "paper_portfolio": {"tool": "trading.paper.get_portfolio", "server": "jarvis"},
+            "paper_balance": {"tool": "trading.paper.get_balance", "server": "jarvis"},
+            "paper_performance": {"tool": "trading.paper.get_performance", "server": "jarvis"},
+            "paper_trades": {"tool": "trading.paper.get_trades", "server": "jarvis"},
+            "paper_history": {"tool": "trading.paper.get_trades", "server": "jarvis"},
             
             # Music mappings
             "play": {"tool": "music_play", "server": "local"},
@@ -442,6 +442,32 @@ ANALYZE THE REQUEST:
 """
         return prompt
     
+    def _correct_tool_name(self, tool_name: str) -> str:
+        """Correct common tool name mistakes made by LLM."""
+        corrections = {
+            # Trading tool corrections
+            "trading.get_momentum_signals": "trading.trading.get_momentum_signals",
+            "trading.get_balance": "trading.trading.get_portfolio_balance",
+            "trading.get_portfolio_balance": "trading.trading.get_portfolio_balance",
+            "trading.get_price": "trading.trading.get_price",
+            "trading.get_recent_executions": "trading.trading.get_recent_executions",
+            "trading.get_portfolio": "portfolio.get_overview",
+            "portfolio.get_overview": "trading.portfolio.get_overview",
+            "portfolio.get_positions": "trading.portfolio.get_positions",
+            "portfolio.get_trades": "trading.portfolio.get_trades",
+            "portfolio.get_performance": "trading.portfolio.get_performance",
+            "pnl": "trading.portfolio.get_performance",
+            # Paper trading corrections
+            "paper.get_portfolio": "trading.paper.get_portfolio",
+            "paper.get_balance": "trading.paper.get_balance",
+            "paper.get_performance": "trading.paper.get_performance",
+            "paper.get_trades": "trading.paper.get_trades",
+        }
+        corrected = corrections.get(tool_name, tool_name)
+        if corrected != tool_name:
+            logger.info(f"🔧 Corrected tool name: {tool_name} -> {corrected}")
+        return corrected
+    
     def _parse_llm_response(self, response: str, original_text: str) -> Optional[IntentResult]:
         """Parse LLM response into IntentResult."""
         try:
@@ -452,10 +478,14 @@ ANALYZE THE REQUEST:
             
             data = json.loads(json_match.group())
             
+            # Correct tool name if necessary
+            raw_tool_name = data.get("tool_name", "jarvis_chat")
+            corrected_tool_name = self._correct_tool_name(raw_tool_name)
+            
             return IntentResult(
                 intent_type=IntentType(data.get("intent_type", "unknown")),
                 confidence=float(data.get("confidence", 0.0)),
-                tool_name=data.get("tool_name", "jarvis_chat"),
+                tool_name=corrected_tool_name,
                 arguments=data.get("arguments", {}),
                 reasoning=data.get("reasoning", "LLM analysis"),
                 context_used=data.get("context_used", []),

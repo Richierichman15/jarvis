@@ -383,8 +383,16 @@ async def on_message(message):
                         model_manager=model_manager,
                         context=context
                     )
-                    response = formatted_response
-                    logger.info("✨ Response formatted by AI")
+                    
+                    # Validate that formatting actually succeeded
+                    # Don't use error messages from the formatter as the response
+                    if formatted_response and not formatted_response.startswith("Error:") and "No models available" not in formatted_response:
+                        response = formatted_response
+                        logger.info("✨ Response formatted by AI")
+                    else:
+                        # Formatting returned an error, use raw response instead
+                        logger.warning(f"Formatting returned error, using raw response: {formatted_response}")
+                        response = raw_response
                 except Exception as format_error:
                     logger.warning(f"Formatting failed, using raw response: {format_error}")
                     response = raw_response
