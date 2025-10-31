@@ -13,51 +13,62 @@ import asyncio
 import aiohttp
 import logging
 import sys
+import os
 import importlib
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 
 # CRITICAL: When running as `python -m discord.main`, Python loads our discord package first.
-# We need to save/remove it and ensure the discord.py library is loaded instead.
-# This must be the FIRST thing we do, before any other imports.
+# We need to ensure the discord.py library is loaded BEFORE our package.
+# Strategy: Temporarily remove current directory from sys.path, import discord library,
+# put it in sys.modules, then restore sys.path and use normal imports.
 
-# Save reference to our package if it exists
-_our_discord_pkg = None
+# Save current working directory
+_current_dir = str(Path(__file__).parent.parent.absolute())
+
+# Remove current directory from sys.path temporarily to prevent our package from loading
+_sys_path_removed = False
+if _current_dir in sys.path:
+    sys.path.remove(_current_dir)
+    _sys_path_removed = True
+
+# Also remove the discord package if it was already loaded
 if 'discord' in sys.modules:
     existing = sys.modules['discord']
     # Check if it's our package (doesn't have Client) vs the library (has Client)
     if not hasattr(existing, 'Client'):
-        _our_discord_pkg = existing
-
-# Save the path to our package before removing it
-_discord_pkg_path = None
-if _our_discord_pkg:
-    _discord_pkg_path = _our_discord_pkg.__path__[0] if hasattr(_our_discord_pkg, '__path__') else None
-    # Remove our package and all its submodules
-    keys_to_remove = [k for k in sys.modules.keys() if k == 'discord' or k.startswith('discord.')]
-    for key in keys_to_remove:
-        del sys.modules[key]
+        # Remove our package and all its submodules
+        keys_to_remove = [k for k in sys.modules.keys() if k == 'discord' or k.startswith('discord.')]
+        for key in keys_to_remove:
+            del sys.modules[key]
 
 # Now import the actual discord.py library and put it in sys.modules
+# This will load from site-packages or wherever discord.py is installed
 import discord as discord_lib
 sys.modules['discord'] = discord_lib
 discord = discord_lib
 
-# Now we need to import our config module manually using importlib
-# since we removed 'discord' from sys.modules
-import importlib.util
-if _discord_pkg_path:
-    # Load config module directly from file
-    config_path = f"{_discord_pkg_path}/config.py"
-    config_spec = importlib.util.spec_from_file_location("discord.config", config_path)
-    if config_spec and config_spec.loader:
-        config = importlib.util.module_from_spec(config_spec)
-        config_spec.loader.exec_module(config)
-    else:
-        raise ImportError(f"Could not load config from {config_path}")
-else:
-    # Fallback: try normal import (shouldn't happen when running as module)
-    from discord import config
+# Restore current directory to sys.path so we can import our package modules
+if _sys_path_removed:
+    sys.path.insert(0, _current_dir)
+
+# Sanity check to ensure we loaded the real discord.py library
+logger = logging.getLogger(__name__)
+try:
+    discord_file = getattr(discord, '__file__', 'built-in')
+    has_member = hasattr(discord, 'Member')
+    logger.info(f"✅ Discord library loaded: {discord_file}")
+    logger.info(f"✅ Discord has Member: {has_member}")
+    if not has_member:
+        raise ImportError("Discord library not properly loaded - Member attribute missing")
+except Exception as e:
+    logger.error(f"❌ Discord library import failed: {e}")
+    raise
+
+# Now we can import our config module normally
+# The discord library is already in sys.modules, so our package will use it
+from discord import config
 
 # Ensure discord library stays in sys.modules
 sys.modules['discord'] = discord_lib
@@ -66,43 +77,13 @@ sys.modules['discord'] = discord_lib
 # and since discord library is in sys.modules, they'll get it correctly
 config._ensure_checks_done()
 
-# Helper function to import our package modules
-def _import_our_module(module_name):
-    """Import a module from our discord package."""
-    if _discord_pkg_path:
-        module_path = f"{_discord_pkg_path}/{module_name}.py"
-        spec = importlib.util.spec_from_file_location(f"discord.{module_name}", module_path)
-        if spec and spec.loader:
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            return module
-    raise ImportError(f"Could not import discord.{module_name}")
-
-# Import our package components using importlib
-if _discord_pkg_path:
-    clients_module = _import_our_module("clients/__init__")
-    RobustMCPClient = clients_module.RobustMCPClient
-    JarvisClientMCPClient = clients_module.JarvisClientMCPClient
-    
-    routers_module = _import_our_module("routers/__init__")
-    DiscordCommandRouter = routers_module.DiscordCommandRouter
-    
-    services_module = _import_our_module("services/__init__")
-    ConversationContext = services_module.ConversationContext
-    
-    utils_module = _import_our_module("utils/__init__")
-    send_long_message = utils_module.send_long_message
-    send_error_webhook = utils_module.send_error_webhook
-    
-    tool_executor_module = _import_our_module("handlers/tool_executor")
-    execute_intelligent_tool = tool_executor_module.execute_intelligent_tool
-else:
-    # Fallback: normal imports (shouldn't happen when running as module)
-    from discord.clients import RobustMCPClient, JarvisClientMCPClient
-    from discord.routers import DiscordCommandRouter
-    from discord.services import ConversationContext
-    from discord.utils import send_long_message, send_error_webhook
-    from discord.handlers.tool_executor import execute_intelligent_tool
+# Import our package components using normal imports
+# Since discord library is in sys.modules, relative imports in our submodules will work
+from discord.clients import RobustMCPClient, JarvisClientMCPClient
+from discord.routers import DiscordCommandRouter
+from discord.services import ConversationContext
+from discord.utils import send_long_message, send_error_webhook
+from discord.handlers.tool_executor import execute_intelligent_tool
 
 # Import optional components
 # The discord library should already be in sys.modules from config.py

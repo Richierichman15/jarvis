@@ -100,9 +100,11 @@ def _check_monitoring_available():
 def _check_music_player_available():
     """Check if music player is available (lazy import)."""
     try:
-        import jarvis_music_player
-        return True
-    except ImportError:
+        # Only verify that the discord library is the real one and supports voice
+        import importlib
+        discord_lib = importlib.import_module('discord')
+        return hasattr(discord_lib, 'Member') and hasattr(discord_lib, 'VoiceClient')
+    except Exception:
         return False
 
 def _check_mcp_client_available():
