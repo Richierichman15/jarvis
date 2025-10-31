@@ -4,7 +4,20 @@ import sys
 import logging
 from typing import Dict, Any, Optional
 
-from discord import config
+# Import config from discord_bot namespace
+try:
+    from discord_bot import config
+except ImportError:
+    # Fallback: try relative import if running as normal package
+    try:
+        from .. import config
+    except ImportError:
+        # Last resort: try importing discord_bot.config directly
+        import sys
+        if 'discord_bot.config' in sys.modules:
+            import discord_bot.config as config
+        else:
+            raise ImportError("Could not import config module")
 MCP_CLIENT_AVAILABLE = config.MCP_CLIENT_AVAILABLE
 
 if MCP_CLIENT_AVAILABLE:

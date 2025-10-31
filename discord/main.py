@@ -66,9 +66,26 @@ except Exception as e:
     logger.error(f"❌ Discord library import failed: {e}")
     raise
 
-# Now we can import our config module normally
-# The discord library is already in sys.modules, so our package will use it
-from discord import config
+# Now we need to import our config module
+# Since discord library is in sys.modules, we need to import our config using importlib
+# to avoid importing our discord package
+import importlib.util
+_discord_pkg_path = Path(__file__).parent.absolute()
+
+# Create discord_bot package namespace for our modules
+_discord_bot_pkg = type(sys)('discord_bot')
+_discord_bot_pkg.__path__ = [_discord_pkg_path]
+sys.modules['discord_bot'] = _discord_bot_pkg
+
+# Import config and put it in discord_bot namespace so submodules can import it
+config_path = _discord_pkg_path / "config.py"
+config_spec = importlib.util.spec_from_file_location("discord_bot.config", config_path)
+if config_spec and config_spec.loader:
+    config = importlib.util.module_from_spec(config_spec)
+    sys.modules['discord_bot.config'] = config
+    config_spec.loader.exec_module(config)
+else:
+    raise ImportError(f"Could not load config from {config_path}")
 
 # Ensure discord library stays in sys.modules
 sys.modules['discord'] = discord_lib
@@ -77,13 +94,39 @@ sys.modules['discord'] = discord_lib
 # and since discord library is in sys.modules, they'll get it correctly
 config._ensure_checks_done()
 
-# Import our package components using normal imports
-# Since discord library is in sys.modules, relative imports in our submodules will work
-from discord.clients import RobustMCPClient, JarvisClientMCPClient
-from discord.routers import DiscordCommandRouter
-from discord.services import ConversationContext
-from discord.utils import send_long_message, send_error_webhook
-from discord.handlers.tool_executor import execute_intelligent_tool
+# Import each module and put them in the discord_bot namespace
+def _import_package_module(module_path, module_name):
+    """Import a module from our discord package."""
+    full_path = _discord_pkg_path / f"{module_path}.py"
+    spec = importlib.util.spec_from_file_location(f"discord_bot.{module_name}", full_path)
+    if spec and spec.loader:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[f"discord_bot.{module_name}"] = module
+        spec.loader.exec_module(module)
+        return module
+    raise ImportError(f"Could not import {module_path}")
+
+# Import clients
+clients_init = _import_package_module("clients/__init__", "clients")
+RobustMCPClient = clients_init.RobustMCPClient
+JarvisClientMCPClient = clients_init.JarvisClientMCPClient
+
+# Import routers
+routers_init = _import_package_module("routers/__init__", "routers")
+DiscordCommandRouter = routers_init.DiscordCommandRouter
+
+# Import services
+services_init = _import_package_module("services/__init__", "services")
+ConversationContext = services_init.ConversationContext
+
+# Import utils
+utils_init = _import_package_module("utils/__init__", "utils")
+send_long_message = utils_init.send_long_message
+send_error_webhook = utils_init.send_error_webhook
+
+# Import handlers
+tool_executor = _import_package_module("handlers/tool_executor", "tool_executor")
+execute_intelligent_tool = tool_executor.execute_intelligent_tool
 
 # Import optional components
 # The discord library should already be in sys.modules from config.py

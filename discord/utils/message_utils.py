@@ -6,7 +6,20 @@ from typing import List
 from datetime import datetime
 import discord
 
-from discord import config
+# Import config from discord_bot namespace
+try:
+    from discord_bot import config
+except ImportError:
+    # Fallback: try relative import if running as normal package
+    try:
+        from .. import config
+    except ImportError:
+        # Last resort: try importing discord_bot.config directly
+        import sys
+        if 'discord_bot.config' in sys.modules:
+            import discord_bot.config as config
+        else:
+            raise ImportError("Could not import config module")
 
 logger = logging.getLogger(__name__)
 
