@@ -11,14 +11,23 @@ Usage:
 
 import asyncio
 import aiohttp
-import discord
 import logging
 import sys
+import importlib
 from datetime import datetime
 from typing import Optional
 
-# Import configuration
+# CRITICAL: Import the actual discord.py library FIRST
+# Then import our discord package with an alias to avoid conflicts
+import discord as discord_lib  # The actual discord.py library
+
+# Import configuration from our discord package
+# Use importlib to explicitly import our package
+_discord_pkg = importlib.import_module('discord')
 from discord import config
+
+# Now discord refers to the library, but we can access our package via _discord_pkg if needed
+discord = discord_lib  # Ensure discord refers to the library
 
 # Import components
 from discord.clients import RobustMCPClient, JarvisClientMCPClient
@@ -28,8 +37,18 @@ from discord.utils import send_long_message, send_error_webhook
 from discord.handlers.tool_executor import execute_intelligent_tool
 
 # Import optional components
+# Ensure discord library is in sys.modules before importing jarvis_event_listener
 try:
-    from jarvis_event_listener import TradingEventListener
+    # Temporarily remove our discord package from sys.modules so jarvis_event_listener gets the library
+    _discord_pkg = sys.modules.pop('discord', None)
+    try:
+        from jarvis_event_listener import TradingEventListener
+    finally:
+        # Restore our discord package
+        if _discord_pkg:
+            sys.modules['discord'] = _discord_pkg
+        # But ensure the library is also available as 'discord'
+        sys.modules['discord'] = _discord_lib
 except ImportError:
     TradingEventListener = None
 

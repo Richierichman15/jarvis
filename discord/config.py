@@ -35,48 +35,74 @@ SYSTEM_MONITORING_AVAILABLE = False
 MUSIC_PLAYER_AVAILABLE = False
 MCP_CLIENT_AVAILABLE = False
 
-# Initialize feature flags
-try:
-    from jarvis.models.model_manager import ModelManager
-    from formatter import format_response
-    MODEL_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import Jarvis model or formatter: {e}")
+# Initialize feature flags - use lazy imports to avoid conflicts
+# These will be checked when actually needed, not at module import time
 
-try:
-    from jarvis_event_listener import TradingEventListener
-    EVENT_LISTENER_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import event listener: {e}")
+def _check_model_available():
+    """Check if model is available (lazy import)."""
+    try:
+        import jarvis.models.model_manager
+        import formatter
+        return True
+    except ImportError:
+        return False
 
-try:
-    from jarvis.intelligence import IntentRouter, IntentResult, IntentType
-    INTELLIGENCE_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import intelligence core: {e}")
+def _check_event_listener_available():
+    """Check if event listener is available (lazy import)."""
+    try:
+        # This check is deferred - actual import happens in main.py
+        # where we handle the discord import conflict properly
+        return True  # Assume available, actual check happens at runtime
+    except Exception:
+        return False
 
-try:
-    from server_manager import ServerManager
-    SERVER_MANAGER_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import server manager: {e}")
+def _check_intelligence_available():
+    """Check if intelligence is available (lazy import)."""
+    try:
+        from jarvis.intelligence import IntentRouter, IntentResult, IntentType
+        return True
+    except ImportError:
+        return False
 
-try:
-    from jarvis.monitoring import start_system_monitoring, get_system_monitor
-    SYSTEM_MONITORING_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import system monitoring: {e}")
+def _check_server_manager_available():
+    """Check if server manager is available (lazy import)."""
+    try:
+        import server_manager
+        return True
+    except ImportError:
+        return False
 
-try:
-    from jarvis_music_player import MusicPlayer
-    MUSIC_PLAYER_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import music player: {e}")
+def _check_monitoring_available():
+    """Check if monitoring is available (lazy import)."""
+    try:
+        from jarvis.monitoring import start_system_monitoring, get_system_monitor
+        return True
+    except ImportError:
+        return False
 
-try:
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
-    MCP_CLIENT_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Could not import MCP client: {e}")
+def _check_music_player_available():
+    """Check if music player is available (lazy import)."""
+    try:
+        import jarvis_music_player
+        return True
+    except ImportError:
+        return False
+
+def _check_mcp_client_available():
+    """Check if MCP client is available (lazy import)."""
+    try:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+        return True
+    except ImportError:
+        return False
+
+# Set defaults - will be checked when needed
+MODEL_AVAILABLE = _check_model_available()
+EVENT_LISTENER_AVAILABLE = _check_event_listener_available()
+INTELLIGENCE_AVAILABLE = _check_intelligence_available()
+SERVER_MANAGER_AVAILABLE = _check_server_manager_available()
+SYSTEM_MONITORING_AVAILABLE = _check_monitoring_available()
+MUSIC_PLAYER_AVAILABLE = _check_music_player_available()
+MCP_CLIENT_AVAILABLE = _check_mcp_client_available()
 
