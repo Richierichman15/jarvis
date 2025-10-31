@@ -237,10 +237,10 @@ class IntentRouter:
             "balance": {"tool": "trading.get_portfolio_balance", "server": "trading"},
             "positions": {"tool": "portfolio.get_positions", "server": "trading"},
             "trades": {"tool": "trading.get_recent_executions", "server": "trading"},
-            "price": {"tool": "trading.get_momentum_signals", "server": "trading"},
-            "momentum": {"tool": "trading.get_momentum_signals", "server": "trading"},
-            "pnl": {"tool": "portfolio.get_performance", "server": "trading"},
-            "doctor": {"tool": "trading.get_momentum_signals", "server": "trading"},
+            "price": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
+            "momentum": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
+            "pnl": {"tool": "trading.portfolio.get_performance", "server": "jarvis"},
+            "doctor": {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"},
             
             # Paper trading mappings
             "paper_portfolio": {"tool": "paper.get_portfolio", "server": "trading"},
@@ -388,7 +388,7 @@ class IntentRouter:
                 # Convert prompt to message format for model manager
                 messages = [{"role": "system", "content": "You are an intelligent intent analysis system."},
                            {"role": "user", "content": prompt}]
-                response = self.model_manager.generate_response(messages)
+                response = await self.model_manager.generate_response(messages)
             elif BRAIN_AVAILABLE:
                 response = await brain_generate(prompt)
             else:

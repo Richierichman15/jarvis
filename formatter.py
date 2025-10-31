@@ -141,7 +141,7 @@ Improve readability while keeping all facts intact. Use Discord markdown where h
             logger.info(f"Using {max_tokens} max tokens for response formatting")
             
             # Call the AI model to format the response
-            formatted = self.model_manager.generate(
+            formatted = await self.model_manager.generate(
                 prompt=prompt,
                 system_prompt=self.system_prompt,
                 temperature=0.7,

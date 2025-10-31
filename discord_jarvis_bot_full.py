@@ -1240,18 +1240,23 @@ async def execute_intelligent_tool(intent_result: 'IntentResult', message: disco
         server = "jarvis"  # Default server
         
         # Determine server based on tool name
+        # Note: Most tools go through "jarvis" server which proxies to other MCP servers
         if tool_name.startswith("music_"):
             server = "local"
         elif tool_name.startswith("events_"):
             server = "local"
+        elif tool_name.startswith("trading.trading.") or tool_name.startswith("trading.portfolio.") or tool_name.startswith("trading.paper."):
+            # Trading tools go through jarvis server (which routes to trading MCP server)
+            server = "jarvis"
         elif tool_name.startswith("trading."):
-            server = "trading"
+            # Other trading tools also go through jarvis
+            server = "jarvis"
         elif tool_name.startswith("system."):
             server = "jarvis"
         elif tool_name.startswith("jarvis_"):
             server = "jarvis"
         elif tool_name.startswith("search."):
-            server = "search"
+            server = "jarvis"  # Search also goes through jarvis
         
         logger.info(f"🔧 Executing intelligent tool: {tool_name} on server: {server}")
         logger.info(f"📝 Arguments: {arguments}")
