@@ -18,7 +18,6 @@ Environment Variables:
 
 import asyncio
 import aiohttp
-import discord
 import logging
 import os
 import sys
@@ -26,6 +25,37 @@ import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from dotenv import load_dotenv
+from pathlib import Path
+
+# CRITICAL: Ensure we import the actual discord.py library, not our local discord/ package
+# Remove current directory from sys.path temporarily to avoid importing our local discord/ package
+_current_dir = str(Path(__file__).parent.absolute())
+if _current_dir in sys.path:
+    sys.path.remove(_current_dir)
+
+# Remove our discord package from sys.modules if it's already loaded
+if 'discord' in sys.modules:
+    existing = sys.modules['discord']
+    if not hasattr(existing, 'TextChannel'):
+        # It's our package, remove it and all submodules
+        keys_to_remove = [k for k in list(sys.modules.keys()) if k == 'discord' or k.startswith('discord.')]
+        for key in keys_to_remove:
+            sys.modules.pop(key, None)
+
+# Now import discord.py library
+import discord
+
+# Verify we got the right one
+if not hasattr(discord, 'TextChannel'):
+    raise ImportError(
+        "Failed to import discord.py library. "
+        "The local 'discord/' package is shadowing the discord.py library. "
+        "Please ensure discord.py is installed: pip install discord.py"
+    )
+
+# Restore sys.path
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
 
 # Import Jarvis AI model and formatter
 try:
@@ -511,10 +541,7 @@ class AgentToolRouter:
             "system.list_goals": (AgentCapability.SYSTEM, "list_goals"),
             "system.get_level": (AgentCapability.SYSTEM, "get_level"),
             
-            # Research commands
-            "jarvis_scan_news": (AgentCapability.RESEARCH, "scan_news"),
-            "jarvis_web_search": (AgentCapability.RESEARCH, "web_search"),
-            "search.web.search": (AgentCapability.RESEARCH, "web_search"),
+            # Research commands - removed agent routing, go directly to MCP
         }
     
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any] = None) -> str:
@@ -1219,8 +1246,11 @@ async def execute_intelligent_tool(intent_result: 'IntentResult', message: disco
         tool_name = intent_result.tool_name
         arguments = intent_result.arguments
         
-        # Try agent system first
-        if agent_manager is not None:
+        # Skip agent system for search/news - go directly to MCP
+        if tool_name in ("jarvis_web_search", "jarvis_scan_news", "search.web.search"):
+            logger.info(f"🔍 Search/news command - skipping agent system, going directly to MCP")
+        # Try agent system first for other tools
+        elif agent_manager is not None:
             try:
                 agent_router = AgentToolRouter(agent_manager)
                 result = await agent_router.call_tool(tool_name, arguments)

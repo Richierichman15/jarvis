@@ -245,6 +245,46 @@ class JarvisMCPServer:
                     texts.append(str(content.get("text") or ""))
             return "\n".join(t for t in texts if t)
         return str(result)
+    
+    def _format_search_results(self, results: List[Dict[str, Any]], query: str, max_chars: int = 2000) -> str:
+        """Format search results into a readable string under max_chars."""
+        if not results:
+            return f"🔎 No results found for '{query}'"
+        
+        formatted = f"🔎 **Search Results for '{query}'**\n\n"
+        
+        for i, result in enumerate(results[:10], 1):  # Limit to 10 results
+            if isinstance(result, dict):
+                title = result.get("title", "No title")
+                url = result.get("url", result.get("href", ""))
+                snippet = result.get("snippet", result.get("body", ""))
+                
+                # Truncate snippet if needed
+                max_snippet_len = 150
+                if len(snippet) > max_snippet_len:
+                    snippet = snippet[:max_snippet_len] + "..."
+                
+                result_text = f"{i}. **{title}**\n"
+                if url:
+                    result_text += f"   {url}\n"
+                if snippet:
+                    result_text += f"   {snippet}\n"
+                
+                # Check if adding this result would exceed limit
+                if len(formatted) + len(result_text) + 10 > max_chars:
+                    break
+                
+                formatted += result_text + "\n"
+        
+        # Trim to exact limit if needed
+        if len(formatted) > max_chars:
+            formatted = formatted[:max_chars-3] + "..."
+        
+        return formatted.strip()
+    
+    def _is_ai_available(self) -> bool:
+        """Check if AI model is available for summarization."""
+        return BRAIN_AVAILABLE
 
     async def send_to_discord(self, message: str) -> Optional[TextContent]:
         """Send a message to Discord via webhook.
@@ -439,38 +479,51 @@ class JarvisMCPServer:
                 
                 # Parse JSON results
                 try:
-                    results = json.loads(text)
-                    if not isinstance(results, list):
+                    data = json.loads(text)
+                    # Handle both dict with "results" key and direct list
+                    if isinstance(data, dict):
+                        results = data.get("results", [])
+                    elif isinstance(data, list):
+                        results = data
+                    else:
                         results = []
                 except (json.JSONDecodeError, TypeError):
                     results = []
                 
-                # Format top 5 results into readable context
-                context_parts = []
-                for i, result in enumerate(results[:5], 1):
-                    if isinstance(result, dict):
-                        title = result.get("title", "No title")
-                        url = result.get("url", "No URL")
-                        snippet = result.get("snippet", "No snippet")
-                        context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
+                # If AI is available, try to get a summary
+                if self._is_ai_available() and results:
+                    try:
+                        # Format top 5 results for AI context
+                        context_parts = []
+                        for i, result in enumerate(results[:5], 1):
+                            if isinstance(result, dict):
+                                title = result.get("title", "No title")
+                                url = result.get("url", result.get("href", ""))
+                                snippet = result.get("snippet", result.get("body", ""))
+                                context_parts.append(f"{i}. {title}\n   {url}\n   {snippet[:200]}")
+                        
+                        if context_parts:
+                            context = "\n\n".join(context_parts)
+                            prompt = f"Based on these search results for '{query}':\n\n{context}\n\nPlease provide a helpful summary and analysis."
+                            chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
+                            chat_text = self._extract_text_content(chat_response[0]) if chat_response else None
+                            
+                            if chat_text and not chat_text.startswith("Error") and len(chat_text) < 2000:
+                                return [TextContent(type="text", text=f"🔎 Results for '{query}':\n\n{chat_text}")]
+                    except Exception as e:
+                        logger.warning(f"AI summarization failed, using formatted results: {e}")
                 
-                if context_parts:
-                    context = "\n\n".join(context_parts)
-                    prompt = f"Based on these search results for '{query}':\n\n{context}\n\nPlease provide a helpful summary and analysis."
-                else:
-                    prompt = f"I searched for '{query}' but didn't find any structured results. The raw response was: {text[:500]}..."
+                # Fallback: format results directly (under 2000 chars)
+                formatted = self._format_search_results(results, query, max_chars=2000)
+                return [TextContent(type="text", text=formatted)]
                 
-                # Send to jarvis_chat tool
-                chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
-                chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
-                
-                return [TextContent(type="text", text=f"🔎 Results for '{query}':\n\n{chat_text}")]
             except Exception as e:
                 logger.error("Proxy search failed: %s", e)
-                return [TextContent(type="text", text=f"Search proxy failed: {e}")]
+                return [TextContent(type="text", text=f"Search failed: {e}")]
 
         if name == "jarvis_scan_news":
-            topics = ["AI", "Crypto and Web3", "Finance and Trading Tech", "Automation", "Emerging Tech", "Economics"]
+            # Reduced topics for faster scanning
+            topics = ["AI", "Crypto and Web3", "Finance and Trading Tech"]
             
             if not self._is_external_server_connected("search"):
                 return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
@@ -480,10 +533,11 @@ class JarvisMCPServer:
                 return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
             
             all_summaries = []
+            ai_available = self._is_ai_available()
             
-            for topic in topics:
+            # Process topics in parallel for speed
+            async def process_topic(topic: str) -> str:
                 try:
-                    # Search for news on this topic
                     response = await self._invoke_external_tool(params, "web.search", {"query": f"{topic} news"})
                     text = self._extract_text_content(response)
                     
@@ -494,34 +548,51 @@ class JarvisMCPServer:
                     except (json.JSONDecodeError, TypeError):
                         results = []
                     
-                    # Format top 5 results into readable context
-                    context_parts = []
-                    for i, result in enumerate(results[:5], 1):
-                        if isinstance(result, dict):
-                            title = result.get("title", "No title")
-                            url = result.get("url", "No URL")
-                            snippet = result.get("snippet", "No snippet")
-                            context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
+                    if not results:
+                        return f"## {topic}\n\nNo recent news found."
                     
-                    if context_parts:
-                        context = "\n\n".join(context_parts)
-                        prompt = f"Based on these recent news articles about {topic}:\n\n{context}\n\nPlease provide a concise summary of the key developments and trends in this area."
-                    else:
-                        prompt = f"I searched for recent {topic} news but didn't find any structured results. The raw response was: {text[:300]}..."
+                    # If AI available, try to get summary
+                    if ai_available:
+                        try:
+                            context_parts = []
+                            for i, result in enumerate(results[:3], 1):  # Top 3 for speed
+                                if isinstance(result, dict):
+                                    title = result.get("title", "No title")
+                                    url = result.get("url", result.get("href", ""))
+                                    snippet = result.get("snippet", result.get("body", ""))
+                                    context_parts.append(f"{i}. {title}\n   {url}\n   {snippet[:150]}")
+                            
+                            if context_parts:
+                                context = "\n\n".join(context_parts)
+                                prompt = f"Recent {topic} news:\n\n{context}\n\nProvide a brief summary (2-3 sentences)."
+                                chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
+                                chat_text = self._extract_text_content(chat_response[0]) if chat_response else None
+                                
+                                if chat_text and not chat_text.startswith("Error"):
+                                    return f"## {topic}\n\n{chat_text}"
+                        except Exception as e:
+                            logger.warning(f"AI summary failed for {topic}, using formatted results: {e}")
                     
-                    # Send to jarvis_chat tool
-                    chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
-                    chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
-                    
-                    all_summaries.append(f"## {topic}\n\n{chat_text}")
+                    # Fallback: format results directly
+                    formatted = self._format_search_results(results[:3], f"{topic} news", max_chars=600)
+                    return f"## {topic}\n\n{formatted}"
                     
                 except Exception as e:
                     logger.error(f"News scan failed for topic '{topic}': {e}")
-                    all_summaries.append(f"## {topic}\n\nError scanning news for this topic: {str(e)}")
+                    return f"## {topic}\n\nError: {str(e)}"
             
-            # Combine all summaries
-            combined_summary = "\n\n".join(all_summaries)
-            return [TextContent(type="text", text=f"📰 **Daily Tech News Scan**\n\n{combined_summary}")]
+            # Process all topics
+            import asyncio
+            results = await asyncio.gather(*[process_topic(topic) for topic in topics])
+            all_summaries = results
+            
+            # Combine all summaries, ensuring total is under 2000 chars
+            combined = "📰 **Tech News Scan**\n\n" + "\n\n".join(all_summaries)
+            if len(combined) > 2000:
+                # Truncate if needed
+                combined = combined[:1997] + "..."
+            
+            return [TextContent(type="text", text=combined)]
 
         if name == "jarvis_trigger_n8n":
             if not AIOHTTP_AVAILABLE:
@@ -908,106 +979,12 @@ class JarvisMCPServer:
                     return [TextContent(type="text", text=settings_text)]
                 
                 elif name == "jarvis_web_search":
-                    query = (arguments or {}).get("query", "")
-                    if not query:
-                        return [TextContent(type="text", text="Error: No search query provided")]
-
-                    if not self._is_external_server_connected("search"):
-                        return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
-
-                    params = self._load_saved_server_command("search")
-                    if params is None:
-                        return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
-
-                    try:
-                        response = await self._invoke_external_tool(params, "web.search", {"query": query})
-                        text = self._extract_text_content(response)
-                        
-                        # Parse JSON results
-                        try:
-                            results = json.loads(text)
-                            if not isinstance(results, list):
-                                results = []
-                        except (json.JSONDecodeError, TypeError):
-                            results = []
-                        
-                        # Format top 5 results into readable context
-                        context_parts = []
-                        for i, result in enumerate(results[:5], 1):
-                            if isinstance(result, dict):
-                                title = result.get("title", "No title")
-                                url = result.get("url", "No URL")
-                                snippet = result.get("snippet", "No snippet")
-                                context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
-                        
-                        if context_parts:
-                            context = "\n\n".join(context_parts)
-                            prompt = f"Based on these search results for '{query}':\n\n{context}\n\nPlease provide a helpful summary and analysis."
-                        else:
-                            prompt = f"I searched for '{query}' but didn't find any structured results. The raw response was: {text[:500]}..."
-                        
-                        # Send to jarvis_chat tool
-                        chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
-                        chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
-                        
-                        return [TextContent(type="text", text=f"🔎 Results for '{query}':\n\n{chat_text}")]
-                    except Exception as e:
-                        logger.error("Proxy search failed: %s", e)
-                        return [TextContent(type="text", text=f"Search proxy failed: {e}")]
+                    # Delegate to _dispatch_tool to avoid duplication
+                    return await self._dispatch_tool("jarvis_web_search", arguments)
                 
                 elif name == "jarvis_scan_news":
-                    topics = ["AI", "Crypto and Web3", "Finance and Trading Tech", "Automation", "Emerging Tech", "Economics"]
-                    
-                    if not self._is_external_server_connected("search"):
-                        return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
-                    
-                    params = self._load_saved_server_command("search")
-                    if params is None:
-                        return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
-                    
-                    all_summaries = []
-                    
-                    for topic in topics:
-                        try:
-                            # Search for news on this topic
-                            response = await self._invoke_external_tool(params, "web.search", {"query": f"{topic} news"})
-                            text = self._extract_text_content(response)
-                            
-                            # Parse JSON results
-                            try:
-                                data = json.loads(text)
-                                results = data.get("results", []) if isinstance(data, dict) else []
-                            except (json.JSONDecodeError, TypeError):
-                                results = []
-                            
-                            # Format top 5 results into readable context
-                            context_parts = []
-                            for i, result in enumerate(results[:5], 1):
-                                if isinstance(result, dict):
-                                    title = result.get("title", "No title")
-                                    url = result.get("url", "No URL")
-                                    snippet = result.get("snippet", "No snippet")
-                                    context_parts.append(f"{i}. **{title}**\n   URL: {url}\n   {snippet}")
-                            
-                            if context_parts:
-                                context = "\n\n".join(context_parts)
-                                prompt = f"Based on these recent news articles about {topic}:\n\n{context}\n\nPlease provide a concise summary of the key developments and trends in this area."
-                            else:
-                                prompt = f"I searched for recent {topic} news but didn't find any structured results. The raw response was: {text[:300]}..."
-                            
-                            # Send to jarvis_chat tool
-                            chat_response = await self._dispatch_tool("jarvis_chat", {"message": prompt})
-                            chat_text = self._extract_text_content(chat_response[0]) if chat_response else "No response from chat"
-                            
-                            all_summaries.append(f"## {topic}\n\n{chat_text}")
-                            
-                        except Exception as e:
-                            logger.error(f"News scan failed for topic '{topic}': {e}")
-                            all_summaries.append(f"## {topic}\n\nError scanning news for this topic: {str(e)}")
-                    
-                    # Combine all summaries
-                    combined_summary = "\n\n".join(all_summaries)
-                    return [TextContent(type="text", text=f"📰 **Daily Tech News Scan**\n\n{combined_summary}")]
+                    # Delegate to _dispatch_tool to avoid duplication
+                    return await self._dispatch_tool("jarvis_scan_news", arguments)
 
                 elif name == "jarvis_trigger_n8n":
                     if not AIOHTTP_AVAILABLE:

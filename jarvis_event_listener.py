@@ -4,11 +4,46 @@ Jarvis Event Listener - Subscribes to trading MCP server events and sends Discor
 
 import asyncio
 import aiohttp
-import discord
+import sys
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from collections import deque
+
+# CRITICAL: Ensure we import the actual discord.py library, not our local discord/ package
+# This prevents AttributeError when accessing discord.TextChannel, discord.Member, etc.
+
+# First, temporarily remove current directory from sys.path if discord/ folder exists
+import os
+from pathlib import Path
+_current_dir = str(Path(__file__).parent.absolute())
+if _current_dir in sys.path:
+    sys.path.remove(_current_dir)
+
+# Remove our discord package from sys.modules if it's already loaded
+if 'discord' in sys.modules:
+    existing = sys.modules['discord']
+    # Check if it's our package (doesn't have TextChannel) or the library (has TextChannel)
+    if not hasattr(existing, 'TextChannel'):
+        # It's our package, remove it and all submodules
+        keys_to_remove = [k for k in list(sys.modules.keys()) if k == 'discord' or k.startswith('discord.')]
+        for key in keys_to_remove:
+            sys.modules.pop(key, None)
+
+# Now import discord.py library
+import discord
+
+# Verify we got the right one
+if not hasattr(discord, 'TextChannel'):
+    raise ImportError(
+        "Failed to import discord.py library. "
+        "The local 'discord/' package is shadowing the discord.py library. "
+        "Please ensure discord.py is installed: pip install discord.py"
+    )
+
+# Restore sys.path
+if _current_dir not in sys.path:
+    sys.path.insert(0, _current_dir)
 
 logger = logging.getLogger(__name__)
 

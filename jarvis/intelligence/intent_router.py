@@ -445,23 +445,31 @@ ANALYZE THE REQUEST:
     def _correct_tool_name(self, tool_name: str) -> str:
         """Correct common tool name mistakes made by LLM."""
         corrections = {
-            # Trading tool corrections
+            # Trading tool corrections - ensure all use full prefix format
             "trading.get_momentum_signals": "trading.trading.get_momentum_signals",
             "trading.get_balance": "trading.trading.get_portfolio_balance",
             "trading.get_portfolio_balance": "trading.trading.get_portfolio_balance",
             "trading.get_price": "trading.trading.get_price",
             "trading.get_recent_executions": "trading.trading.get_recent_executions",
-            "trading.get_portfolio": "portfolio.get_overview",
+            # Portfolio corrections - map to full trading.portfolio.* format
+            "trading.get_portfolio": "trading.portfolio.get_overview",
             "portfolio.get_overview": "trading.portfolio.get_overview",
             "portfolio.get_positions": "trading.portfolio.get_positions",
             "portfolio.get_trades": "trading.portfolio.get_trades",
             "portfolio.get_performance": "trading.portfolio.get_performance",
+            "get_portfolio": "trading.portfolio.get_overview",
+            "get_positions": "trading.portfolio.get_positions",
+            "get_trades": "trading.portfolio.get_trades",
+            "get_performance": "trading.portfolio.get_performance",
             "pnl": "trading.portfolio.get_performance",
             # Paper trading corrections
             "paper.get_portfolio": "trading.paper.get_portfolio",
             "paper.get_balance": "trading.paper.get_balance",
             "paper.get_performance": "trading.paper.get_performance",
             "paper.get_trades": "trading.paper.get_trades",
+            # Balance corrections
+            "get_balance": "trading.trading.get_portfolio_balance",
+            "balance": "trading.trading.get_portfolio_balance",
         }
         corrected = corrections.get(tool_name, tool_name)
         if corrected != tool_name:

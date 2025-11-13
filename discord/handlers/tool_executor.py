@@ -78,6 +78,12 @@ async def execute_intelligent_tool(
         # Try robust MCP client first (like CLI uses)
         if robust_mcp_client:
             try:
+                # For jarvis_chat, ensure message argument is present
+                if tool_name == "jarvis_chat" and "message" not in arguments:
+                    if message and hasattr(message, 'content'):
+                        arguments = arguments.copy()
+                        arguments["message"] = message.content
+                
                 result = await robust_mcp_client.call_tool(tool_name, arguments, server)
                 if not result.startswith("Server '") and not result.startswith("Error calling tool:"):
                     logger.info(f"✅ Tool executed by robust MCP client: {tool_name}")
@@ -89,7 +95,11 @@ async def execute_intelligent_tool(
         
         # Final fallback to HTTP client
         if tool_name == "jarvis_chat":
-            return await jarvis_client.natural_language_query(arguments.get("message", ""))
+            # jarvis_chat requires a "message" argument - use message content if not provided
+            message_content = arguments.get("message", "")
+            if not message_content and message and hasattr(message, 'content'):
+                message_content = message.content
+            return await jarvis_client.natural_language_query(message_content)
         else:
             return await jarvis_client.call_tool(tool_name, arguments, server)
             
