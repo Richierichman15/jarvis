@@ -66,6 +66,13 @@ except ImportError as e:
     logging.warning(f"Could not import Jarvis model or formatter: {e}")
     MODEL_AVAILABLE = False
 
+try:
+    from jarvis.ollama_lifecycle import OllamaLifecycle
+    OLLAMA_LIFECYCLE_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Could not import Ollama lifecycle: {e}")
+    OLLAMA_LIFECYCLE_AVAILABLE = False
+
 # Import event listener
 try:
     from jarvis_event_listener import TradingEventListener
@@ -1336,6 +1343,7 @@ EVENT_NOTIFICATION_CHANNEL_ID = os.getenv('EVENT_NOTIFICATION_CHANNEL_ID', None)
 # Global variables
 agent_manager = None  # Global agent manager instance
 robust_mcp_client = None  # Global robust MCP client instance
+ollama_lifecycle: Optional["OllamaLifecycle"] = None
 
 
 @client.event
@@ -1770,7 +1778,7 @@ async def send_error_webhook(error_msg: str, original_message: str):
 
 async def cleanup():
     """Cleanup resources on shutdown."""
-    global session, event_listener, music_player
+    global session, event_listener, music_player, ollama_lifecycle
     
     # Stop event monitoring if running
     if event_listener:
@@ -1791,6 +1799,13 @@ async def cleanup():
     if session:
         await session.close()
         logger.info("Closed aiohttp session")
+
+    if ollama_lifecycle:
+        try:
+            await ollama_lifecycle.stop()
+        except Exception as e:
+            logger.error(f"Error stopping Ollama: {e}")
+        ollama_lifecycle = None
 
 
 @client.event
@@ -1878,6 +1893,8 @@ async def connection_monitor():
 
 async def main():
     """Main entry point with enhanced error handling and monitoring."""
+    global ollama_lifecycle
+
     # Debug: Show loaded environment variables (without exposing tokens)
     logger.info("Environment variables loaded:")
     logger.info(f"DISCORD_BOT_TOKEN: {'SET' if DISCORD_BOT_TOKEN and DISCORD_BOT_TOKEN != 'YOUR_DISCORD_BOT_TOKEN_HERE' else 'NOT SET'}")
@@ -1894,7 +1911,18 @@ async def main():
     
     logger.info("Starting Full-Featured Discord Jarvis Bot...")
     logger.info(f"Connecting to Jarvis Client HTTP Server: {JARVIS_CLIENT_URL}")
-    
+
+    # Start Ollama when the bot starts (stop on exit if we started it)
+    if OLLAMA_LIFECYCLE_AVAILABLE and os.getenv("OLLAMA_MANAGED_LIFECYCLE", "1") != "0":
+        try:
+            ollama_lifecycle = OllamaLifecycle()
+            if await ollama_lifecycle.start():
+                logger.info("✅ Ollama ready for Discord bot")
+            else:
+                logger.warning("⚠️ Ollama could not be started — AI formatting may be limited")
+        except Exception as e:
+            logger.warning(f"⚠️ Ollama lifecycle error: {e}")
+
     # Start connection monitor task
     monitor_task = None
     

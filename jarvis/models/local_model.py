@@ -103,11 +103,19 @@ class OllamaModel:
                     start_new_session=True
                 )
             else:  # Windows
+                from jarvis.ollama_lifecycle import find_ollama_executable
+
+                exe = find_ollama_executable()
+                if not exe:
+                    logger.error("ollama.exe not found; set OLLAMA_EXE or add Ollama to PATH")
+                    return False
                 subprocess.Popen(
-                    ["ollama", "serve"],
+                    [exe, "serve"],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     creationflags=subprocess.CREATE_NO_WINDOW
+                    if hasattr(subprocess, "CREATE_NO_WINDOW")
+                    else 0,
                 )
             
             # Give it a moment to start
@@ -210,65 +218,69 @@ class OllamaModel:
         return "Error: Failed to get a response from the local model after multiple attempts."
     
     async def is_available(self) -> bool:
-        """Check if the model is available and responding.
-        
-        Returns:
-            True if model is available, False otherwise
-        """
-        logger.info(f"Checking availability of local model: {self.model_name}")
-        
-        # First, check if Ollama service is running
+        """Check if the model is available and responding."""
+        logger.info("Checking availability of local model: %s", self.model_name)
+
         if not self._restart_ollama_if_needed():
             logger.error("Ollama service is not running and could not be started")
             return False
-        
-        # Give Ollama a few seconds to initialize if just started
+
         max_retries = 3
-        retry_delay = 2  # seconds
-        
+        retry_delay = 2
+
         for attempt in range(max_retries):
             try:
-                # Simple test query to check if model is responding
-                payload = {
-                    "model": self.model_name,
-                    "prompt": "Hello",
-                    "max_tokens": 1,
-                    "stream": False  # Important to get a single response
-                }
-                logger.info(f"Sending test request to {self.generate_endpoint} (attempt {attempt+1}/{max_retries})")
-                
-                # Use async HTTP request with shorter timeout
                 async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"{self.base_url}/api/tags",
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as tags_resp:
+                        if tags_resp.status == 200:
+                            data = await tags_resp.json()
+                            names = {m.get("name", "") for m in data.get("models", [])}
+                            if self.model_name in names or f"{self.model_name}:latest" in names:
+                                logger.info("Local model available (tags): %s", self.model_name)
+                                return True
+                            for name in names:
+                                if name == self.model_name or name.startswith(f"{self.model_name}:"):
+                                    logger.info("Local model available (tags): %s", name)
+                                    return True
+
+                    payload = {
+                        "model": self.model_name,
+                        "prompt": "Hello",
+                        "max_tokens": 1,
+                        "stream": False,
+                    }
+                    logger.info(
+                        "Sending test request to %s (attempt %s/%s)",
+                        self.generate_endpoint,
+                        attempt + 1,
+                        max_retries,
+                    )
                     async with session.post(
-                        self.generate_endpoint, 
-                        json=payload, 
-                        timeout=aiohttp.ClientTimeout(total=5)  # Much shorter timeout
+                        self.generate_endpoint,
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=45),
                     ) as response:
-                        is_available = response.status == 200
-                        logger.info(f"Local model available: {is_available}, Status code: {response.status}")
-                        
-                        if is_available:
+                        if response.status == 200:
+                            logger.info("Local model available, status 200")
                             return True
-                            
-                        # If model not found, let the user know
                         if response.status == 404:
-                            logger.error(f"Model '{self.model_name}' not found in Ollama")
+                            logger.error("Model '%s' not found in Ollama", self.model_name)
                             return False
-                
-                # If not available, wait before retrying
+
                 if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    logger.info("Retrying in %s seconds...", retry_delay)
                     await asyncio.sleep(retry_delay)
-                    
+
             except asyncio.TimeoutError:
-                logger.error(f"Timeout when checking local model availability (attempt {attempt+1})")
+                logger.error("Timeout when checking local model availability (attempt %s)", attempt + 1)
                 if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
                     await asyncio.sleep(retry_delay)
             except Exception as e:
-                logger.error(f"Exception when checking local model availability: {str(e)}")
+                logger.error("Exception when checking local model availability: %s", e)
                 if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
                     await asyncio.sleep(retry_delay)
-        
+
         return False 

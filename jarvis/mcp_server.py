@@ -223,7 +223,40 @@ class JarvisMCPServer:
         if not command:
             return None
 
-        return StdioServerParameters(command=command, args=args)
+        cwd = entry.get("cwd")
+        env = entry.get("env")
+        return StdioServerParameters(command=command, args=args, cwd=cwd, env=env)
+
+    def _stdio_params_usable(self, params: StdioServerParameters) -> bool:
+        cmd_path = Path(str(params.command))
+        if cmd_path.suffix.lower() in {".exe", ".cmd", ".bat"} and not cmd_path.is_file():
+            return False
+        args = params.args or []
+        if args:
+            script = Path(str(args[-1]))
+            if script.suffix.lower() == ".py" and not script.is_file():
+                return False
+        return True
+
+    def _resolve_external_stdio_params(self, alias: str) -> Optional[StdioServerParameters]:
+        """Load saved MCP server params or use built-in defaults for this repo."""
+        params = self._load_saved_server_command(alias)
+        if params is not None and self._stdio_params_usable(params):
+            return params
+
+        if alias == "search":
+            script = PROJECT_ROOT / "search" / "mcp_server.py"
+            if script.is_file():
+                child_env = dict(os.environ)
+                child_env["PYTHONUNBUFFERED"] = "1"
+                child_env["JARVIS_MCP_STDIO_CHILD"] = "1"
+                return StdioServerParameters(
+                    command=sys.executable,
+                    args=["-u", str(script.resolve())],
+                    cwd=str(PROJECT_ROOT),
+                    env=child_env,
+                )
+        return None
 
     async def _invoke_external_tool(
         self,
@@ -471,11 +504,9 @@ class JarvisMCPServer:
             query = (arguments or {}).get("query", "")
             if not query:
                 return [TextContent(type="text", text="Error: No search query provided")]
-            if not self._is_external_server_connected("search"):
-                return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
-            params = self._load_saved_server_command("search")
+            params = self._resolve_external_stdio_params("search")
             if params is None:
-                return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
+                return [TextContent(type="text", text="Search server not available. Missing search/mcp_server.py in the project.")]
             try:
                 response = await self._invoke_external_tool(params, "web.search", {"query": query})
                 text = self._extract_text_content(response)
@@ -527,14 +558,11 @@ class JarvisMCPServer:
         if name == "jarvis_scan_news":
             # Reduced topics for faster scanning
             topics = ["AI", "Crypto and Web3", "Finance and Trading Tech"]
-            
-            if not self._is_external_server_connected("search"):
-                return [TextContent(type="text", text="Search server not connected. Run: connect search python3 search/mcp_server.py")]
-            
-            params = self._load_saved_server_command("search")
+
+            params = self._resolve_external_stdio_params("search")
             if params is None:
-                return [TextContent(type="text", text="Search server command not configured. Reconnect the 'search' server from the client.")]
-            
+                return [TextContent(type="text", text="Search server not available. Missing search/mcp_server.py in the project.")]
+
             all_summaries = []
             ai_available = self._is_ai_available()
             
