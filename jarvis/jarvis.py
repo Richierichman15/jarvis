@@ -114,16 +114,19 @@ class Jarvis:
             try:
                 # Use model from brain.env if available, otherwise fallback to default
                 model_name = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q8_0")
-                self.llm = OllamaLLM(
-                    model=model_name,
-                    callbacks=[StreamingStdOutCallbackHandler()],
-                    temperature=0.7
-                )
+                llm_kwargs: Dict[str, Any] = {
+                    "model": model_name,
+                    "temperature": 0.7,
+                }
+                # Never stream model output to stdout in MCP stdio child mode.
+                if os.environ.get("JARVIS_MCP_STDIO_CHILD") != "1":
+                    llm_kwargs["callbacks"] = [StreamingStdOutCallbackHandler()]
+                self.llm = OllamaLLM(**llm_kwargs)
             except Exception as e:
-                print(f"Warning: Could not initialize AI model: {e}")
+                print(f"Warning: Could not initialize AI model: {e}", file=sys.stderr)
                 self.llm = None
         else:
-            print("Info: AI chat capabilities disabled (langchain not available)")
+            print("Info: AI chat capabilities disabled (langchain not available)", file=sys.stderr)
     
     def _task_identity(self, task: "Task"):
         """Return a tuple that uniquely identifies a task to help deduplicate."""
@@ -174,7 +177,7 @@ class Jarvis:
                                         if isinstance(t, dict) and 'name' in t:
                                             self.tasks.append(Task.from_dict(t))
                                     except Exception as e:
-                                        print(f"Error loading task: {e}")
+                                        print(f"Error loading task: {e}", file=sys.stderr)
                             if 'conversation_history' in user_data:
                                 self.conversation_history = user_data['conversation_history']
                 
@@ -185,7 +188,7 @@ class Jarvis:
                 self.save_memory()
                     
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"Error loading memory: {e}")
+            print(f"Error loading memory: {e}", file=sys.stderr)
             # Create default memory file
             self.save_memory()
     
@@ -236,7 +239,7 @@ class Jarvis:
                 json.dump(data, f, indent=4)
                 
         except Exception as e:
-            print(f"Error saving memory: {e}")
+            print(f"Error saving memory: {e}", file=sys.stderr)
     
     def greet(self):
         """Display welcome message and system status."""

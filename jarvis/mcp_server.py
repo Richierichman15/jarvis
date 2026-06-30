@@ -17,7 +17,7 @@ try:
     AIOHTTP_AVAILABLE = True
 except ImportError:
     AIOHTTP_AVAILABLE = False
-    print("Warning: aiohttp library not available. Install with: pip install aiohttp")
+    print("Warning: aiohttp library not available. Install with: pip install aiohttp", file=sys.stderr)
 
 # MCP imports
 try:
@@ -35,7 +35,7 @@ try:
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
-    print("Warning: MCP library not available. Install with: pip install mcp")
+    print("Warning: MCP library not available. Install with: pip install mcp", file=sys.stderr)
 
 from .jarvis import Jarvis
 from .config import PROJECT_ROOT
@@ -75,15 +75,18 @@ class JarvisMCPServer:
         self._namespace_remote = os.environ.get("NAMESPACE_REMOTE_TOOLS", "true").lower() in ("1", "true", "yes", "on")
         # tool name -> (alias, remote_tool_name)
         self._remote_tool_index: Dict[str, Tuple[str, str]] = {}
-        try:
-            # Lazy import to avoid a hard dependency for users not using multi-server mode
-            from client.api import SessionManager  # type: ignore
-            # Build a dummy default parameter (not used to start Jarvis here) and pass saved servers
-            default_path = PROJECT_ROOT / "run_mcp_server.py"
-            default_params = StdioServerParameters(command=sys.executable, args=["-u", str(default_path), user_name])
-            self._session_manager = SessionManager(default_params, saved_servers=self._load_saved_external_servers())
-        except Exception as e:
-            logger.info("Multi-server session manager unavailable: %s", e)
+        if os.environ.get("JARVIS_MCP_STDIO_CHILD") == "1":
+            logger.info("stdio child mode: external MCP session manager disabled")
+        else:
+            try:
+                # Lazy import to avoid a hard dependency for users not using multi-server mode
+                from client.api import SessionManager  # type: ignore
+                # Build a dummy default parameter (not used to start Jarvis here) and pass saved servers
+                default_path = PROJECT_ROOT / "run_mcp_server.py"
+                default_params = StdioServerParameters(command=sys.executable, args=["-u", str(default_path), user_name])
+                self._session_manager = SessionManager(default_params, saved_servers=self._load_saved_external_servers())
+            except Exception as e:
+                logger.info("Multi-server session manager unavailable: %s", e)
         self._register_tools()
 
     # -------- External servers management --------
@@ -1109,11 +1112,9 @@ class JarvisMCPServer:
     async def run(self):
         """Run the MCP server."""
         logger.info("Starting Jarvis MCP Server...")
-        # Proactively connect external MCP servers before accepting requests
-        try:
-            await self._ensure_external_sessions()
-        except Exception as e:
-            logger.warning("External servers pre-connect failed: %s", e)
+        # External MCP servers connect lazily on first remote-tool use.
+        # Connecting before stdio_server() blocked the MCP handshake and caused
+        # "Connection closed" failures in the client HTTP server on startup.
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
                 read_stream,
@@ -1130,7 +1131,7 @@ def create_mcp_server(user_name: str = "Boss") -> JarvisMCPServer:
 async def main():
     """Main entry point for the MCP server."""
     if not MCP_AVAILABLE:
-        print("Error: MCP library is required. Install with: pip install mcp")
+        print("Error: MCP library is required. Install with: pip install mcp", file=sys.stderr)
         sys.exit(1)
     
     # Get user name from command line or use default

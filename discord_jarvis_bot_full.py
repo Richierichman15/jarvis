@@ -24,8 +24,8 @@ import sys
 import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
 
 # CRITICAL: Ensure we import the actual discord.py library, not our local discord/ package
 # Remove current directory from sys.path temporarily to avoid importing our local discord/ package
@@ -123,8 +123,9 @@ except ImportError as e:
     logging.warning(f"Could not import MCP client: {e}")
     MCP_CLIENT_AVAILABLE = False
 
-# Load environment variables from .env file
+# Load environment variables from .env file (project root + jarvis/.env)
 load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / "jarvis" / ".env", override=False)
 
 # Configure logging
 logging.basicConfig(
@@ -1515,7 +1516,14 @@ async def on_message(message):
     
     # Only respond to messages in the configured server (if specified)
     if DISCORD_CLIENT_SERVER and DISCORD_CLIENT_SERVER != 'YOUR_DISCORD_SERVER_ID_HERE':
+        if message.guild is None:
+            return  # ignore DMs when a server is configured
         if str(message.guild.id) != DISCORD_CLIENT_SERVER:
+            logger.debug(
+                "Ignoring message from guild %s (configured server is %s)",
+                message.guild.id,
+                DISCORD_CLIENT_SERVER,
+            )
             return
     
     # Log incoming message
@@ -1874,7 +1882,7 @@ async def main():
     logger.info("Environment variables loaded:")
     logger.info(f"DISCORD_BOT_TOKEN: {'SET' if DISCORD_BOT_TOKEN and DISCORD_BOT_TOKEN != 'YOUR_DISCORD_BOT_TOKEN_HERE' else 'NOT SET'}")
     logger.info(f"DISCORD_CLIENT_ID: {'SET' if DISCORD_CLIENT_ID and DISCORD_CLIENT_ID != 'YOUR_DISCORD_CLIENT_ID_HERE' else 'NOT SET'}")
-    logger.info(f"DISCORD_CLIENT_SERVER: {'SET' if DISCORD_CLIENT_SERVER and DISCORD_CLIENT_SERVER != 'YOUR_DISCORD_SERVER_ID_HERE' else 'NOT SET'}")
+    logger.info(f"DISCORD_CLIENT_SERVER: {DISCORD_CLIENT_SERVER if DISCORD_CLIENT_SERVER and DISCORD_CLIENT_SERVER != 'YOUR_DISCORD_SERVER_ID_HERE' else 'NOT SET'}")
     logger.info(f"DISCORD_WEBHOOK_URL: {'SET' if DISCORD_WEBHOOK_URL else 'NOT SET'}")
     logger.info(f"JARVIS_CLIENT_URL: {JARVIS_CLIENT_URL}")
     

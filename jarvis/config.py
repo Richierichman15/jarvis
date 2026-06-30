@@ -3,14 +3,16 @@ Configuration file for Jarvis assistant.
 Contains API keys, model settings, and other configuration parameters.
 """
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent
+
+# Load environment variables (.env at repo root or jarvis/.env)
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(PROJECT_ROOT / "jarvis" / ".env")
 MEMORY_DIR = PROJECT_ROOT / "jarvis" / "memory"
 os.makedirs(MEMORY_DIR, exist_ok=True)  # Ensure memory directory exists
 
@@ -30,17 +32,17 @@ os.makedirs(AGENT_LOGS_DIR, exist_ok=True)  # Ensure logs directory exists
 # First check for API key in environment, then use default if not available
 OPENAI_API_KEY = os.environ.get("OPENAI_KEY", "")
 if not OPENAI_API_KEY:
-    print("Warning: OPENAI_KEY not found in environment variables or .env file")
+    print("Warning: OPENAI_KEY not found in environment variables or .env file", file=sys.stderr)
 
 # Claude API configuration (optional - using fallback LLM)
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
 if not CLAUDE_API_KEY:
-    print("Note: CLAUDE_API_KEY not found. Using fallback LLM for Claude functionality.")
+    print("Note: CLAUDE_API_KEY not found. Using fallback LLM for Claude functionality.", file=sys.stderr)
 
 # OpenWeatherMap API configuration
 OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
 if not OPENWEATHER_API_KEY:
-    print("Note: OPENWEATHER_API_KEY not found. Weather API functionality will use web search fallback.")
+    print("Note: OPENWEATHER_API_KEY not found. Weather API functionality will use web search fallback.", file=sys.stderr)
 
 # Available local models
 LOCAL_MODELS = {
@@ -49,9 +51,9 @@ LOCAL_MODELS = {
     "phi3": "phi3:mini"                          # Efficient smaller model
 }
 
-# Model settings
-LOCAL_MODEL_NAME = LOCAL_MODELS["llama3.1"]  # Using llama3.1:8b-instruct-q8_0 as default
-LOCAL_MODEL_BASE_URL = "http://localhost:11434"  # Ollama API endpoint
+# Model settings — OLLAMA_MODEL env overrides default tag
+LOCAL_MODEL_NAME = os.environ.get("OLLAMA_MODEL", LOCAL_MODELS["llama3.1"])
+LOCAL_MODEL_BASE_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 
 OPENAI_MODEL = "gpt-4-turbo-preview"  # Latest GPT-4 model
 CLAUDE_MODEL = "claude-3-sonnet-20240229"  # Latest Claude 3 Sonnet model

@@ -8,6 +8,10 @@ import os
 import asyncio
 from pathlib import Path
 
+# Mark this process as the Jarvis MCP stdio child so it does not spawn nested clients.
+os.environ.setdefault("JARVIS_MCP_STDIO_CHILD", "1")
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+
 # Add the project root to the Python path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
@@ -15,8 +19,8 @@ sys.path.insert(0, str(project_root))
 try:
     from jarvis.mcp_server import create_mcp_server
 except ImportError as e:
-    print(f"Error importing Jarvis MCP server: {e}")
-    print("Make sure you're running this from the project root directory.")
+    print(f"Error importing Jarvis MCP server: {e}", file=sys.stderr)
+    print("Make sure you're running this from the project root directory.", file=sys.stderr)
     sys.exit(1)
 
 

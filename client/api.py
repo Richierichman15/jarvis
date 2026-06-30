@@ -32,9 +32,130 @@ from mcp.client.stdio import stdio_client
 from client.storage import load_servers as load_saved_servers, save_servers
 
 
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
 def _default_server_path() -> Path:
     # Default to the Jarvis stdio server at repo root
-    return Path(__file__).resolve().parent.parent / "run_mcp_server.py"
+    return _project_root() / "run_mcp_server.py"
+
+
+def _resolve_python_executable() -> str:
+    """Use a concrete Windows-friendly path for subprocess spawning."""
+    exe = Path(sys.executable)
+    if exe.is_file():
+        return str(exe.resolve())
+    return sys.executable
+
+
+# Environment variables that can silently break a freshly spawned interpreter
+# when inherited from an interactive shell (e.g. Git Bash / MSYS), causing the
+# MCP child to die before it can emit any diagnostics.
+_PYTHON_ENV_TO_STRIP = (
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "PYTHONSTARTUP",
+    "PYTHONEXECUTABLE",
+    "PYTHONNOUSERSITE",
+    "PYTHONCASEOK",
+)
+
+
+def _build_child_env() -> Dict[str, str]:
+    """Return a sanitized environment for the Jarvis MCP child process.
+
+    Strips inherited Python vars that can break a fresh interpreter and pins the
+    venv / base interpreter directories to the FRONT of PATH so that an active
+    conda base or another shell cannot shadow the venv's native DLLs (which
+    would otherwise crash the child on import before it can print anything).
+    """
+    child_env = dict(os.environ)
+    for key in _PYTHON_ENV_TO_STRIP:
+        child_env.pop(key, None)
+    child_env["JARVIS_MCP_STDIO_CHILD"] = "1"
+    child_env["PYTHONUNBUFFERED"] = "1"
+    # Force UTF-8 stdio so JSON-RPC framing is never corrupted by a locale
+    # that defaults to cp1252 (common on Windows / MSYS).
+    child_env["PYTHONIOENCODING"] = "utf-8"
+    child_env["PYTHONUTF8"] = "1"
+
+    exe = Path(_resolve_python_executable())
+    priority_dirs = [
+        str(exe.parent),                 # .venv/Scripts (or bin)
+        str(Path(sys.base_prefix)),      # base interpreter (python3xx.dll lives here)
+        str(Path(sys.base_prefix) / "Scripts"),
+        str(Path(sys.base_prefix) / "DLLs"),
+    ]
+    existing_path = child_env.get("PATH", "")
+    seen = set()
+    ordered: List[str] = []
+    for part in priority_dirs + existing_path.split(os.pathsep):
+        if part and part not in seen and Path(part).exists():
+            seen.add(part)
+            ordered.append(part)
+    child_env["PATH"] = os.pathsep.join(ordered)
+    return child_env
+
+
+def _jarvis_stdio_params(user_name: str = "Boss") -> StdioServerParameters:
+    """Build stdio params for the Jarvis MCP child process."""
+    root = _project_root()
+    server_env = os.environ.get("MCP_SERVER_PATH")
+    server_path = Path(server_env) if server_env else _default_server_path()
+    return StdioServerParameters(
+        command=_resolve_python_executable(),
+        args=["-u", str(server_path.resolve()), user_name],
+        cwd=str(root),
+        env=_build_child_env(),
+    )
+
+
+async def preflight_jarvis_mcp() -> None:
+    """Verify the Jarvis MCP child can start before binding the HTTP port.
+
+    Captures the child's stderr so that, if it dies during startup, the real
+    Python traceback is surfaced instead of an opaque "Connection closed".
+    """
+    import tempfile
+
+    params = _jarvis_stdio_params()
+    server_script = params.args[1] if len(params.args) > 1 else "?"
+    print(f"Preflight MCP: python={params.command}")
+    print(f"Preflight MCP: script={server_script}")
+    print(f"Preflight MCP: cwd={params.cwd}")
+    mcp_path = os.environ.get("MCP_SERVER_PATH")
+    if mcp_path:
+        print(f"Preflight MCP: MCP_SERVER_PATH={mcp_path}")
+    if not Path(server_script).is_file():
+        raise RuntimeError(f"MCP server script not found: {server_script}")
+
+    err_path = Path(tempfile.gettempdir()) / "jarvis_mcp_preflight.err.log"
+    err_file = open(err_path, "w+", encoding="utf-8", errors="replace")
+    try:
+        async with stdio_client(params, errlog=err_file) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+        print("Preflight MCP: Jarvis connection OK")
+    except BaseException as exc:
+        try:
+            err_file.flush()
+            err_file.seek(0)
+            child_err = err_file.read().strip()
+        except Exception:
+            child_err = ""
+        if child_err:
+            print("\n--- Jarvis MCP child output (stderr) ---")
+            print(child_err[-4000:])
+            print("--- end child output ---")
+        else:
+            print("\n(The MCP child produced no stderr output before exiting.)")
+        raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc
+    finally:
+        try:
+            err_file.close()
+        except Exception:
+            pass
 
 
 def _extract_text(result: Any) -> str:
@@ -94,6 +215,25 @@ def _normalize_mcp_result(result: Any) -> str:
     return dumped[:5000]
 
 
+def _server_entry_usable(entry: Dict[str, Any]) -> bool:
+    """Return False when a saved MCP server points at missing binaries/paths."""
+    command = entry.get("command")
+    if not command:
+        return False
+    cmd_path = Path(str(command))
+    if cmd_path.suffix.lower() in {".exe", ".cmd", ".bat"} and not cmd_path.is_file():
+        return False
+    cwd = entry.get("cwd")
+    if cwd and not Path(str(cwd)).exists():
+        return False
+    args = entry.get("args") or []
+    if args:
+        script = Path(str(args[-1]))
+        if script.suffix.lower() == ".py" and not script.is_file():
+            return False
+    return True
+
+
 class SessionManager:
     def __init__(self, default_params: StdioServerParameters, saved_servers: Dict[str, Dict[str, Any]]) -> None:
         self.default_alias = "jarvis"
@@ -111,6 +251,9 @@ class SessionManager:
         
         for alias, entry in self.saved_servers.items():
             if alias == self.default_alias:
+                continue
+            if not isinstance(entry, dict) or not _server_entry_usable(entry):
+                logger.warning("Skipping saved server '%s': command or script path not found on this machine", alias)
                 continue
             try:
                 await self.ensure_session(alias)
@@ -179,9 +322,14 @@ class SessionManager:
             "env": dict(params.env) if params.env else None,
         }
 
+        import tempfile
+
+        err_path = Path(tempfile.gettempdir()) / f"jarvis_mcp_{alias}.err.log"
+
         async def runner() -> None:
+            err_file = open(err_path, "w+", encoding="utf-8", errors="replace")
             try:
-                async with stdio_client(params) as (read, write):
+                async with stdio_client(params, errlog=err_file) as (read, write):
                     async with ClientSession(read, write) as session:
                         await session.initialize()
                         self.sessions[alias] = session
@@ -194,10 +342,22 @@ class SessionManager:
                 if not ready.done():
                     ready.set_exception(exc)
                 logger.warning("Session '%s' stopped: %s", alias, exc)
-                # Log the full exception details for debugging
+                # Surface the child's own stderr so the real cause is visible.
+                try:
+                    err_file.flush()
+                    err_file.seek(0)
+                    child_err = err_file.read().strip()
+                except Exception:
+                    child_err = ""
+                if child_err:
+                    logger.error("Child stderr for session '%s':\n%s", alias, child_err[-4000:])
                 import traceback
                 logger.error("Full error for session '%s':\n%s", alias, traceback.format_exc())
             finally:
+                try:
+                    err_file.close()
+                except Exception:
+                    pass
                 self.sessions.pop(alias, None)
                 self.tools_cache.pop(alias, None)
                 self.runtime_params.pop(alias, None)
@@ -347,10 +507,12 @@ class DisconnectServerRequest(BaseModel):
 
 
 def create_app() -> FastAPI:
-    server_env = os.environ.get("MCP_SERVER_PATH")
-    server_path = Path(server_env) if server_env else _default_server_path()
-    default_params = StdioServerParameters(command=sys.executable, args=["-u", str(server_path), "Boss"])
-    saved_servers = load_saved_servers()
+    default_params = _jarvis_stdio_params()
+    saved_servers = {
+        alias: entry
+        for alias, entry in load_saved_servers().items()
+        if isinstance(entry, dict) and _server_entry_usable(entry)
+    }
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
