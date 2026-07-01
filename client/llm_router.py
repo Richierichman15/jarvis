@@ -389,11 +389,12 @@ NEVER invent tools. Match schema requirements."""
             return "budget.get_category_stats", {}
     
     # Trading patterns
-    if any(word in ql for word in ["price", "value", "worth", "trading", "crypto", "stock"]):
-        # Try to extract symbol
-        symbols = re.findall(r'\b([A-Z]{2,6})\b', q)  # Use original case
+    if any(word in ql for word in ["price", "value", "worth", "trading", "crypto", "stock", "quote"]):
+        from jarvis.intelligence.ticker_utils import extract_ticker_symbols
+
+        symbols = extract_ticker_symbols(q)
         if symbols:
-            return "trading.get_price", {"symbol": f"{symbols[0]}/USDT"}
+            return "trading.get_quote", {"symbol": symbols[0]}
     
     # Default fallback
     return "jarvis_chat", {"message": query}

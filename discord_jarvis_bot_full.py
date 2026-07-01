@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 import json
+import re
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pathlib import Path
@@ -346,30 +347,43 @@ class JarvisClientMCPClient:
     async def get_available_tools(self) -> Dict[str, Any]:
         """Get all available tools from all connected servers."""
         try:
-            # Perform health check first
             if not await self.health_check():
                 logger.warning("Server health check failed, but continuing with tools request")
-            
+
+            servers_data: List[Dict[str, Any]] = []
             async with self.session.get(
-                f"{self.base_url}/tools",
-                timeout=self.timeout
+                f"{self.base_url}/servers",
+                timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 if response.status == 200:
+                    payload = await response.json()
+                    servers_data = payload.get("servers") or []
+
+            aliases = [
+                s.get("alias")
+                for s in servers_data
+                if s.get("connected") and s.get("alias")
+            ]
+            if not aliases:
+                aliases = ["jarvis"]
+
+            tools_by_server: Dict[str, Any] = {}
+            total = 0
+            for alias in aliases:
+                async with self.session.get(
+                    f"{self.base_url}/tools",
+                    params={"server": alias},
+                    timeout=self.timeout,
+                ) as response:
+                    if response.status != 200:
+                        continue
                     tools_data = await response.json()
-                    # Organize tools by server
-                    tools_by_server = {}
-                    for tool in tools_data:
-                        server = tool.get('server', 'unknown')
-                        if server not in tools_by_server:
-                            tools_by_server[server] = []
-                        tools_by_server[server].append(tool)
-                    
-                    self.available_tools = tools_by_server
-                    logger.info(f"Loaded {len(tools_data)} tools from {len(tools_by_server)} servers")
-                    return tools_by_server
-                else:
-                    logger.error(f"Failed to get tools: HTTP {response.status}")
-                    return {}
+                    tools_by_server[alias] = tools_data
+                    total += len(tools_data)
+
+            self.available_tools = tools_by_server
+            logger.info(f"Loaded {total} tools from {len(tools_by_server)} servers")
+            return tools_by_server
         except Exception as e:
             logger.error(f"Error getting tools: {e}")
             return {}
@@ -425,27 +439,11 @@ class JarvisClientMCPClient:
                         data = await response.json()
                         
                         if data.get('ok'):
-                            result = data.get('result', {})
-                            
-                            # Handle different result formats
-                            if isinstance(result, dict):
-                                if 'text' in result:
-                                    return result['text']
-                                elif 'items' in result:
-                                    # Handle content list
-                                    texts = []
-                                    for item in result.get('items', []):
-                                        if item.get('type') == 'text' and item.get('text'):
-                                            texts.append(item['text'])
-                                    return '\n'.join(texts) if texts else str(result)
-                                else:
-                                    return str(result)
-                            else:
-                                return str(result)
+                            return _extract_tool_text(data.get('result', {}))
                         else:
                             error_msg = data.get('detail', 'Unknown error')
                             logger.error(f"Tool call failed: {error_msg}")
-                            return f"Error: {error_msg}"
+                            return f"⚠️ {error_msg}"
                     else:
                         error_msg = await response.text()
                         logger.error(f"HTTP {response.status}: {error_msg}")
@@ -456,7 +454,7 @@ class JarvisClientMCPClient:
                             await asyncio.sleep(2 ** attempt)
                             continue
                         
-                        return f"Error: HTTP {response.status} - {error_msg}"
+                        return f"⚠️ HTTP {response.status} - {error_msg}"
                         
             except asyncio.TimeoutError:
                 error_msg = f"Request timed out (attempt {attempt + 1}/{max_retries})"
@@ -1173,6 +1171,11 @@ class DiscordCommandRouter:
             Response from Jarvis
         """
         tool_name, arguments, server = self.parse_command(message.content)
+
+        if server != "local" and tool_name != "natural_language":
+            tool_name, arguments, server = resolve_trading_tool(
+                tool_name, arguments, message.content
+            )
         
         # Handle local commands (event management)
         if server == "local":
@@ -1246,6 +1249,107 @@ class DiscordCommandRouter:
         return result or "No response received from Jarvis."
 
 
+_STONKSS_TOOL_ALIASES: Dict[str, str] = {
+    "trading.trading.get_price": "trading.get_quote",
+    "trading.trading.get_ohlcv": "trading.get_bars",
+    "trading.get_price": "trading.get_quote",
+    "trading.trading.get_balance": "trading.get_balance",
+    "trading.trading.get_portfolio_balance": "trading.get_balance",
+    "trading.portfolio.get_overview": "trading.get_portfolio",
+    "trading.portfolio.get_positions": "trading.get_positions",
+    "trading.trading.get_recent_executions": "trading.get_orders",
+    "trading.trading.get_momentum_signals": "trading.scan_watchlist",
+    "trading.get_momentum_signals": "trading.scan_watchlist",
+    "trading.get_momentum": "trading.get_momentum",
+    "trading.trading.get_trade_history": "trading.get_orders",
+    "trading.trading.get_pnl_summary": "trading.get_portfolio",
+    "trading.trading.doctor": "trading.get_market_status",
+    "trading.search_pairs": "trading.search_symbols",
+}
+
+
+def _normalize_trading_symbol(symbol: str) -> str:
+    """Strip crypto pair suffixes so stonkss gets a plain ticker (e.g. AAPL)."""
+    symbol = (symbol or "").strip().upper()
+    if not symbol:
+        return symbol
+    if "/" in symbol:
+        return symbol.split("/", 1)[0]
+    if "-" in symbol:
+        return symbol.split("-", 1)[0]
+    return symbol
+
+
+def resolve_trading_tool(
+    tool_name: str,
+    arguments: Optional[Dict[str, Any]] = None,
+    user_message: str = "",
+) -> tuple[str, Dict[str, Any], str]:
+    """Map legacy trading tool names to stonkss and route to the trading server."""
+    from jarvis.intelligence.ticker_utils import enrich_trading_arguments
+
+    args = dict(arguments or {})
+    server = "jarvis"
+
+    if tool_name.startswith("music_") or tool_name.startswith("events_"):
+        return tool_name, args, "local"
+
+    mapped = _STONKSS_TOOL_ALIASES.get(tool_name, tool_name)
+    if mapped.startswith("trading.") or tool_name.startswith("trading."):
+        tool_name = mapped if mapped.startswith("trading.") else tool_name
+        server = "trading"
+        args = enrich_trading_arguments(tool_name, args, user_message)
+        if "symbol" in args:
+            args["symbol"] = _normalize_trading_symbol(str(args["symbol"]))
+        if tool_name == "trading.get_momentum" and "symbols" in args:
+            args["symbols"] = [_normalize_trading_symbol(str(s)) for s in args["symbols"]]
+
+    return tool_name, args, server
+
+
+def _extract_tool_text(result: Any) -> str:
+    """Pull display text from a Jarvis HTTP /run-tool result payload."""
+    if isinstance(result, dict):
+        if result.get("text"):
+            text = str(result["text"])
+            try:
+                payload = json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return text
+            if isinstance(payload, dict):
+                if payload.get("success") is False:
+                    err = payload.get("error") or "Tool call failed"
+                    code = payload.get("code")
+                    return f"⚠️ {err}" + (f" ({code})" if code else "")
+                inner = payload.get("result")
+                if isinstance(inner, dict) and inner.get("formatted"):
+                    return str(inner["formatted"])
+                if inner is not None:
+                    return json.dumps(inner, ensure_ascii=False, indent=2)
+            return text
+        if result.get("items"):
+            texts = [
+                item.get("text", "")
+                for item in result.get("items", [])
+                if item.get("type") == "text" and item.get("text")
+            ]
+            if texts:
+                return "\n".join(texts)
+    return str(result)
+
+
+def _is_trading_formatted_response(text: str) -> bool:
+    """True when the tool already returned a Discord-ready trading message."""
+    if not text:
+        return False
+    stripped = text.strip()
+    if stripped.startswith("📊") or stripped.startswith("⚠️"):
+        return True
+    if stripped.startswith("Error:") or "HTTP 404" in stripped or "BAD_REQUEST" in stripped:
+        return True
+    return False
+
+
 async def execute_intelligent_tool(intent_result: 'IntentResult', message: discord.Message) -> str:
     """Execute a tool based on intelligent intent analysis, trying agent system first."""
     global jarvis_client, command_router, agent_manager, robust_mcp_client
@@ -1253,6 +1357,10 @@ async def execute_intelligent_tool(intent_result: 'IntentResult', message: disco
     try:
         tool_name = intent_result.tool_name
         arguments = intent_result.arguments
+        
+        tool_name, arguments, server = resolve_trading_tool(
+            tool_name, arguments, message.content
+        )
         
         # Skip agent system for search/news - go directly to MCP
         if tool_name in ("jarvis_web_search", "jarvis_scan_news", "search.web.search"):
@@ -1274,32 +1382,7 @@ async def execute_intelligent_tool(intent_result: 'IntentResult', message: disco
         else:
             logger.warning("⚠️ Agent system not available - bot may still be initializing")
         
-        # Fallback to MCP servers
-        server = "jarvis"  # Default server
-        
-        # Determine server based on tool name
-        # Note: Most tools go through "jarvis" server which proxies to other MCP servers
-        if tool_name.startswith("music_"):
-            server = "local"
-        elif tool_name.startswith("events_"):
-            server = "local"
-        elif tool_name.startswith("trading.trading.") or tool_name.startswith("trading.portfolio.") or tool_name.startswith("trading.paper."):
-            # Trading tools go through jarvis server (which routes to trading MCP server)
-            server = "jarvis"
-        elif tool_name.startswith("trading."):
-            # Other trading tools also go through jarvis
-            server = "jarvis"
-        elif tool_name.startswith("system."):
-            server = "jarvis"
-        elif tool_name.startswith("jarvis_"):
-            server = "jarvis"
-        elif tool_name.startswith("search."):
-            server = "jarvis"  # Search also goes through jarvis
-        
-        logger.info(f"🔧 Executing intelligent tool: {tool_name} on server: {server}")
-        logger.info(f"📝 Arguments: {arguments}")
-        
-        # Handle local commands (music, events)
+        # Fallback to MCP servers (stonkss tools use server "trading")
         if server == "local":
             return await command_router._handle_local_command(tool_name, arguments, message)
         
@@ -1581,7 +1664,8 @@ async def on_message(message):
                     raw_response = "❌ Bot is still initializing. Please wait a moment and try again."
             
             # Step 3: Format the response using AI (if available)
-            if model_manager and MODEL_AVAILABLE:
+            skip_format = _is_trading_formatted_response(raw_response or "")
+            if model_manager and MODEL_AVAILABLE and not skip_format:
                 try:
                     # Get context about what command was run
                     context = f"User asked: {message.content[:100]}"
@@ -1608,9 +1692,11 @@ async def on_message(message):
                     response = formatted_response
                     logger.info("✨ Response formatted by AI")
                 except Exception as format_error:
-                    # If formatting fails, use raw response
                     logger.warning(f"Formatting failed, using raw response: {format_error}")
                     response = raw_response
+            elif skip_format:
+                response = raw_response
+                logger.info("📊 Using trading tool formatted response directly")
             else:
                 # No AI available, use raw response
                 response = raw_response

@@ -278,6 +278,13 @@ class _HttpMcpClient:
       error = payload.get("error") or "tool call failed"
       code = payload.get("code")
       raise RuntimeError(f"{error}" + (f" ({code})" if code else ""))
+    if isinstance(payload, dict) and payload.get("success") is True:
+      result = payload.get("result")
+      if isinstance(result, dict) and result.get("formatted"):
+        return _HttpCallResult(str(result["formatted"]))
+      if result is not None:
+        text = json.dumps(result, ensure_ascii=False, indent=2)
+        return _HttpCallResult(text)
     text = json.dumps(payload, ensure_ascii=False, indent=2) if isinstance(payload, dict) else str(payload)
     return _HttpCallResult(text)
 
@@ -862,9 +869,9 @@ def create_app() -> FastAPI:
                 except Exception:
                     pass
 
-            # Step 4: summarise via jarvis_chat
-            summary_text = raw_text
-            if SUMMARIZER_ENABLED and routed_tool != "jarvis_chat":
+            if isinstance(raw_text, str) and raw_text.strip().startswith("📊"):
+                summary_text = raw_text.strip()
+            elif SUMMARIZER_ENABLED and routed_tool != "jarvis_chat":
                 summary_prompt = (
                     "Summarize this tool output for the user in 3-6 concise bullet points or 1 short paragraph. "
                     "Remove raw JSON. Answer directly and plainly. Output only the summary.\n\n---\n"
@@ -872,6 +879,8 @@ def create_app() -> FastAPI:
                 )
                 summary_result = await manager.call_tool(manager.default_alias, "jarvis_chat", {"message": summary_prompt})
                 summary_text = _normalize_mcp_result(summary_result) or raw_text
+            else:
+                summary_text = raw_text
 
             return {
                 "text": summary_text,

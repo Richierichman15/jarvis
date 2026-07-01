@@ -138,17 +138,22 @@ class JarvisMCPServer:
         try:
             # Connect all known servers from saved configuration
             for alias, entry in (self._session_manager.saved_servers or {}).items():
-                if not isinstance(entry, dict) or not entry.get("command"):
+                if not isinstance(entry, dict):
                     continue
                 try:
-                    await self._session_manager.connect_server(
-                        alias=alias,
-                        command=entry.get("command"),
-                        args=entry.get("args") or [],
-                        save=False,
-                        cwd=entry.get("cwd"),
-                        env=entry.get("env"),
-                    )
+                    if entry.get("base_url"):
+                        await self._session_manager._connect_http(alias)
+                    elif entry.get("command"):
+                        await self._session_manager.connect_server(
+                            alias=alias,
+                            command=entry.get("command"),
+                            args=entry.get("args") or [],
+                            save=False,
+                            cwd=entry.get("cwd"),
+                            env=entry.get("env"),
+                        )
+                    else:
+                        continue
                     logger.info("Connected external MCP server '%s'", alias)
                 except Exception as exc:
                     logger.warning("Failed to connect external server '%s': %s", alias, exc)
@@ -1116,14 +1121,13 @@ class JarvisMCPServer:
                         await self._index_remote_tools()
                         alias: Optional[str] = None
                         remote_tool: Optional[str] = None
-                        if "." in name:
+                        mapped = self._remote_tool_index.get(name)
+                        if mapped:
+                            alias, remote_tool = mapped
+                        elif "." in name:
                             prefix, _, tool_part = name.partition(".")
                             if prefix and tool_part:
                                 alias, remote_tool = prefix, tool_part
-                        if alias is None or remote_tool is None:
-                            mapped = self._remote_tool_index.get(name)
-                            if mapped:
-                                alias, remote_tool = mapped
                         if alias and remote_tool:
                             try:
                                 result = await self._session_manager.call_tool(alias, remote_tool, arguments or {})

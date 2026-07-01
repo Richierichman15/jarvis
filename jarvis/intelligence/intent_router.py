@@ -23,6 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass, asdict
+
+from jarvis.intelligence.ticker_utils import extract_ticker_symbols, enrich_trading_arguments
 from enum import Enum
 
 # Import LLM capabilities
@@ -167,10 +169,11 @@ class ContextRetriever:
     def _get_available_tools(self) -> List[str]:
         """Get list of available tools."""
         return [
-            # Trading tools
-            "trading.get_price", "trading.get_balance", "trading.get_portfolio",
-            "trading.get_positions", "trading.get_trades", "trading.get_momentum_signals",
-            "trading.get_pnl_summary", "trading.get_trade_history", "trading.doctor",
+            # Trading tools (stonkss / jarvis-trader)
+            "trading.get_quote", "trading.get_snapshot", "trading.get_bars",
+            "trading.get_balance", "trading.get_portfolio", "trading.get_positions",
+            "trading.get_orders", "trading.get_momentum", "trading.scan_watchlist",
+            "trading.manage_watchlist", "trading.search_symbols", "trading.get_market_status",
             
             # Music tools
             "music.play_song", "music.play_random", "music.search_songs",
@@ -325,6 +328,9 @@ class IntentRouter:
             if self.llm_available:
                 result = await self._llm_intent_analysis(text, context)
                 if result and result.confidence > 0.7:
+                    result.arguments = enrich_trading_arguments(
+                        result.tool_name, result.arguments, text
+                    )
                     processing_time = time.time() - start_time
                     result.processing_time = processing_time
                     await self._log_intent(text, result, context)
@@ -332,6 +338,9 @@ class IntentRouter:
             
             # Fallback to pattern matching
             result = await self._pattern_intent_analysis(text, context)
+            result.arguments = enrich_trading_arguments(
+                result.tool_name, result.arguments, text
+            )
             processing_time = time.time() - start_time
             result.processing_time = processing_time
             
@@ -445,31 +454,32 @@ ANALYZE THE REQUEST:
     def _correct_tool_name(self, tool_name: str) -> str:
         """Correct common tool name mistakes made by LLM."""
         corrections = {
-            # Trading tool corrections - ensure all use full prefix format
-            "trading.get_momentum_signals": "trading.trading.get_momentum_signals",
-            "trading.get_balance": "trading.trading.get_portfolio_balance",
-            "trading.get_portfolio_balance": "trading.trading.get_portfolio_balance",
-            "trading.get_price": "trading.trading.get_price",
-            "trading.get_recent_executions": "trading.trading.get_recent_executions",
-            # Portfolio corrections - map to full trading.portfolio.* format
-            "trading.get_portfolio": "trading.portfolio.get_overview",
-            "portfolio.get_overview": "trading.portfolio.get_overview",
-            "portfolio.get_positions": "trading.portfolio.get_positions",
-            "portfolio.get_trades": "trading.portfolio.get_trades",
-            "portfolio.get_performance": "trading.portfolio.get_performance",
-            "get_portfolio": "trading.portfolio.get_overview",
-            "get_positions": "trading.portfolio.get_positions",
-            "get_trades": "trading.portfolio.get_trades",
-            "get_performance": "trading.portfolio.get_performance",
-            "pnl": "trading.portfolio.get_performance",
-            # Paper trading corrections
-            "paper.get_portfolio": "trading.paper.get_portfolio",
-            "paper.get_balance": "trading.paper.get_balance",
-            "paper.get_performance": "trading.paper.get_performance",
-            "paper.get_trades": "trading.paper.get_trades",
-            # Balance corrections
-            "get_balance": "trading.trading.get_portfolio_balance",
-            "balance": "trading.trading.get_portfolio_balance",
+            # Legacy trading names -> stonkss tools
+            "trading.trading.get_price": "trading.get_quote",
+            "trading.get_price": "trading.get_quote",
+            "trading.trading.get_balance": "trading.get_balance",
+            "trading.trading.get_portfolio_balance": "trading.get_balance",
+            "trading.get_portfolio_balance": "trading.get_balance",
+            "trading.get_balance": "trading.get_balance",
+            "trading.portfolio.get_overview": "trading.get_portfolio",
+            "trading.get_portfolio": "trading.get_portfolio",
+            "trading.portfolio.get_positions": "trading.get_positions",
+            "trading.get_positions": "trading.get_positions",
+            "trading.trading.get_recent_executions": "trading.get_orders",
+            "trading.get_recent_executions": "trading.get_orders",
+            "trading.trading.get_momentum_signals": "trading.scan_watchlist",
+            "trading.get_momentum_signals": "trading.scan_watchlist",
+            "trading.trading.get_trade_history": "trading.get_orders",
+            "trading.trading.get_pnl_summary": "trading.get_portfolio",
+            "trading.trading.doctor": "trading.get_market_status",
+            "trading.trading.get_ohlcv": "trading.get_bars",
+            "get_balance": "trading.get_balance",
+            "balance": "trading.get_balance",
+            "get_portfolio": "trading.get_portfolio",
+            "get_positions": "trading.get_positions",
+            "pnl": "trading.get_portfolio",
+            # Old momentum mappings kept for compatibility
+            "trading.get_momentum_signals": "trading.scan_watchlist",
         }
         corrected = corrections.get(tool_name, tool_name)
         if corrected != tool_name:
@@ -494,7 +504,9 @@ ANALYZE THE REQUEST:
                 intent_type=IntentType(data.get("intent_type", "unknown")),
                 confidence=float(data.get("confidence", 0.0)),
                 tool_name=corrected_tool_name,
-                arguments=data.get("arguments", {}),
+                arguments=enrich_trading_arguments(
+                    corrected_tool_name, data.get("arguments", {}), original_text
+                ),
                 reasoning=data.get("reasoning", "LLM analysis"),
                 context_used=data.get("context_used", []),
                 fallback_suggestions=data.get("fallback_suggestions", []),
@@ -513,7 +525,7 @@ ANALYZE THE REQUEST:
         chat_patterns = self.intent_patterns.get(IntentType.CHAT, [])
         for pattern in chat_patterns:
             if re.search(pattern, text_lower):
-                tool_info = self._determine_tool_from_pattern(IntentType.CHAT, text_lower)
+                tool_info = self._determine_tool_from_pattern(IntentType.CHAT, text_lower, text)
                 return IntentResult(
                     intent_type=IntentType.CHAT,
                     confidence=0.8,  # Higher confidence for chat patterns
@@ -533,7 +545,7 @@ ANALYZE THE REQUEST:
             for pattern in patterns:
                 if re.search(pattern, text_lower):
                     # Found a match, determine tool
-                    tool_info = self._determine_tool_from_pattern(intent_type, text_lower)
+                    tool_info = self._determine_tool_from_pattern(intent_type, text_lower, text)
                     
                     return IntentResult(
                         intent_type=intent_type,
@@ -598,48 +610,49 @@ ANALYZE THE REQUEST:
                 found_symbols.append(symbol)
         
         return found_symbols
-    
-    def _determine_tool_from_pattern(self, intent_type: IntentType, text: str) -> Dict[str, Any]:
+
+    def _extract_ticker_symbols(self, text: str) -> List[str]:
+        return extract_ticker_symbols(text)
+
+    def _determine_tool_from_pattern(
+        self, intent_type: IntentType, text: str, original_text: str | None = None,
+    ) -> Dict[str, Any]:
         """Determine the specific tool based on intent type and text content."""
+        source = original_text or text
         if intent_type == IntentType.TRADING:
             if "portfolio" in text:
-                return {"tool": "trading.portfolio.get_overview", "server": "jarvis"}
+                return {"tool": "trading.get_portfolio", "server": "trading"}
             elif "balance" in text:
-                return {"tool": "trading.trading.get_balance", "server": "jarvis"}
-            elif "price" in text:
-                # Extract symbols if present - handle multiple symbols
-                symbols = self._extract_crypto_symbols(text)
+                return {"tool": "trading.get_balance", "server": "trading"}
+            elif any(word in text for word in ("price", "trading at", "worth", "quote")):
+                symbols = self._extract_ticker_symbols(source) or self._extract_crypto_symbols(text)
                 if symbols:
-                    if len(symbols) == 1:
-                        return {
-                            "tool": "trading.trading.get_price",
-                            "server": "jarvis",
-                            "arguments": {"symbol": f"{symbols[0]}/USD"}
-                        }
-                    else:
-                        # For multiple symbols, we'll need to call the tool multiple times
-                        # For now, return the first symbol and log that multiple were requested
-                        return {
-                            "tool": "trading.trading.get_price",
-                            "server": "jarvis",
-                            "arguments": {
-                                "symbol": f"{symbols[0]}/USD",
-                                "multiple_symbols": symbols,
-                                "note": f"Multiple symbols requested: {', '.join(symbols)}"
-                            }
-                        }
-                else:
+                    symbol = symbols[0]
+                    if "/" in symbol:
+                        symbol = symbol.split("/", 1)[0]
                     return {
-                        "tool": "trading.trading.get_price",
-                        "server": "jarvis",
-                        "arguments": {"symbol": "BTC/USD"}
+                        "tool": "trading.get_quote",
+                        "server": "trading",
+                        "arguments": {"symbol": symbol},
                     }
+                return {
+                    "tool": "trading.get_quote",
+                    "server": "trading",
+                    "arguments": {"symbol": "AAPL"},
+                }
             elif "momentum" in text:
-                return {"tool": "trading.trading.get_momentum_signals", "server": "jarvis"}
-            elif "trades" in text:
-                return {"tool": "trading.trading.get_recent_executions", "server": "jarvis"}
+                return {"tool": "trading.scan_watchlist", "server": "trading"}
+            elif "trades" in text or "orders" in text:
+                return {"tool": "trading.get_orders", "server": "trading"}
             else:
-                return {"tool": "trading.portfolio.get_overview", "server": "jarvis"}
+                symbols = self._extract_ticker_symbols(source)
+                if symbols:
+                    return {
+                        "tool": "trading.get_quote",
+                        "server": "trading",
+                        "arguments": {"symbol": symbols[0]},
+                    }
+                return {"tool": "trading.get_portfolio", "server": "trading"}
         
         elif intent_type == IntentType.MUSIC:
             if "play" in text:
