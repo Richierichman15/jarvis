@@ -27,6 +27,8 @@ from fastapi import FastAPI, HTTPException, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+import httpx
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from client.storage import load_servers as load_saved_servers, save_servers
@@ -215,8 +217,76 @@ def _normalize_mcp_result(result: Any) -> str:
     return dumped[:5000]
 
 
+class _HttpTool:
+  """Minimal tool descriptor compatible with list_tools_cached consumers."""
+
+  def __init__(self, name: str, description: str, input_schema: Dict[str, Any]) -> None:
+    self.name = name
+    self.description = description
+    self.inputSchema = input_schema
+
+
+class _HttpCallResult:
+  """MCP-shaped tool result built from an HTTP MCP /run-tool response."""
+
+  def __init__(self, text: str) -> None:
+    self.content = [type("Content", (), {"text": text})()]
+
+
+class _HttpMcpClient:
+  """Proxy for remote MCP servers that expose GET /tools and POST /run-tool."""
+
+  def __init__(self, base_url: str) -> None:
+    self.base_url = base_url.rstrip("/")
+
+  async def connect(self) -> None:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+      resp = await client.get(f"{self.base_url}/health")
+      resp.raise_for_status()
+
+  async def list_tools(self) -> List[_HttpTool]:
+    async with httpx.AsyncClient(timeout=15.0) as client:
+      resp = await client.get(f"{self.base_url}/tools")
+      resp.raise_for_status()
+      data = resp.json()
+    tools: List[_HttpTool] = []
+    for item in data if isinstance(data, list) else []:
+      if not isinstance(item, dict):
+        continue
+      name = str(item.get("name") or "")
+      if not name:
+        continue
+      schema = item.get("inputSchema") or item.get("parameters") or {}
+      tools.append(
+        _HttpTool(
+          name=name,
+          description=str(item.get("description") or ""),
+          input_schema=schema if isinstance(schema, dict) else {},
+        )
+      )
+    return tools
+
+  async def call_tool(self, tool: str, args: Dict[str, Any]) -> _HttpCallResult:
+    async with httpx.AsyncClient(timeout=60.0) as client:
+      resp = await client.post(
+        f"{self.base_url}/run-tool",
+        json={"tool": tool, "parameters": args or {}},
+      )
+      resp.raise_for_status()
+      payload = resp.json()
+    if isinstance(payload, dict) and payload.get("success") is False:
+      error = payload.get("error") or "tool call failed"
+      code = payload.get("code")
+      raise RuntimeError(f"{error}" + (f" ({code})" if code else ""))
+    text = json.dumps(payload, ensure_ascii=False, indent=2) if isinstance(payload, dict) else str(payload)
+    return _HttpCallResult(text)
+
+
 def _server_entry_usable(entry: Dict[str, Any]) -> bool:
     """Return False when a saved MCP server points at missing binaries/paths."""
+    base_url = entry.get("base_url")
+    if base_url:
+        return bool(str(base_url).strip())
     command = entry.get("command")
     if not command:
         return False
@@ -240,10 +310,20 @@ class SessionManager:
         self.default_params = default_params
         self.saved_servers = saved_servers or {}
         self.sessions: Dict[str, ClientSession] = {}
+        self.http_clients: Dict[str, _HttpMcpClient] = {}
         self.tasks: Dict[str, asyncio.Task] = {}
         self.tools_cache: Dict[str, Dict[str, Any]] = {}
         self.runtime_params: Dict[str, Dict[str, Any]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
+
+    def _http_base_url(self, alias: str) -> Optional[str]:
+        entry = self.saved_servers.get(alias) or {}
+        runtime = self.runtime_params.get(alias) or {}
+        base_url = runtime.get("base_url") or entry.get("base_url")
+        return str(base_url).strip() if base_url else None
+
+    def _is_http_alias(self, alias: str) -> bool:
+        return bool(self._http_base_url(alias))
 
     async def start(self) -> None:
         await self.ensure_session(self.default_alias, force_default=True)
@@ -253,10 +333,13 @@ class SessionManager:
             if alias == self.default_alias:
                 continue
             if not isinstance(entry, dict) or not _server_entry_usable(entry):
-                logger.warning("Skipping saved server '%s': command or script path not found on this machine", alias)
+                logger.warning("Skipping saved server '%s': entry is missing or invalid on this machine", alias)
                 continue
             try:
-                await self.ensure_session(alias)
+                if entry.get("base_url"):
+                    await self._connect_http(alias)
+                else:
+                    await self.ensure_session(alias)
                 logger.info("✅ Connected server '%s'", alias)
             except Exception as exc:
                 logger.warning("❌ Failed to auto-connect server '%s': %s", alias, exc)
@@ -271,12 +354,13 @@ class SessionManager:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self.sessions.clear()
+        self.http_clients.clear()
         self.tasks.clear()
         self.tools_cache.clear()
         self.runtime_params.clear()
 
     def list_aliases(self) -> List[str]:
-        aliases = list(self.sessions.keys())
+        aliases = list(self.sessions.keys()) + list(self.http_clients.keys())
         if self.default_alias not in aliases:
             aliases.insert(0, self.default_alias)
         return sorted(set(aliases), key=lambda a: (0 if a == self.default_alias else 1, a))
@@ -284,15 +368,33 @@ class SessionManager:
     async def ensure_session(self, alias: str, force_default: bool = False) -> ClientSession:
         if alias in self.sessions:
             return self.sessions[alias]
+        if alias in self.http_clients:
+            raise RuntimeError(f"HTTP server '{alias}' does not expose a stdio session")
         lock = self._locks.setdefault(alias, asyncio.Lock())
         async with lock:
             if alias in self.sessions:
                 return self.sessions[alias]
+            if self._is_http_alias(alias):
+                await self._connect_http(alias)
+                raise RuntimeError(f"HTTP server '{alias}' connected (no stdio session)")
             params = self._resolve_params(alias, force_default)
             await self._spawn_and_hold(alias, params)
             if alias not in self.sessions:
                 raise RuntimeError(f"Failed to start session '{alias}'")
             return self.sessions[alias]
+
+    async def _connect_http(self, alias: str) -> _HttpMcpClient:
+        if alias in self.http_clients:
+            return self.http_clients[alias]
+        base_url = self._http_base_url(alias)
+        if not base_url:
+            raise RuntimeError(f"Saved server '{alias}' missing base_url")
+        client = _HttpMcpClient(base_url)
+        await client.connect()
+        self.http_clients[alias] = client
+        self.tools_cache.pop(alias, None)
+        self.runtime_params[alias] = {"base_url": base_url}
+        return client
 
     def _resolve_params(self, alias: str, force_default: bool = False) -> StdioServerParameters:
         if alias == self.default_alias or force_default:
@@ -369,7 +471,20 @@ class SessionManager:
     async def get_session(self, alias: str) -> ClientSession:
         return await self.ensure_session(alias)
 
+    async def _ensure_connected(self, alias: str, *, force_default: bool = False) -> None:
+        if alias in self.sessions or alias in self.http_clients:
+            return
+        if self._is_http_alias(alias):
+            await self._connect_http(alias)
+            return
+        await self.ensure_session(alias, force_default=force_default)
+
     async def call_tool(self, alias: str, tool: str, args: Dict[str, Any]) -> Any:
+        if self._is_http_alias(alias) or alias in self.http_clients:
+            client = self.http_clients.get(alias)
+            if client is None:
+                client = await self._connect_http(alias)
+            return await client.call_tool(tool, args or {})
         # Try up to 2 times (original + 1 retry on session closed)
         for attempt in range(2):
             try:
@@ -390,24 +505,29 @@ class SessionManager:
                 raise
 
     async def list_tools_cached(self, alias: str) -> List[Any]:
-        await self.ensure_session(alias)
+        await self._ensure_connected(alias)
         cache = self.tools_cache.setdefault(alias, {"data": None, "expires": 0.0})
         now = time.time()
         if cache["data"] is None or now >= cache["expires"]:
-            response = await self.sessions[alias].list_tools()
-            cache["data"] = response.tools
+            if alias in self.http_clients:
+                cache["data"] = await self.http_clients[alias].list_tools()
+            else:
+                response = await self.sessions[alias].list_tools()
+                cache["data"] = response.tools
             cache["expires"] = now + 60.0
         return cache["data"]
 
     def get_server_entry(self, alias: str) -> Dict[str, Any]:
         saved_entry = self.saved_servers.get(alias, {})
         runtime_entry = self.runtime_params.get(alias, {})
-        connected = alias in self.sessions
+        connected = alias in self.sessions or alias in self.http_clients
         entry: Dict[str, Any] = {
             "alias": alias,
             "connected": connected,
             "default": alias == self.default_alias,
             "saved": alias in self.saved_servers,
+            "transport": "http" if alias in self.http_clients or self._is_http_alias(alias) else "stdio",
+            "base_url": runtime_entry.get("base_url") or saved_entry.get("base_url"),
             "command": runtime_entry.get("command") or saved_entry.get("command"),
             "args": runtime_entry.get("args") or saved_entry.get("args") or [],
             "cwd": runtime_entry.get("cwd") or saved_entry.get("cwd"),
@@ -417,15 +537,21 @@ class SessionManager:
         return entry
 
     def list_servers(self) -> List[Dict[str, Any]]:
-        known_aliases = set(self.sessions.keys()) | set(self.saved_servers.keys()) | {self.default_alias}
+        known_aliases = (
+            set(self.sessions.keys())
+            | set(self.http_clients.keys())
+            | set(self.saved_servers.keys())
+            | {self.default_alias}
+        )
         return [self.get_server_entry(alias) for alias in sorted(known_aliases)]
 
     async def connect_server(
         self,
         alias: str,
-        command: str,
+        command: Optional[str] = None,
         args: Optional[List[str]] = None,
         *,
+        base_url: Optional[str] = None,
         save: bool = True,
         cwd: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
@@ -437,10 +563,22 @@ class SessionManager:
             raise RuntimeError("Use the default session without reconnecting it explicitly")
         if alias in self.tasks and alias in self.sessions and not self.tasks[alias].done():
             raise RuntimeError(f"Server alias '{alias}' already connected")
+        if alias in self.http_clients:
+            raise RuntimeError(f"Server alias '{alias}' already connected")
 
-        command = command.strip()
+        http_url = (base_url or "").strip()
+        if http_url:
+            if save:
+                self.saved_servers[alias] = {"base_url": http_url}
+                save_servers(self.saved_servers)
+            else:
+                self.runtime_params[alias] = {"base_url": http_url}
+            await self._connect_http(alias)
+            return self.get_server_entry(alias)
+
+        command = (command or "").strip()
         if not command:
-            raise RuntimeError("Command is required")
+            raise RuntimeError("Command or base_url is required")
 
         arg_list = list(args or [])
         params = StdioServerParameters(command=command, args=arg_list, cwd=cwd, env=env)
@@ -474,6 +612,7 @@ class SessionManager:
                 await task
 
         self.sessions.pop(alias, None)
+        self.http_clients.pop(alias, None)
         self.tasks.pop(alias, None)
         self.tools_cache.pop(alias, None)
         self.runtime_params.pop(alias, None)
@@ -494,8 +633,9 @@ class RunToolRequest(BaseModel):
 
 class ConnectServerRequest(BaseModel):
     alias: str
-    command: str
+    command: Optional[str] = None
     args: List[str] = Field(default_factory=list)
+    base_url: Optional[str] = None
     save: bool = True
     cwd: Optional[str] = None
     env: Optional[Dict[str, str]] = None
@@ -553,6 +693,7 @@ def create_app() -> FastAPI:
                 req.alias,
                 req.command,
                 req.args,
+                base_url=req.base_url,
                 save=req.save,
                 cwd=req.cwd,
                 env=req.env,
